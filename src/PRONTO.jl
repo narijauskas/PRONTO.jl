@@ -1,5 +1,5 @@
 module PRONTO
 
-greet() = print("Hello World!")
+greet() = println("Hello World!")
 
 end # module
