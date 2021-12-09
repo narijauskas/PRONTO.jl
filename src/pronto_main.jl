@@ -24,6 +24,10 @@ function armijo_step(ξ, ζ, g, Dh, (α, β)=(.7,.4))
     γ = 0
 end
 
+function stepsize(ξ)
+    # is q pos def?
+end
+
 function pronto()
     # linearize
     A = Jx(f, ξeqb.x, ξeqb.u)

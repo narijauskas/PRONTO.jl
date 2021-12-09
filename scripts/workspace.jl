@@ -12,12 +12,6 @@ g = 9.81
 
 # ---------------- pendulum jacobian ---------------- #
 
-function pendulum!(dx, x, u)
-    dx[1] = x[2]
-    dx[2] = (1/(m*l^2))*(u[1] - m*g*l*sin(x[1]))
-    return dx
-end
-
 
 
 function pendulum(x, u)
@@ -147,14 +141,21 @@ yeet = t->reshape(yop(t), 2, 2)
 # ---------------- non-mutating jacobian/hessian ---------------- #
 
 
+function pendulum!(dx, x, p, t)
+    dx[1] = x[2]
+    dx[2] = (1/(m*l^2))*(u[1] - m*g*l*sin(x[1]))
+    return dx
+end
+
+
 pendulum(x, u) = [
     x[2],
-    (1/(m*l^2))*(u[1] - m*g*l*sin(x[1]))
+    (1/(m*l^2))*(u[1] - 2*m*g*l*sin(x[1]))
 ]
 
 
 U = t->[cos(t)]
-X = t->[π/2, 0]
+X = t->[sin(t), 0]
 
 Jx(f, X, U) = t->jacobian(x->f(x, U(t)), X(t))
 Ju(f, X, U) = t->jacobian(u->f(X(t), u), U(t))
