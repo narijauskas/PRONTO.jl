@@ -1,4 +1,4 @@
-# assume Q, R, x(t), xd(t), u(t), ud(t), f, Kᵣ
+# assume A,B, Q, R, x(t), xd(t), u(t), ud(t), f, Kᵣ
 
 # calculate a,b
 
@@ -21,10 +21,8 @@ function backstep!((Ṗ,ṙ), (P,r), p, t)
     (a,b,R₀,S₀,Q₀,A,B) = p
 
     K₀ = inv(R₀(t))*(S₀(t)' + B(t)'P)
-    Ṗ = -A(t)'P - P*A(t) + K₀'R₀(t)K₀ + Q₀
-    ṙ = -(A(t)-B(t)K₀)'r - a(t) + K₀*b(t)
-
-    dx = 
+    Ṗ .= -A(t)'P - P*A(t) + K₀'R₀(t)K₀ + Q₀
+    ṙ .= -(A(t)-B(t)K₀)'r - a(t) + K₀*b(t)
 end
 
 P,r = solve(ODEProblem(backstep!, ))

@@ -17,9 +17,10 @@ end
 
 function armijo_step(ξ, ζ, g, Dh, (α, β)=(.7,.4))
     while γ > .01 # TODO: make min β a parameter?
-        true_cost = g(ξ + γ*ζ)
-        threshold =  α*Dh(ξ, γ*ζ) # maybe a clever way to def as α*Dh(ξ) /dot γ*ζ 
-        true_cost < threshold ? (return γ) : (γ *= β)
+        g(ξ + γ*ζ) < α*Dh(ξ, γ*ζ) ? (return γ) : (γ *= β)
+        # true_cost = g(ξ + γ*ζ)
+        # threshold =  α*Dh(ξ, γ*ζ) # maybe a clever way to def as α*Dh(ξ) /dot γ*ζ 
+        # true_cost < threshold ? (return γ) : (γ *= β)
     end
     γ = 0
 end
@@ -27,6 +28,9 @@ end
 function stepsize(ξ)
     # is q pos def?
 end
+
+fréchet() = println("je suis extra")
+#TODO: implicitly derive wrt vars and combine as anonymous f(t)
 
 function pronto()
     # linearize
