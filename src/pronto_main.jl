@@ -30,7 +30,7 @@ end
 
 function pronto()
     # linearize
-    A = Jx(f, ξeqb.x, ξeqb.u)
+    A = Jx(f, ξeqb.x, ξeqb.u) #TODO: add wrapper to J to input trajectory
     B = Ju(f, ξeqb.x, ξeqb.u)
 
     Kᵣ = optKr(A, B, Q, R)

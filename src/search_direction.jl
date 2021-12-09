@@ -47,5 +47,9 @@ function frontstep!(dx, x, p, t)
     #TODO: zn+1 and zn+2
 end
 
+function search_direction(ξ, ξd, f, Kᵣ, Q, R)
+    a = (t)->Q*(x(t)-xd(t))
+    b = (t)->R*(u(t)-ud(t))
 
-
+    
+end
