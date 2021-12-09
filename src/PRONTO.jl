@@ -1,8 +1,7 @@
 module PRONTO
 
 using OrdinaryDiffEq
-using Zygote
-
+using ForwardDiff
 
 greet() = println("Hello World!")
 

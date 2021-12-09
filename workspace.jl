@@ -1,6 +1,6 @@
 # using Zygote
 using ForwardDiff
-using ForwardDiff: jacobian
+using ForwardDiff: jacobian, jacobian!
 using LinearAlgebra
 using LinearAlgebra: I
 
@@ -12,69 +12,83 @@ g = 9.81
 
 # ---------------- pendulum jacobian ---------------- #
 
-function pendulum!(dx, x, p, t)
+function pendulum!(dx, x, u)
     dx[1] = x[2]
-    dx[2] = (1/(m*l^2))*(p[1] - m*g*l*sin(x[1]))
+    dx[2] = (1/(m*l^2))*(u[1] - m*g*l*sin(x[1]))
+    return dx
+end
+
+# for compatibility with OrdinaryDiffEq
+# ode_pendulum!(dx, x, p, t) = pendulum!(dx, x, p(t))
+
+U = t->[cos(t)]
+X = t->[π/2, 0]
+
+
+function Jx(f!, X, U)
+    # dx = similar(X(0))
+    # return t->jacobian((dx,x)->f!(dx, x, U(t)), dx, X(t))
+    return t->jacobian(similar(X(0)), X(t)) do dx, x
+        f!(dx, x, U(t))
+    end
 end
 
 
-dx = zeros(2)
-x = zeros(2)
-M = t->[sin(t)]
-X = t->[1, 0]
-
-
-Jx = t->jacobian((dx,x)->pendulum!(dx, x, M(t), t), dx, X(t))
-Jx(0.0)
-
-Jx = t->jacobian((dx,p)->pendulum!(dx, X(t), p, t), dx, M(t))
-Jx(0.0)
-
-
-
-
-
-
-# ---------------- pendulum jacobian ---------------- #
-
-#YO: assume the following form:
-# fxn!(ẋ, x, u, t)
-# where x = X(t) and u = U(t)
-
-function pendulum!(dx, x, p, t)
-    dx[1] = x[2]
-    dx[2] = (1/(m*l^2))*(p(t)[1] - m*g*l*sin(x[1]))
+function Ju(f!, X, U)
+    dx = similar(X(0))
+    return t->jacobian((dx,u)->f!(dx, X(t), u), dx, U(t))
 end
 
+A = Jx(pendulum!, X, U)
+B = Ju(pendulum!, X, U)
 
-dx = zeros(2)
-x = zeros(2)
-
-
-U = t->[sin(t)]
-X = t->[1, 0]
-
-
-Jx = t->jacobian((dx,x)->pendulum!(dx, x, M(t), t), dx, X(t))
-Jx(0.0)
-
-Ju = t->jacobian((dx,p)->pendulum!(dx, X(t), M, t), dx, M(t))
-Ju(0.0)
+A(0)
+B(0)
+# ---------------- pendulum hessian ---------------- #
 
 
+function vector_hessian(f, x)
+       n = length(x)
+       out = jacobian(x -> jacobian(f, x), x)
+    return reshape(out, n, n, n)
+end
+
+test_pendulum!(dx, x) = pendulum!(dx, x, [1])
+
+function test_pendulum(x)
+    return [x[2], (1/(m*l^2))*(1 - m*g*l*sin(x[1]))]
+end
+
+jacobian(x->jacobian(test_pendulum, x), [π/2, 0])
+
+
+jacobian((ddx,x) -> jacobian!(ddx, test_pendulum!, zeros(2), x), zeros(2, 2), [π/2, 0])
+
+# jacobian(v->jacobian(f!, ), X(t))
 
 
 
 
+function Hxx(f!, X, U)
+    hess = t->jacobian(X(t)) do xx
+        jacobian(xx) do x
+            f!(similar(x), x, U(t))
+        end
+    end
+    n = length(X(0))
+    return t->permutedims(reshape(hess(t), n, n, n), (2,3,1))
+end
+
+yeet = Hxx(pendulum!, X, U)
+yeet(0)
+
+# jacobian(x -> jacobian((dx,x)->pendulum!(dx, x, U(t)), x), X(0))
 
 
+yop = t->[sin(t), cos(t), cos(t), sin(t)]
+yeet = t->reshape(yop(t), 2, 2)
 
-
-
-
-
-
-
+@btime yeet(0)
 
 # ---------------- pendulum jacobian ---------------- #
 
