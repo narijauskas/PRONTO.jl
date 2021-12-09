@@ -12,7 +12,7 @@ function project(ξ, f, Kᵣ, ḣ, T)
     prob = ODEProblem(ẋl!, (ξ.x(0), 0), (0,T), p) # IC syntax?
     x,l = solve(prob) # output syntax?
     u = project_u(ξ, x, Kᵣ)
-    return trajectory(x, u), l
+    return Trajectory(x, u), l
 end
 
 function armijo_step(ξ, ζ, g, Dh, (α, β)=(.7,.4))
