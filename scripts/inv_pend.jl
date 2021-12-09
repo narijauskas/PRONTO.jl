@@ -15,7 +15,7 @@ end
 T = 10 # final time
 
 # desired trajectory
-xd(t) = (t) -> ([0.0; 0.0])
+xd(t) = t->[0.0; 0.0]
 ud(t) = (t) -> ([0.0])
 ξd = Trajectory(xd, ud)
 
