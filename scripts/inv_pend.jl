@@ -4,11 +4,12 @@ using LinearAlgebra
 ## ------------------------------ USER INPUTS ------------------------------ ## 
  
 # define dynamics
-function f!(ẋ, x, u)
+function fxn(x, u)
     # parameters:
     l = 1; g = 9.8;
     # dynamics:
-    ẋ = [ x[2];
+    return [
+        x[2],
         (g/l)*sin(x[1]) - (u/l) * cos(x[1])]
 end
 
@@ -16,7 +17,7 @@ T = 10 # final time
 
 # desired trajectory
 xd(t) = t->[0.0; 0.0]
-ud(t) = (t) -> ([0.0])
+ud(t) = t->[0.0]
 ξd = Trajectory(xd, ud)
 
 # equilibrium trajectory
