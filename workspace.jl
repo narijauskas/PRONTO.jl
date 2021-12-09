@@ -26,17 +26,19 @@ X = t->[π/2, 0]
 
 
 function Jx(f!, X, U)
-    # dx = similar(X(0))
-    # return t->jacobian((dx,x)->f!(dx, x, U(t)), dx, X(t))
     return t->jacobian(similar(X(0)), X(t)) do dx, x
         f!(dx, x, U(t))
     end
 end
 
+# flex:
+# Jx(f!, X, U) = t->jacobian((dx, x)->f!(dx, x, U(t)), similar(X(0)), X(t))
+
 
 function Ju(f!, X, U)
-    dx = similar(X(0))
-    return t->jacobian((dx,u)->f!(dx, X(t), u), dx, U(t))
+    return t->jacobian(similar(X(0)), U(t)) do dx, u
+        f!(dx, X(t), u)
+    end
 end
 
 A = Jx(pendulum!, X, U)
@@ -47,39 +49,74 @@ B(0)
 # ---------------- pendulum hessian ---------------- #
 
 
-function vector_hessian(f, x)
-       n = length(x)
-       out = jacobian(x -> jacobian(f, x), x)
-    return reshape(out, n, n, n)
-end
+# function vector_hessian(f, x)
+#        n = length(x)
+#        out = jacobian(x -> jacobian(f, x), x)
+#     return reshape(out, n, n, n)
+# end
 
-test_pendulum!(dx, x) = pendulum!(dx, x, [1])
+# test_pendulum!(dx, x) = pendulum!(dx, x, [1])
 
-function test_pendulum(x)
-    return [x[2], (1/(m*l^2))*(1 - m*g*l*sin(x[1]))]
-end
+# function test_pendulum(x)
+#     return [x[2], (1/(m*l^2))*(1 - m*g*l*sin(x[1]))]
+# end
 
-jacobian(x->jacobian(test_pendulum, x), [π/2, 0])
+# jacobian(x->jacobian(test_pendulum, x), [π/2, 0])
 
 
-jacobian((ddx,x) -> jacobian!(ddx, test_pendulum!, zeros(2), x), zeros(2, 2), [π/2, 0])
+# jacobian((ddx,x) -> jacobian!(ddx, test_pendulum!, zeros(2), x), zeros(2, 2), [π/2, 0])
 
-# jacobian(v->jacobian(f!, ), X(t))
+# # jacobian(v->jacobian(f!, ), X(t))
 
 
 
 
 function Hxx(f!, X, U)
+    nx = length(X(0))
+    function f(x, u)
+        dx = Array{promote_type(eltype(x), eltype(u))}(undef, size(x)...)
+        f!(dx, x, u)
+    end
     hess = t->jacobian(X(t)) do xx
         jacobian(xx) do x
-            f!(similar(x), x, U(t))
+            f(x, U(t))
         end
     end
-    n = length(X(0))
-    return t->permutedims(reshape(hess(t), n, n, n), (2,3,1))
+    return t->permutedims(reshape(hess(t), nx, nx, nx), (2,3,1))
 end
 
-yeet = Hxx(pendulum!, X, U)
+
+function Huu(f!, X, U)
+    nu = length(U(0))
+    nx = length(X(0))
+    function f(x, u)
+        dx = Array{promote_type(eltype(x), eltype(u))}(undef, size(x)...)
+        f!(dx, x, u)
+    end
+    hess = t->jacobian(U(t)) do uu
+        jacobian(uu) do u
+            f(X(t),u)
+        end
+    end
+    return t->permutedims(reshape(hess(t), nx, nu, nu), (2,3,1))
+end
+
+
+function Hxu(f!, X, U)
+    nu = length(U(0))
+    nx = length(X(0))
+    function f(x, u)
+        dx = Array{promote_type(eltype(x), eltype(u))}(undef, size(x)...)
+        f!(dx, x, u)
+    end
+    hess = t->jacobian(U(t)) do u
+        jacobian(x->f(x, u), X(t))
+    end
+    return t->permutedims(reshape(hess(t), nx, nu, nx), (2,3,1))
+end
+
+
+yeet = Hxu(pendulum!, X, U)
 yeet(0)
 
 # jacobian(x -> jacobian((dx,x)->pendulum!(dx, x, U(t)), x), X(0))
