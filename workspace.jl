@@ -18,6 +18,15 @@ function pendulum!(dx, x, u)
     return dx
 end
 
+
+
+function pendulum(x, u)
+    dx = similar(x)
+    pendulum!(dx, x, u)
+end
+
+
+
 # for compatibility with OrdinaryDiffEq
 # ode_pendulum!(dx, x, p, t) = pendulum!(dx, x, p(t))
 
@@ -126,6 +135,64 @@ yop = t->[sin(t), cos(t), cos(t), sin(t)]
 yeet = t->reshape(yop(t), 2, 2)
 
 @btime yeet(0)
+
+
+
+
+
+
+
+
+
+# ---------------- non-mutating jacobian/hessian ---------------- #
+
+
+pendulum(x, u) = [
+    x[2],
+    (1/(m*l^2))*(u[1] - m*g*l*sin(x[1]))
+]
+
+
+U = t->[cos(t)]
+X = t->[π/2, 0]
+
+Jx(f, X, U) = t->jacobian(x->f(x, U(t)), X(t))
+Ju(f, X, U) = t->jacobian(u->f(X(t), u), U(t))
+
+
+function Hxx(f, X, U)
+    nx = length(X(0))
+    hess = t->jacobian(X(t)) do xx
+        jacobian(x->f(x, U(t)), xx)
+    end
+    return t->permutedims(reshape(hess(t), nx, nx, nx), (2,3,1))
+end
+
+
+function Huu(f, X, U)
+    nu = length(U(0))
+    nx = length(X(0))
+    hess = t->jacobian(U(t)) do uu
+        jacobian(u->f(X(t), u), uu)
+    end
+    return t->permutedims(reshape(hess(t), nx, nu, nu), (2,3,1))
+end
+
+
+function Hxu(f, X, U)
+    nu = length(U(0))
+    nx = length(X(0))
+    hess = t->jacobian(U(t)) do u
+        jacobian(x->f(x, u), X(t))
+    end
+    return t->permutedims(reshape(hess(t), nx, nu, nx), (2,3,1))
+end
+
+
+Hxx(pendulum, X, U)(0.0)
+Hxu(pendulum, X, U)(0.0)
+Huu(pendulum, X, U)(0.0)
+
 
 # ---------------- pendulum jacobian ---------------- #
 
