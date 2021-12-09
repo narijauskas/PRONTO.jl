@@ -2,6 +2,8 @@ module PRONTO
 
 using OrdinaryDiffEq
 using ForwardDiff
+using ForwardDiff: jacobian
+using LinearAlgebra
 
 include("trajectories.jl")
 include("cost.jl")
