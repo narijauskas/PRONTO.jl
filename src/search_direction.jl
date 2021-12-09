@@ -5,28 +5,29 @@
 a = (t)->Q*(x(t)-xd(t))
 b = (t)->R*(u(t)-ud(t))
 
-function qstep!(dx, x, p, t)
-    q = x
-    (Kᵣ,a,b) = p
-    q̇ = -(A(t)-B(t)*Kᵣ)'q - a(t) + Kᵣ*b(t)
-
-    dx = q̇
+function qstep!(q̇, q, (Kᵣ,a,b), t)
+    q̇ .= -(A(t)-B(t)*Kᵣ)'q - a(t) + Kᵣ*b(t)
 end
 
-q = solve(ODEProblem(qstep!, ))
-# calculate R₀,S₀,Q₀
+q = solve(ODEProblem(qstep!, r₁, T:Δt:0, (Kᵣ,a,b)))
 
-function backstep!(dx, x, p, t)
-    (P,r) = x
+# calculate R₀,S₀,Q₀
+Q₀ = t -> Q(t) + sum(map((qk,fk) -> qk*fk, q(t), fxx(t)))
+R₀ = t -> R(t) + sum(map((qk,fk) -> qk*fk, q(t), fuu(t)))
+S₀ = t ->        sum(map((qk,fk) -> qk*fk, q(t), fxu(t)))
+
+
+function backstep!((Ṗ,ṙ), (P,r), p, t)
     (a,b,R₀,S₀,Q₀,A,B) = p
 
     K₀ = inv(R₀(t))*(S₀(t)' + B(t)'P)
     Ṗ = -A(t)'P - P*A(t) + K₀'R₀(t)K₀ + Q₀
     ṙ = -(A(t)-B(t)K₀)'r - a(t) + K₀*b(t)
 
-    dx = (Ṗ,ṙ)
+    dx = 
 end
 
+P,r = solve(ODEProblem(backstep!, ))
 
 # afterwards
 # v₀ = ...
