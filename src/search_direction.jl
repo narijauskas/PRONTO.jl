@@ -13,6 +13,7 @@ function qstep!(dx, x, p, t)
     dx = q̇
 end
 
+q = solve(ODEProblem(qstep!, ))
 # calculate R₀,S₀,Q₀
 
 function backstep!(dx, x, p, t)
