@@ -21,8 +21,8 @@ ud(t) = t->[0.0]
 ξd = Trajectory(xd, ud)
 
 # equilibrium trajectory
-xe(t) = (t) -> ([0.0; 0.0])
-ue(t) = (t) -> ([0.0])
+xe(t) = t->[0.0; 0.0]
+ue(t) = t->[0.0]
 ξeqb = Trajectory(xe, ue)
 
 # cost parameters
