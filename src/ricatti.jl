@@ -11,5 +11,8 @@ function ricatti!(Ṗ, P, params, t)
 end
 
 
-function optKr()
+function optKr(A, B, Q, R)
+    # create optimal LQ regulator Kr that stabilizes around trajectory  
+    P = solve_ricatti(A, B, Q, R)# call riccati solver
+    return Kᵣ = inv(R)*B'*P
 end

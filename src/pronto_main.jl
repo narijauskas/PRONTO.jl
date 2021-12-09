@@ -1,10 +1,3 @@
-
-function optKr(A,B,Q,R)
-    # create optimal LQ regulator Kr that stabilizes around trajectory
-    P = solve_diff_ric(A,B,Q,R)# call riccati solver
-    Kᵣ = inv(R)*B'*P
-end
-
 function ẋl!((ẋ, l̇), (x, l), (f, ξ, Kᵣ, ḣ), t)
     u = ξ.u(t) + Kᵣ(t) * (ξ.x(t) - x)
     ẋ = f(x, u)
@@ -32,15 +25,18 @@ function armijo_step(ξ, ζ, g, Dh, (α, β)=(.7,.4))
 end
 
 function pronto()
-    A,B = linearize() 
-    Kᵣ = optKr(A,B,Q,R)
+    # linearize
+    A = Jx(f, ξeqb.x, ξeqb.u)
+    B = Ju(f, ξeqb.x, ξeqb.u)
+
+    Kᵣ = optKr(A, B, Q, R)
     ξ, l = project(ξ, f, Kᵣ, ḣ, T) # make mutating?
     while γ > 0 # if keep γ as only condition, move initialization into loop?
         ζ = search_direction()
         γ = stepsize(ξ) #TODO: move into search_direction? then can check posdef q
         ξ = ξ + γ*ζ
         ξ, l = project(ξ, f, Kᵣ, ḣ, T)
-        Kᵣ = optKr(A,B,Q,R)
+        Kᵣ = optKr(A, B, Q, R)
     end
     return ξ, Kᵣ
 end
