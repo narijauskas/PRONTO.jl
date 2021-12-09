@@ -47,8 +47,9 @@ function frontstep!(dx, x, p, t)
 end
 
 function search_direction(ξ, ξd, f, Kᵣ, Q, R)
-    a = (t)->Q*(x(t)-xd(t))
-    b = (t)->R*(u(t)-ud(t))
+    a = (t)->Q*(x(t)-xd(t)) # TODO: change to lx'
+    b = (t)->R*(u(t)-ud(t)) # TODO: change to lu'
+    q = solve(ODEProblem(qstep!, ))
 
     
 end
