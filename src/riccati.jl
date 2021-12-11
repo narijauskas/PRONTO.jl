@@ -1,8 +1,6 @@
-# user provides: Q, R, T
 
 function solve_riccati(A, B, Q, R, T)
-    #TODO: P₁ = ?
-    -A(t)'P - P*A(t) + P*B(t)*inv(R)*B(t)'P - Q
+    P₁,_ = arec(A(T), B(T)inv(R)B(T)', Q)
     solve(ODEProblem(riccati!, P₁, (T,0), (A,B,Q,R)))
 end
 

@@ -32,19 +32,20 @@ end
 fréchet() = println("je suis extra")
 #TODO: implicitly derive wrt vars and combine as anonymous f(t)
 
+# user provides: Q, R, h, f, ξeqb, ξd
 function pronto()
     # linearize
     A = Jx(f, ξeqb.x, ξeqb.u) #TODO: add wrapper to J to input trajectory
     B = Ju(f, ξeqb.x, ξeqb.u)
 
-    Kᵣ = optKr(A, B, Q, R)
-    ξ, l = project(ξ, f, Kᵣ, ḣ, T) # make mutating?
+    Kᵣ = optKr(A, B, Q, R, T)
+    ξ, l = project(ξd, f, Kᵣ, ḣ, T)
     while γ > 0 # if keep γ as only condition, move initialization into loop?
         ζ = search_direction()
         γ = stepsize(ξ) #TODO: move into search_direction? then can check posdef q
         ξ = ξ + γ*ζ
-        ξ, l = project(ξ, f, Kᵣ, ḣ, T)
-        Kᵣ = optKr(A, B, Q, R)
+        ξ, l = project(ξ, f, Kᵣ, ḣ, T) # update trajectory
+        Kᵣ = optKr(A, B, Q, R, T)
     end
     return ξ, Kᵣ
 end
