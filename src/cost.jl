@@ -35,3 +35,7 @@ function frechet(h)
     return Dh
 end
 
+begin
+    z = ζ.x; v = ζ.u; x = ξ.x; u = ξ.u
+    gradient(x->h(?), z) + gradient(u->h(?), v)
+end
