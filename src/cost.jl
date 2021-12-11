@@ -32,6 +32,10 @@ end
 
 #TODO: add generic cost functional
 # should have form: h(ξ) = build_h(ξ, p(ξ, t), T)
+# incremental cost: l(ξ, t) = build_l(ξ, p, t)
+# terminal cost: m(ξ) 
+# h = ∫ l(ξ, τ) dτ + m(ξ(T)) 
+
 # Dh(ξ, ζ)
 # ḣ(ξ, t)
 function frechet(h)
