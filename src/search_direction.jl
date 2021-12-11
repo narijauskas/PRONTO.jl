@@ -25,7 +25,7 @@ function backstep!((Ṗ,ṙ), (P,r), p, t)
     ṙ .= -(A(t)-B(t)K₀)'r - a(t) + K₀*b(t)
 end
 
-P,r = solve(ODEProblem(backstep!, ))
+P,r = solve(ODEProblem(backstep!, ?, T:Δt:0, params))
 
 # afterwards
 # v₀ = ...
