@@ -11,6 +11,10 @@ function LQ_cost(ξ, ξd, Q, R, P1, T)
     return L
 end
 
+function h(ξd, Q, R, P1, T)
+    return ξ -> LQ_cost(ξ, ξd, Q, R, P1, T)
+end
+
 function LQ_cost_dt(ξ, ξd, Q, R, t)
     # add time derivative of LQ_cost
     err = ξ - ξd
@@ -27,7 +31,7 @@ function DLQ_cost(ζ, ξ, ξd, Q, R, P1, T)
 end
 
 #TODO: add generic cost functional
-# should have form: l(ξ) = h(ξ, p(ξ, t), T)
+# should have form: h(ξ) = build_h(ξ, p(ξ, t), T)
 # Dh(ξ, ζ)
 # ḣ(ξ, t)
 function frechet(h)
