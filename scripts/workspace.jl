@@ -1,16 +1,18 @@
 # using Zygote
 using ForwardDiff
-using ForwardDiff: jacobian, jacobian!
+using ForwardDiff: gradient, jacobian, derivative
 using LinearAlgebra
 using LinearAlgebra: I
+using QuadGK
 
 
+f = g->quadgk(g, 0, π)[1]
 
+f(sin)
 
+fg = t->derivative(f, sin(t)) # where f(x)
 
-
-
-
+fg(1)
 
 
 
