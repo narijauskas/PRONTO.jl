@@ -2,8 +2,8 @@
 
 # calculate a,b
 
-a = (t)->Q*(x(t)-xd(t))
-b = (t)->R*(u(t)-ud(t))
+a = (t)->Q*(x(t)-xd(t)) #TODO: l_x'
+b = (t)->R*(u(t)-ud(t)) #TODO: l_u'
 
 function qstep!(q̇, q, (Kᵣ,a,b), t)
     q̇ .= -(A(t)-B(t)*Kᵣ)'q - a(t) + Kᵣ*b(t)
@@ -45,10 +45,10 @@ function frontstep!(dx, x, p, t)
     #TODO: zn+1 and zn+2
 end
 
-function search_direction(ξ, ξd, f, Kᵣ, Q, R)
-    a = (t)->Q*(x(t)-xd(t)) # TODO: change to lx'
-    b = (t)->R*(u(t)-ud(t)) # TODO: change to lu'
-    q = solve(ODEProblem(qstep!, ))
+# function search_direction(ξ, ξd, f, Kᵣ, Q, R)
+#     a = (t)->Q*(x(t)-xd(t)) # TODO: change to lx'
+#     b = (t)->R*(u(t)-ud(t)) # TODO: change to lu'
+#     q = solve(ODEProblem(qstep!, ))
 
     
-end
+# end
