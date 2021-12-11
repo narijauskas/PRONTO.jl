@@ -26,3 +26,12 @@ function DLQ_cost(ζ, ξ, ξd, Q, R, P1, T)
     return L
 end
 
+#TODO: add generic cost functional
+# should have form: l(ξ) = h(ξ, p(ξ, t), T)
+# Dh(ξ, ζ)
+# ḣ(ξ, t)
+function frechet(h)
+    # (ξ, ζ) -> 
+    return Dh
+end
+
