@@ -13,7 +13,7 @@ export Jx, Ju
 export Hxx, Hxu, Huu
 
 include("cost.jl")
-include("pronto_main.jl")
 include("riccati.jl")
+include("pronto_main.jl")
 
 end # module
