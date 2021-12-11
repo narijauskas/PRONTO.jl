@@ -6,6 +6,25 @@ using LinearAlgebra: I
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 m = 1
 l = 1
 g = 9.81
