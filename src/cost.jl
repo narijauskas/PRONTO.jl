@@ -34,45 +34,48 @@ end
  
 # should have form: 
 # incremental cost: l(ξ, t) = build_l(ξ, p, t)
-# terminal cost: m(ξ) 
+# or instead l(x, u, t) = build_l(p, t) where x(t), u(t) evaluated externally
+# terminal cost: m(ξ(T)) 
 # h = ∫ l(ξ, τ) dτ + m(ξ(T)) 
 
-function loss_grads1(l, m)
-    lx(l, ξ) = gradient(ξ.x -> l(ξ), ξ.x) # return fn lx(ξ)
-    lu(l, ξ) = gradient(ξ.u -> l(ξ), ξ.u)
-    a(ξ) = lx(l, ξ)' # return lx(ξ)'
-    b(ξ) = lu(l, ξ)'
+# l(x, u, t) = l(Trajectory(x,u), t)
 
-    ḣ(ξ, t) = l(ξ, t)
-    mx(m, ξ) = gradient(ξ.x -> m(ξ), ξ.x)' # dimensionality?
-    r1(ξ) = mx(m, ξ)'
-    return a, b, ḣ, r1
+function loss_grads1(l, m, ξ, T)
+    lx = t -> gradient(x -> l(x, ξ.u(t), t), ξ.x(t)) # return fn lx(t)
+    lu = t -> gradient(u -> l(ξ.x(t), u, t), ξ.u(t)) # return fn lu(t)
+    a = t -> lx(t)' # return lx(ξ)'
+    b = t -> lu(t)'
+
+    ḣ = l # time derivative of full cost fn is just l
+    mx = gradient(x(T) -> m(x(T), u(T)), ξ.x(T))' # constant for given ξ
+    r1 = mx'
+    return a, b, ḣ, r1 # functions of time
 end
 
-function loss_grads2(a, b, r1)
-    lxx(a) = ξ -> gradient(ξ.x -> a(ξ)', ξ.x) # uh oh fns of time
-    lxu(a) = ξ -> gradient(ξ.u -> a(ξ)', ξ.u)
-    luu(b) = ξ -> gradient(ξ.u -> b(ξ)', ξ.u) 
-    mxx(r1, ξ) = gradient(ξ.x -> r1(ξ), ξ.x)'
-    P1(ξ) = mxx(r1, ξ) #TODO: Check pos def?
-    return lxx(a), lxu(a), luu(b), P1
+function loss_grads2(l, m, ξ, T)
+    lxx = t -> hessian(x -> l(x, ξ.u(t), t), ξ.x(t)) # return fn lxx(t)
+    luu = t -> hessian(u -> l(ξ.x(t), u, t), ξ.u(t)) # return fn lxx(t)
+    lxu = t -> jacobian(u ->  gradient(x -> l(x, u(t), t), ξ.x(t)), ξ.u(t)) # ??? # return fn lxu(t)
+    mxx = hessian(x -> m(x), ξ.x(T))'
+    P1 = mxx #TODO: Check pos def?
+    return lxx, lxu, luu, P1
 end
 
-build_h(l, m, ξ, T) = quadgk(l(ξ), 0, T) + m(ξ(T)) # return h(ξ)
+build_h(l, m, ξ, T) = quadgk(t -> l(ξ.x(t), ξ.u(t), t), 0, T) + m(ξ(T)) # return h(ξ)
 
-function tot_grads(a, b, Q₀, R₀, S₀)
-    Dh(ξ, ζ) = a(ξ.x)' * ζ.x + b(ξ.u)' * ζ.u
-    D2g(ζ) = wnorm(ζ.x, Q₀) + 2ζ.z'*S₀*ζ.x + wnorm(ζ.x, R₀)
+function tot_grads(ζ, a, b, Q₀, R₀, S₀)
+    Dh = t -> a(t)' * ζ.x(t) + b(t)' * ζ.u(t)
+    D2g = t -> wnorm(ζ.x(t), Q₀(t)) + 2ζ.z(t)'*S₀(t)*ζ.x(t) + wnorm(ζ.x(t), R₀(t))
     return Dh, D2g
 end
 
-function set_up_cost(l, m)
-    # example of how to get all cost quantities
-    a, b, ḣ, r1 = loss_grads1(l, m)
-    lxx, lxu, luu, P1 = loss_grads2(a, b, r1)
-    h(ξ, T) =  build_h(l, m, ξ, T)
-    Dh, D2g = tot_grads(a, b, Q₀, R₀, S₀)
-end
+# example of how to get all cost quantities
+loss_grads1_ml = (ξ, T) -> loss_grads1(l, m, ξ, T) # for l, m in scope, constant
+loss_grads2_ml = (ξ, T) -> loss_grads2(l, m, ξ, T) # for l, m in scope, constant
+a, b, ḣ, r1 = loss_grads1_ml(l, m)
+lxx, lxu, luu, P1 = loss_grads2ml(l, m, ξ, T)
+h(ξ, T) =  build_h(l, m, ξ, T)
+Dh, D2g = tot_grads(ζ, a, b, Q₀, R₀, S₀)
 
 begin
     z = ζ.x; v = ζ.u; x = ξ.x; u = ξ.u

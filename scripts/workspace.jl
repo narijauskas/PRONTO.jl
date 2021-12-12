@@ -4,7 +4,8 @@ using ForwardDiff: gradient, jacobian, derivative
 using LinearAlgebra
 using LinearAlgebra: I
 using QuadGK
-
+using PRONTO
+##
 
 f = g->quadgk(g, 0, π)[1]
 
@@ -351,3 +352,11 @@ T0 = t0:dt:t1
 
 Φ₀ = @. tanh(T0-t1/2)*(1-tanh(T0-t1/2)^2)
 maximum(Φ₀)
+
+## cost function testing
+ξd = Trajectory(t ->  [0.0;0.0], t -> [0.0;0.0])
+Q = identity(2)
+R = identity(2)
+P1 = identity(2)
+T = 10
+l, m = build_LQ_cost(ξd, Q, R, P1, T)
