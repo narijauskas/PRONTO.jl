@@ -7,6 +7,31 @@ using QuadGK
 using PRONTO
 ##
 
+Jx(f, X, U) = jacobian(x->f(x, U), X)
+A = t->Jx(pendulum, X(t), U(t))
+
+m=g=l=1
+
+pendulum(x, u) = [
+    x[2],
+    (1/(m*l^2))*(u[1] - 2*m*g*l*sin(x[1]))
+]
+
+
+
+U = t->[cos(t)]
+X = t->[π/2, 0]
+
+
+A(1.0)
+
+
+
+
+
+
+
+
 f = g->quadgk(g, 0, π)[1]
 
 f(sin)
