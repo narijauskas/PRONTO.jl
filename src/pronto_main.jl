@@ -18,32 +18,32 @@ function project(ξ, f, Kᵣ, ḣ, T)
     return Trajectory(x, u), l
 end
 
-function armijo_backstep(ξ, ζ, g, Dh, (α, β)=(.7,.4))
-    while γ > .01 # TODO: make min β a parameter?
-        g(ξ + γ*ζ) < α*Dh(ξ, γ*ζ) ? (return γ) : (γ *= β)
-        # true_cost = g(ξ + γ*ζ)
-        # threshold =  α*Dh(ξ, γ*ζ) # maybe a clever way to def as α*Dh(ξ) /dot γ*ζ 
-        # true_cost < threshold ? (return γ) : (γ *= β)
+function armijo_backstep(ξ, ζ, f, Kᵣ, (h, ḣ, Dh), (α, β)=(.7,.4))
+    while γ >= γ^(12) # TODO: make min β a parameter?
+        # g(ξ + γ*ζ) < α*Dh(ξ, γ*ζ) ? (return γ) : (γ *= β)
+        ξi = project(ξ + γ*ζ, f, Kᵣ, ḣ, T)
+        # h = build_h(l, m, ξi, T)
+        true_cost = h(ξi)
+        threshold =  α*Dh(ζ)
+        true_cost < threshold ? (return γ) : (γ *= β)
     end
     γ = 0
 end
 
 fréchet() = println("je suis extra")
-#TODO: implicitly derive wrt vars and combine as anonymous f(t)
 
-# user provides: Q, R, (m&t), f, ξeqb, ξd
+# user provides: Q, R, (m&l), f, ξeqb, ξd
 function pronto()
     # linearize
     
-
-    #TODO: build cost functional (m,l)->h
-    #TODO: differentiate h->ḣ
+    ḣ = l
     Kᵣ = optKr(A, B, Q, R, T)
     ξ, l = project(ξd, f, Kᵣ, ḣ, T)
     while γ > 0 # if keep γ as only condition, move initialization into loop?
         #TODO: is there a better way to check for convergence?
         ζ = search_direction()
-        γ = stepsize(ξ) #TODO: move into search_direction? then can check posdef q
+        Dh = build_Dh(a, b)
+        γ = armijo_backstep(ξ, ζ, f, Kᵣ, (h, ḣ, Dh))
         ξ = ξ + γ*ζ
         Kᵣ = optKr(A, B, Q, R, T)
         ξ, lxi = project(ξ, f, Kᵣ, ḣ, T) # update trajectory
