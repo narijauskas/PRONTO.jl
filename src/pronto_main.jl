@@ -35,14 +35,14 @@ fréchet() = println("je suis extra")
 # user provides: Q, R, (m&l), f, ξeqb, ξd
 function pronto()
     # linearize
-    
+    h = ξ -> build_h(l, m, ξ, T)
     ḣ = l
     Kᵣ = optKr(A, B, Q, R, T)
     ξ, l = project(ξd, f, Kᵣ, ḣ, T)
     while γ > 0 # if keep γ as only condition, move initialization into loop?
         #TODO: is there a better way to check for convergence?
         ζ = search_direction()
-        Dh = build_Dh(a, b)
+        Dh = build_Dh(a, b, r1) # returns Dh(ζ)
         γ = armijo_backstep(ξ, ζ, f, Kᵣ, (h, ḣ, Dh))
         ξ = ξ + γ*ζ
         Kᵣ = optKr(A, B, Q, R, T)
