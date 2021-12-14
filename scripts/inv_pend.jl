@@ -25,14 +25,17 @@ xe(t) = t->[0.0; 0.0]
 ue(t) = t->[0.0]
 ξeqb = Trajectory(xe, ue)
 
-# cost parameters
-Qc = I(2)
-Rc = I(1)
-# m(t) 
-
 # regulator parameters
 Qr = I(2)
 Rr = I(1)
+
+# cost parameters
+Qc = I(2)
+Rc = I(1)
+
+# cost functional
+l, m = build_LQ_cost(ξd, Qc, Rc, P1, T)
+
 
 ## ------------------------------ DO PRONTO STUFF ------------------------------ ## 
 
