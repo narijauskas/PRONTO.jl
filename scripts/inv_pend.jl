@@ -24,8 +24,8 @@ end
 
 T = 10 # final time
 
-A = Jx(f, ξ)
-B = Ju(f, ξ)
+A = Jx(f, ξd)
+B = Ju(f, ξd)
 
 # create cost functional
 P₁,_ = arec(A(T), B(T)inv(Rᵣ)B(T)', Qc) # solve algebraic riccati eq at time T
