@@ -3,7 +3,17 @@ using LinearAlgebra
 using GLMakie
 
 ## ------------------------------ USER INPUTS ------------------------------ ## 
- 
+# desired trajectory
+
+
+# regulator parameters
+Qr = I(2)
+Rr = I(1)
+
+# cost parameters
+Qc = I(2)
+Rc = I(1)
+
 # define dynamics
 function fxn(x, u)
     # parameters:
@@ -14,9 +24,15 @@ end
 
 T = 10 # final time
 
-A = Jx(f, ξ)
-B = Ju(f, ξ)
-P₁,_ = arec(A(T), B(T)inv(Rᵣ)B(T)', Qᵣ) # solve algebraic riccati eq at time T
+A = Jx(f, ξd)
+B = Ju(f, ξd)
+
+# create cost functional
+P₁,_ = arec(A(T), B(T)inv(Rᵣ)B(T)', Qc) # solve algebraic riccati eq at time T
+l, m = build_LQ_cost(ξd, Qc, Rc, P₁, T) # cost functional
+
+
+Pr₁,_ = arec(A(T), B(T)inv(Rr)B(T)', Qr) # solve algebraic riccati eq at time T
 
 
 # ---------------- from newt_invpend ---------------- #
@@ -38,25 +54,6 @@ GG = 9.81;  LL = 0.5;
 u = t -> (GG*sin(ϕ(t)) - LL*ddϕ(t))/cos(ϕ(t))
 # u = t -> 0.0
 
-
-# desired trajectory
-xd(t) = t->[0.0; 0.0]
-ud(t) = t->[0.0]
-ξd = Trajectory(xd, ud)
-
-# equilibrium trajectory
-xe(t) = t->[0.0; 0.0]
-ue(t) = t->[0.0]
-ξeqb = Trajectory(xe, ue)
-
-# cost parameters
-Qc = I(2)
-Rc = I(1)
-# m(t) 
-
-# regulator parameters
-Qr = I(2)
-Rr = I(1)
 
 ## ------------------------------ DO PRONTO STUFF ------------------------------ ## 
 
