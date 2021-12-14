@@ -38,7 +38,7 @@ function pronto(ξd, Q, R, (m, l), f)
     h = ξ -> build_h(l, m, ξ, T)
     ḣ = l
     Kᵣ = optKr(f, ξ, Q, R, P₁, T)
-    ξ, l = project(ξd, f, Kᵣ, ḣ, T)
+    ξ = project(ξd, f, Kᵣ, T)
     while γ > 0 # if keep γ as only condition, move initialization into loop?
         #TODO: is there a better way to check for convergence?
         ζ = search_direction()
@@ -47,7 +47,7 @@ function pronto(ξd, Q, R, (m, l), f)
         γ = armijo_backstep(ξ, ζ, f, Kᵣ, (h, ḣ, Dh))
         ξ = ξ + γ*ζ
         Kᵣ = optKr(f, ξ, Q, R, P₁, T)
-        ξ, lxi = project(ξ, f, Kᵣ, ḣ, T) # update trajectory
+        ξ = project(ξ, f, Kᵣ, T) # update trajectory
         #MAYBE: print cost of that step (lxi)
     end
     return ξ, Kᵣ

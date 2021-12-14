@@ -2,7 +2,7 @@ module PRONTO
 
 using OrdinaryDiffEq
 using ForwardDiff
-using ForwardDiff: jacobian
+using ForwardDiff: jacobian, gradient, hessian
 using LinearAlgebra
 using MatrixEquations
 

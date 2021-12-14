@@ -40,15 +40,15 @@ end
 # l(x, u, t) = l(Trajectory(x,u), t)
 
 function loss_grads1(l, m, ξ, T)
-    lx = t -> gradient(x -> l(x, ξ.u(t), t), ξ.x(t)) # return fn lx(t)
-    lu = t -> gradient(u -> l(ξ.x(t), u, t), ξ.u(t)) # return fn lu(t)
+    lx = t -> gradient(x -> l(x, ξ.u, t), ξ.x(t)) # time evaled internally# return fn lx(t)
+    lu = t -> gradient(u -> l(ξ.x, u, t), ξ.u(t)) # return fn lu(t)
     a = t -> lx(t)' # return lx(ξ)'
     b = t -> lu(t)'
 
-    ḣ = l # time derivative of full cost fn is just l
-    mx = gradient(x -> m(x, u(T)), ξ.x(T))' # constant for given ξ
+    # ḣ = l # time derivative of full cost fn is just l
+    mx = gradient(x -> m(x), ξ.x(T))' # constant for given ξ
     r1 = mx'
-    return a, b, ḣ, r1 # functions of time
+    return a, b, r1 # functions of time
 end
 
 function loss_grads2(l, m, ξ, T)
