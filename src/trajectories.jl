@@ -4,12 +4,16 @@ export Trajectory
 mutable struct Trajectory
     x :: Function
     u :: Function
+    Trajectory(x::Function, u::Function) = new(x,u)
 end
 
-Trajectory(sol1, sol2) = Trajectory(
-    (t) -> sol1(t),
-    (t) -> sol2(t)
-)
+Trajectory(x::Function, u) = Trajectory(x, t->u(t))
+Trajectory(x, u::Function) = Trajectory(t->x(t), u)
+Trajectory(x, u) = Trajectory(t->x(t), t->u(t))
+# Trajectory(sol1, sol2) = Trajectory(
+#     (t) -> sol1(t),
+#     (t) -> sol2(t)
+# )
 
 # Operators on two trajectories
 (+)(ξ1::Trajectory, ξ2::Trajectory) = Trajectory(
