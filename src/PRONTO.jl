@@ -1,10 +1,11 @@
 module PRONTO
+# __precompile__(false)
 
-using OrdinaryDiffEq
 using ForwardDiff
 using ForwardDiff: jacobian, gradient, hessian
 using LinearAlgebra
 using MatrixEquations
+using DifferentialEquations
 
 include("trajectories.jl")
 export Trajectory
@@ -15,9 +16,12 @@ export Hxx, Hxu, Huu
 
 include("cost.jl")
 export build_LQ_cost
-include("riccati.jl")
-export optKr
+
+
 include("pronto_main.jl")
+export optKr
 export project, pronto
+
+include("search_direction.jl")
 
 end # module

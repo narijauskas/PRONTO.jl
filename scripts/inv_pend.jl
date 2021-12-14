@@ -52,23 +52,19 @@ function ipend(x, u)
     [x[2], (g/l)*sin(x[1]) - (u[1]/l) * cos(x[1])]
 end
 
-
-
 # linearize around desired trajectory
 A = Jx(ipend, ξd)
 B = Ju(ipend, ξd)
 
-
-# create cost functional
+# create cost functional around linearized ξd
 P₁,_ = arec(A(T), B(T)inv(Rc)B(T)', Qc) # solve algebraic riccati eq at time T
 lc, mc = build_LQ_cost(ξd, Qc, Rc, P₁, T) # cost functional
 
 # for LQR
 Pr₁,_ = arec(A(T), B(T)inv(Rr)B(T)', Qr) # solve algebraic riccati eq at time T
 
-
 Kr = optKr(ipend, ξd, Qr, Rr, Pr₁, T)
-Kr = LinearInterpolation(T0, [Kr(t) for t in T0])
+# Kr = LinearInterpolation(T0, [Kr(t) for t in T0])
 
 ##
 ξ = project(ξd, ipend, Kr, T)

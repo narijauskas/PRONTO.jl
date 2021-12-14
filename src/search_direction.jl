@@ -46,14 +46,13 @@ function search_direction(ξ, ξd, Qc, Rc, P₁)
         # S₀ = t -> lxu(t)
         Q₀ = t -> Qc
         R₀ = t -> Rc
-        S₀ = t -> zeros() #TODO: get correct dims
+        S₀ = t -> zeros(size(Qc,1),size(Rc,2))
     end
 
-        
-    P₁,_ = arec(A(T), B(T), R₀(T), Q₀(T), S₀(T))
-    r₁ = P₁*(x(T)-xd(T))
-
-    P,r = solve(ODEProblem(backstep!, (P₁,r₁), (T,0), (Kᵣ,a,b)))
+    # do we want to recalculate P1 on each loop?
+    # P₁,_ = arec(A(T), B(T), R₀(T), Q₀(T), S₀(T))
+    # reuse r₁
+    P,r = solve(ODEProblem(backstep!, (P₁,r₁), (T,0), (a,b,R₀,S₀,Q₀,A,B)))
 
     K₀ = t -> inv(R₀(t))(S₀(t)' + B(t)'P(t)) # P is a function of time
     v₀ = t -> -inv(R₀(t))(B(t)'r(t) + b(t))
@@ -67,11 +66,10 @@ function search_direction(ξ, ξd, Qc, Rc, P₁)
     return Trajectory(z, v)
 end
 
+
 function qstep!(q̇, q, (Kᵣ,a,b), t)
     q̇ .= -(A(t) - B(t)*Kᵣ(t))'q - a(t) + Kᵣ(t)'*b(t)
 end
-
-# Dh, D2g = tot_grads(a, b, Q₀, R₀, S₀)
 
 function backstep!((Ṗ,ṙ), (P,r), p, t)
     (a,b,R₀,S₀,Q₀,A,B) = p
@@ -81,18 +79,11 @@ function backstep!((Ṗ,ṙ), (P,r), p, t)
     ṙ .= -(A(t)-B(t)K₀)'r - a(t) + K₀*b(t)
 end
 
-
 function frontstep!(ż, z, (A,B,K₀,v₀), t)
     v = -K₀(t)z + v₀(t)
     ż .= A(t)z + B(t)v
 end
 
 
-#TODO: if Q₀, R₀, S₀ pos def, γ=1, else armijo step size
+# Dh, D2g = tot_grads(a, b, Q₀, R₀, S₀)
 
-# function search_direction(ξ, ξd, f, Kᵣ, Q, R)
-
-#     q = solve(ODEProblem(qstep!, ))
-
-    
-# end
