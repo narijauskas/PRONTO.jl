@@ -4,14 +4,7 @@ using GLMakie
 
 ## ------------------------------ USER INPUTS ------------------------------ ## 
 # desired trajectory
-xd(t) = t->[0.0; 0.0]
-ud(t) = t->[0.0]
-ξd = Trajectory(xd, ud)
 
-# equilibrium trajectory
-xe(t) = t->[0.0; 0.0]
-ue(t) = t->[0.0]
-ξeqb = Trajectory(xe, ue)
 
 # regulator parameters
 Qr = I(2)
@@ -33,9 +26,14 @@ T = 10 # final time
 
 A = Jx(f, ξ)
 B = Ju(f, ξ)
-P₁,_ = arec(A(T), B(T)inv(Rᵣ)B(T)', Qᵣ) # solve algebraic riccati eq at time T
-# cost functional
-l, m = build_LQ_cost(ξd, Qc, Rc, P₁, T)
+
+# create cost functional
+P₁,_ = arec(A(T), B(T)inv(Rᵣ)B(T)', Qc) # solve algebraic riccati eq at time T
+l, m = build_LQ_cost(ξd, Qc, Rc, P₁, T) # cost functional
+
+
+Pr₁,_ = arec(A(T), B(T)inv(Rr)B(T)', Qr) # solve algebraic riccati eq at time T
+
 
 # ---------------- from newt_invpend ---------------- #
 dt = 0.01
