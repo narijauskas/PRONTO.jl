@@ -5,9 +5,9 @@ wnorm(vec, mat) = 1/2 * vec'*mat*vec
 ## ------------------------------ typical cost functional ------------------------------ ## 
  
 function build_LQ_cost(ξd, Q, R, P1, T)
-    err = (ξ, t) -> ξ(t) - ξd(t)
-    l = (ξ, t) -> wnorm(err(ξ, t).x, Q(t)) + wnorm(err(ξ, t).u, R(t))
-    m = ξ -> wnorm(err(ξ, T).x, P1) 
+    # err = (ξ, t) -> ξ(t) - ξd(t)
+    l = (x, u, t) -> wnorm( (x-ξd.x), Q(t)) + wnorm( (u-ξd.u), R(t))
+    m = x -> wnorm( (x-ξd.x), P1) 
     return l, m
 end
 
@@ -33,10 +33,9 @@ end
 ## ------------------------------ Generic cost functions ------------------------------ ## 
  
 # should have form: 
-# incremental cost: l(ξ, t) = build_l(ξ, p, t)
-# or instead l(x, u, t) = build_l(p, t) where x(t), u(t) evaluated externally
-# terminal cost: m(ξ(T)) 
-# h = ∫ l(ξ, τ) dτ + m(ξ(T)) 
+# incremental cost: l(x, u, t) = build_l(p, t) where x(t), u(t) evaluated externally
+# terminal cost: m(x(T)) 
+# h = ∫ l(ξ, τ) dτ + m(x(T)) 
 
 # l(x, u, t) = l(Trajectory(x,u), t)
 
@@ -69,13 +68,15 @@ function tot_grads(ζ, a, b, Q₀, R₀, S₀)
     return Dh, D2g
 end
 
+build_Dh(a, b, r1) = ζ -> quadgk(t -> a(t)*ζ.x(t) + b(t)*ζ.u(t), 0, T) + r1' * ζ.x(T)
+
 # example of how to get all cost quantities
-loss_grads1_ml = (ξ, T) -> loss_grads1(l, m, ξ, T) # for l, m in scope, constant
-loss_grads2_ml = (ξ, T) -> loss_grads2(l, m, ξ, T) # for l, m in scope, constant
-a, b, ḣ, r1 = loss_grads1_ml(l, m)
-lxx, lxu, luu, P1 = loss_grads2ml(l, m, ξ, T)
-h(ξ, T) =  build_h(l, m, ξ, T)
-Dh, D2g = tot_grads(ζ, a, b, Q₀, R₀, S₀)
+# loss_grads1_ml = (ξ, T) -> loss_grads1(l, m, ξ, T) # for l, m in scope, constant
+# loss_grads2_ml = (ξ, T) -> loss_grads2(l, m, ξ, T) # for l, m in scope, constant
+# a, b, ḣ, r1 = loss_grads1_ml(l, m)
+# lxx, lxu, luu, P1 = loss_grads2ml(l, m, ξ, T)
+# h(ξ, T) =  build_h(l, m, ξ, T)
+# Dh, D2g = tot_grads(ζ, a, b, Q₀, R₀, S₀)
 
 begin
     z = ζ.x; v = ζ.u; x = ξ.x; u = ξ.u
