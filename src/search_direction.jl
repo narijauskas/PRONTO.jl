@@ -18,9 +18,14 @@ end
 q = solve(ODEProblem(qstep!, r₁, (T,0), (Kᵣ,a,b)))
 
 # calculate R₀,S₀,Q₀
-Q₀ = t -> Q(t) + sum(map((qk,fk) -> qk*fk, q(t), fxx(t)))
-R₀ = t -> R(t) + sum(map((qk,fk) -> qk*fk, q(t), fuu(t)))
-S₀ = t ->        sum(map((qk,fk) -> qk*fk, q(t), fxu(t)))
+# Q₀ = t -> Q(t) + sum(map((qk,fk) -> qk*fk, q(t), fxx(t)))
+# R₀ = t -> R(t) + sum(map((qk,fk) -> qk*fk, q(t), fuu(t)))
+# S₀ = t ->        sum(map((qk,fk) -> qk*fk, q(t), fxu(t)))
+
+Q₀ = t -> lxx(t) + sum(map((qk,fk) -> qk*fk, q(t), fxx(t)))
+R₀ = t -> luu(t) + sum(map((qk,fk) -> qk*fk, q(t), fuu(t)))
+S₀ = t -> lxu(t) + sum(map((qk,fk) -> qk*fk, q(t), fxu(t)))
+
 
 # TODO: check pos def of all of above
 # Dh, D2g = tot_grads(a, b, Q₀, R₀, S₀)

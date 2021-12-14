@@ -31,3 +31,4 @@ Trajectory(sol1, sol2) = Trajectory(
 
 (*)(ξ::Trajectory, γ::Tuple{Real, Real}) = γ*ξ
 
+#MAYBE: support single scalar multiplication
