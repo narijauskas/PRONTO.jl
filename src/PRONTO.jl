@@ -13,8 +13,11 @@ include("implicit_diff.jl")
 export Jx, Ju
 export Hxx, Hxu, Huu
 
-# include("cost.jl")
-# include("riccati.jl")
-# include("pronto_main.jl")
+include("cost.jl")
+export build_LQ_cost
+include("riccati.jl")
+export optKr
+include("pronto_main.jl")
+export project, pronto
 
 end # module

@@ -2,7 +2,7 @@ function ẋl!((ẋ, l̇), (x, l), (f, ξ, Kᵣ, ḣ), t)
     # u = μ + Kᵣ*(α - x)
     u = ξ.u(t) + Kᵣ(t) * (ξ.x(t) - x)
     ẋ .= f(x, u)
-    l̇ .= ḣ(x, u)
+    l̇ .= ḣ(x, u, t)
 end
 
 # u = μ + Kᵣ*(α - x)
@@ -13,13 +13,13 @@ function project(ξ, f, Kᵣ, ḣ, T)
     # project desired curve onto trajectory manifold using Kr
     p = (f, ξ, Kᵣ, ḣ)
     prob = ODEProblem(ẋl!, (ξ.x(0), 0), (0,T), p) # IC syntax?
-    x,l = solve(prob) # output syntax?
+    x,l = solve(prob)
     u = project_u(ξ, x, Kᵣ)
     return Trajectory(x, u), l
 end
 
 function armijo_backstep(ξ, ζ, f, Kᵣ, (h, ḣ, Dh), (α, β)=(.7,.4))
-    while γ >= γ^(12) # TODO: make min β a parameter?
+    while γ > β^(12) # TODO: make min γ a parameter?
         # g(ξ + γ*ζ) < α*Dh(ξ, γ*ζ) ? (return γ) : (γ *= β)
         ξi = project(ξ + γ*ζ, f, Kᵣ, ḣ, T)
         # h = build_h(l, m, ξi, T)
@@ -33,7 +33,7 @@ end
 fréchet() = println("je suis extra")
 
 # user provides: Q, R, (m&l), f, ξeqb, ξd
-function pronto()
+function pronto(ξd, Q, R, (m, l), f)
     # linearize
     h = ξ -> build_h(l, m, ξ, T)
     ḣ = l

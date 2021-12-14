@@ -10,7 +10,7 @@ using GLMakie
 
 
 # ---------------- time ---------------- #
-T = 10 # final time
+T = 10.0 # final time
 # unlike the og version, dt and T0 don't really matter beyond plotting
 dt = 0.01
 T0 = 0:dt:T

@@ -46,7 +46,7 @@ function loss_grads1(l, m, ξ, T)
     b = t -> lu(t)'
 
     ḣ = l # time derivative of full cost fn is just l
-    mx = gradient(x(T) -> m(x(T), u(T)), ξ.x(T))' # constant for given ξ
+    mx = gradient(x -> m(x, u(T)), ξ.x(T))' # constant for given ξ
     r1 = mx'
     return a, b, ḣ, r1 # functions of time
 end
@@ -78,7 +78,7 @@ build_Dh(a, b, r1) = ζ -> quadgk(t -> a(t)*ζ.x(t) + b(t)*ζ.u(t), 0, T) + r1' 
 # h(ξ, T) =  build_h(l, m, ξ, T)
 # Dh, D2g = tot_grads(ζ, a, b, Q₀, R₀, S₀)
 
-begin
-    z = ζ.x; v = ζ.u; x = ξ.x; u = ξ.u
-    gradient(x->h(?), z) + gradient(u->h(?), v)
-end
+# begin
+#     z = ζ.x; v = ζ.u; x = ξ.x; u = ξ.u
+#     gradient(x->h(?), z) + gradient(u->h(?), v)
+# end
