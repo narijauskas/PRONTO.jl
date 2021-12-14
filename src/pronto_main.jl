@@ -1,8 +1,8 @@
-function ẋl!((ẋ, l̇), (x, l), (f, ξ, Kᵣ, ḣ), t)
+function ẋl!(dx, x, (f, ξ, Kr), t)
     # u = μ + Kᵣ*(α - x)
-    u = ξ.u(t) + Kᵣ(t) * (ξ.x(t) - x)
-    ẋ .= f(x, u)
-    l̇ .= ḣ(x, u)
+    u = ξ.u(t) + Kr(t) * (ξ.x(t) - x)
+    dx .= f(x, u)
+    # l̇ .= ḣ(x, t->u, t)
 end
 
 # u = μ + Kᵣ*(α - x)
@@ -12,7 +12,7 @@ project_u(ξ, x, Kᵣ) = (t) -> ξ.u(t) + Kᵣ(t) * (ξ.x(t) - x(t))
 function project(ξ, f, Kᵣ, ḣ, T)
     # project desired curve onto trajectory manifold using Kr
     p = (f, ξ, Kᵣ, ḣ)
-    prob = ODEProblem(ẋl!, (ξ.x(0), 0), (0,T), p) # IC syntax?
+    prob = ODEProblem(ẋl!, (ξ.x(0), [0]), (0,T), p) # IC syntax?
     x,l = solve(prob) # output syntax?
     u = project_u(ξ, x, Kᵣ)
     return Trajectory(x, u), l

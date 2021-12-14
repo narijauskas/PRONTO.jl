@@ -10,7 +10,7 @@ using GLMakie
 
 
 # ---------------- time ---------------- #
-T = 10 # final time
+T = 10.0 # final time
 # unlike the og version, dt and T0 don't really matter beyond plotting
 dt = 0.01
 T0 = 0:dt:T
@@ -67,8 +67,13 @@ Pr₁,_ = arec(A(T), B(T)inv(Rr)B(T)', Qr) # solve algebraic riccati eq at time 
 
 
 Kr = optKr(ipend, ξd, Qr, Rr, Pr₁, T)
-
+##
 project(ξd, ipend, Kr, lc, T)
+p = (ipend, ξd, Kr, lc)
+prob = ODEProblem(ẋl!, ξd.x(0), (0.0,T), p) # IC syntax?
+solve(prob) # output syntax?
+u = project_u(ξd, x, Kr)
+return Trajectory(x, u), l
 
 ## ------------------------------ DO PRONTO STUFF ------------------------------ ## 
 
