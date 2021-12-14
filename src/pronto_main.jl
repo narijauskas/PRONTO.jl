@@ -1,8 +1,8 @@
 function ẋl!((ẋ, l̇), (x, l), (f, ξ, Kᵣ, ḣ), t)
     # u = μ + Kᵣ*(α - x)
     u = ξ.u(t) + Kᵣ(t) * (ξ.x(t) - x)
-    ẋ = f(x, u)
-    l̇ = ḣ(x, u)
+    ẋ .= f(x, u)
+    l̇ .= ḣ(x, u)
 end
 
 # u = μ + Kᵣ*(α - x)

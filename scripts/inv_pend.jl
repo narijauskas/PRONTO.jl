@@ -66,9 +66,9 @@ lc, mc = build_LQ_cost(ξd, Qc, Rc, P₁, T) # cost functional
 Pr₁,_ = arec(A(T), B(T)inv(Rr)B(T)', Qr) # solve algebraic riccati eq at time T
 
 
+Kr = optKr(ipend, ξd, Qr, Rr, Pr₁, T)
 
-
-
+project(ξd, ipend, Kr, lc, T)
 
 ## ------------------------------ DO PRONTO STUFF ------------------------------ ## 
 
