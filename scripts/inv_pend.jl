@@ -6,12 +6,14 @@ using MatrixEquations
 using LinearAlgebra
 using GLMakie
 using Interpolations
-## ------------------------------ USER INPUTS ------------------------------ ## 
+
+
+
+## ------------------------------ pre-optimization work ------------------------------ ## 
 
 
 # ---------------- time ---------------- #
 T = 10.0 # final time
-# unlike the og version, dt and T0 don't really matter beyond plotting
 dt = 0.01
 T0 = 0:dt:T
 
@@ -61,7 +63,7 @@ B = Ju(ipend, ξd)
 P₁,_ = arec(A(T), B(T)inv(Rc)B(T)', Qc) # solve algebraic riccati eq at time T
 lc, mc = build_LQ_cost(ξd, Qc, Rc, P₁, T) # cost functional
 
-
+# for LQR
 Pr₁,_ = arec(A(T), B(T)inv(Rr)B(T)', Qr) # solve algebraic riccati eq at time T
 
 
@@ -91,7 +93,7 @@ Kr(tidx)
 ξd.u(tidx)
 findmax([ξd.x(t) for t in T0])
 
-## ------------------------------ DO PRONTO STUFF ------------------------------ ## 
+## ------------------------------ PRONTO loop ------------------------------ ## 
 # inputs:
 f = ipend
 m = mc
