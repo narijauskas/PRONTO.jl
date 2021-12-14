@@ -60,7 +60,7 @@ B = Ju(ipend, ξd)
 
 # create cost functional
 P₁,_ = arec(A(T), B(T)inv(Rc)B(T)', Qc) # solve algebraic riccati eq at time T
-l, m = build_LQ_cost(ξd, Qc, Rc, P₁, T) # cost functional
+lc, mc = build_LQ_cost(ξd, Qc, Rc, P₁, T) # cost functional
 
 
 Pr₁,_ = arec(A(T), B(T)inv(Rr)B(T)', Qr) # solve algebraic riccati eq at time T
