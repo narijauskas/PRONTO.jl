@@ -3,7 +3,24 @@ using LinearAlgebra
 using GLMakie
 
 ## ------------------------------ USER INPUTS ------------------------------ ## 
- 
+# desired trajectory
+xd(t) = t->[0.0; 0.0]
+ud(t) = t->[0.0]
+ξd = Trajectory(xd, ud)
+
+# equilibrium trajectory
+xe(t) = t->[0.0; 0.0]
+ue(t) = t->[0.0]
+ξeqb = Trajectory(xe, ue)
+
+# regulator parameters
+Qr = I(2)
+Rr = I(1)
+
+# cost parameters
+Qc = I(2)
+Rc = I(1)
+
 # define dynamics
 function fxn(x, u)
     # parameters:
@@ -17,7 +34,8 @@ T = 10 # final time
 A = Jx(f, ξ)
 B = Ju(f, ξ)
 P₁,_ = arec(A(T), B(T)inv(Rᵣ)B(T)', Qᵣ) # solve algebraic riccati eq at time T
-
+# cost functional
+l, m = build_LQ_cost(ξd, Qc, Rc, P₁, T)
 
 # ---------------- from newt_invpend ---------------- #
 dt = 0.01
@@ -45,28 +63,6 @@ else
     Udes = 0*T0;  # or whatever you might *invent* (??)
 end
 
-
-
-# desired trajectory
-xd(t) = t->[0.0; 0.0]
-ud(t) = t->[0.0]
-ξd = Trajectory(xd, ud)
-
-# equilibrium trajectory
-xe(t) = t->[0.0; 0.0]
-ue(t) = t->[0.0]
-ξeqb = Trajectory(xe, ue)
-
-# regulator parameters
-Qr = I(2)
-Rr = I(1)
-
-# cost parameters
-Qc = I(2)
-Rc = I(1)
-
-# cost functional
-l, m = build_LQ_cost(ξd, Qc, Rc, P1, T)
 
 
 ## ------------------------------ DO PRONTO STUFF ------------------------------ ## 

@@ -4,10 +4,9 @@ wnorm(vec, mat) = 1/2 * vec'*mat*vec
 
 ## ------------------------------ typical cost functional ------------------------------ ## 
  
-function build_LQ_cost(ξd, Q, R, T)
+function build_LQ_cost(ξd, Q, R, P1, T)
     err = (ξ, t) -> ξ(t) - ξd(t)
     l = (ξ, t) -> wnorm(err(ξ, t).x, Q(t)) + wnorm(err(ξ, t).u, R(t))
-    P1 = arec() #TODO
     m = ξ -> wnorm(err(ξ, T).x, P1) 
     return l, m
 end
