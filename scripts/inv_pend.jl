@@ -5,7 +5,7 @@ using DifferentialEquations
 using MatrixEquations
 using LinearAlgebra
 using GLMakie
-
+using Interpolations
 ## ------------------------------ USER INPUTS ------------------------------ ## 
 
 
@@ -67,13 +67,17 @@ Pr₁,_ = arec(A(T), B(T)inv(Rr)B(T)', Qr) # solve algebraic riccati eq at time 
 
 
 Kr = optKr(ipend, ξd, Qr, Rr, Pr₁, T)
+Kr = LinearInterpolation(T0, Kr)
+
 ##
-project(ξd, ipend, Kr, lc, T)
-p = (ipend, ξd, Kr, lc)
-prob = ODEProblem(ẋl!, ξd.x(0), (0.0,T), p) # IC syntax?
-solve(prob) # output syntax?
-u = project_u(ξd, x, Kr)
-return Trajectory(x, u), l
+project(ξd, ipend, Kr, T)
+# p = (ipend, ξd, Kr, lc)
+# prob = ODEProblem(ẋl!, ξd.x(0), (0.0,T), p) # IC syntax?
+# solve(prob) # output syntax?
+u = PRONTO.project_u(ξd, x, Kr)
+# return Trajectory(x, u), l
+
+lines(T0, [u(i)[1] for i in T0])
 
 ## ------------------------------ DO PRONTO STUFF ------------------------------ ## 
 
