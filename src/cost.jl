@@ -7,7 +7,7 @@ wnorm(vec, mat) = 1/2 * vec'*mat*vec
 function build_LQ_cost(ξd, Q, R, P1, T)
     # err = (ξ, t) -> ξ(t) - ξd(t)
     l = (x, u, t) -> wnorm( (x-ξd.x), Q(t)) + wnorm( (u-ξd.u), R(t))
-    m = x -> wnorm( (x-ξd.x), P1) 
+    m = xT -> wnorm( (xT-ξd.x(T)), P1) 
     return l, m
 end
 
