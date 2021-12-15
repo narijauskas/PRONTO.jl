@@ -11,6 +11,7 @@ m = [1, 1, 1, 1]
 T = t -> zeros(4)
 
 tspan = (0.0, 10.0)
+dt = .05 # for animation
 θ₀ = zeros(N)
 θ₀[N] = .1
 θd₀ = zeros(N)
@@ -25,15 +26,14 @@ Linv = inv(L)
 ℳvec = (U * m) 
 ℳ = [ℳvec[ max(i,j)] for i in 1:N, j in 1:N]
 𝒞 = ϕ -> [cos(ϕ[i] - ϕ[j]) for i in 1:N, j in 1:N]
-M = ϕ -> l^2 .* ℳ .* 𝒞(ϕ) * L
+M = ϕ -> l^2 .* ℳ .* 𝒞(ϕ)
 
 # coriolis vector C:
 𝒮 = ϕ -> [sin(ϕ[i] - ϕ[j]) for i in 1:N, j in 1:N]
 C = (ϕ, ϕd) -> l^2 .* ℳ .* 𝒮(ϕ) * ϕd.^2
 
 # body force vector G:
-Mtot = sum(m)
-G = ϕ -> Mtot.*g.*l .* sin.(ϕ)
+G = ϕ -> g.*l.*ℳvec .* sin.(ϕ)
 
 # ODE solver formulation:
 function f!(dx, x, T, t)
@@ -41,7 +41,7 @@ function f!(dx, x, T, t)
     θ = x[1:N]; θd = x[N+1:end]
     ϕ = L * θ
     ϕd = L * θd
-    θdd = inv(M(ϕ)) * (-C(ϕ, ϕd) - G(ϕ) + T(t))
+    θdd = Linv*inv(M(ϕ)) * (-C(ϕ, ϕd) - G(ϕ) + Linv*T(t))
     dx[1:N] = θd; dx[N+1:end] = θdd
 end
 
@@ -49,34 +49,39 @@ end
 prob = ODEProblem(f!, [θ₀; θd₀], tspan, T)
 x = solve(prob)
 
-## simulate
-time = Node(0.0)
-xplot = @lift(x($time))
+## ---------------------------- simulate ------------------------------ ##
+tvec = tspan[1]:dt:tspan[2]
+# time = Node(0.0)
+# xplot = @lift(x($time))
 
-points = Node(Point[])
-colors = Node(Int[])
+points = Vector{typeof(Node(Point2f[]))}[]
+
+colors = 
 
 # set_theme!(theme_black())
 
 lim = N*l
-fig, ax, l = lines(points, color = colors,
+fig, ax, l = lines(points[1], color = colors,
     colormap = :inferno, transparency = true,
     axis = (; limits = (-lim, lim, -lim, lim)))
 
-function phi2xy(ϕ, i, l)
+for i = 2:N
+    lines!
+
+function phi2xy(ϕ, i)
     x = -l*sum(sin.(ϕ[1:i]))
     y = l*sum(cos.(ϕ[1:i]))
-    return 
-
-function step!(x)
-    x(t)[N] # Nth link angle
+    return x, y
 end
 
-record(fig, "Npend.mp4", 1:120) do frame
-    for i in 1:50
-        push!(points[], step!(attractor))
-        push!(colors[], frame)
-    end
+function phis2points(ϕvec)
+    return [Point2f(phi2xy(ϕvec, i)) for i=1:N]
+end
+
+record(fig, "Npend.mp4", tvec, framerate = 30) do t
+    new_points = phis2points(x(t)[1:N])
+    push!(points[], step!(attractor))
+    push!(colors[], frame)
     ax.azimuth[] = 1.7pi + 0.3 * sin(2pi * frame / 120)
     notify.((points, colors))
     l.colorrange = (0, frame)
