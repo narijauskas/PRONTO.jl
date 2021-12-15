@@ -12,12 +12,12 @@ using Interpolations
 ## ------------------------------ pre-optimization work ------------------------------ ## 
 
 
-# ---------------- time ---------------- #
+## ---------------- time ---------------- ##
 T = 10.0 # final time
 dt = 0.01
 T0 = 0:dt:T
 
-# ---------------- desired trajectory ---------------- #
+## ---------------- desired trajectory ---------------- ##
 ϕ₀ = t -> tanh(t-5)*(1-tanh(t-5)^2)
 amp = (π/2)*(1/maximum(ϕ₀.(T0)))
 
@@ -35,6 +35,11 @@ u = t -> [0]
 x = t->[ϕ(t),dϕ(t)]
 ξd = Trajectory(x,u)
 
+# plot trajectory
+fig = Figure(); ax = Axis(fig[1,1])
+lines!(ax, T0, [ξd.x(t)[1] for t in T0])
+lines!(ax, T0, [ξd.x(t)[2] for t in T0])
+display(fig)
 
 # regulator parameters
 Qr = I(2)
@@ -52,7 +57,7 @@ function ipend(x, u)
     [x[2], (g/l)*sin(x[1]) - (u[1]/l) * cos(x[1])]
 end
 
-# linearize around desired trajectory
+## linearize around desired trajectory
 A = Jx(ipend, ξd)
 B = Ju(ipend, ξd)
 
@@ -63,18 +68,28 @@ lc, mc = build_LQ_cost(ξd, Qc, Rc, P₁, T) # cost functional
 # for LQR
 Pr₁,_ = arec(A(T), B(T)inv(Rr)B(T)', Qr) # solve algebraic riccati eq at time T
 
+P = optKr(ipend, ξd, Qr, Rr, Pr₁, T)
+
 Kr = optKr(ipend, ξd, Qr, Rr, Pr₁, T)
-# Kr = LinearInterpolation(T0, [Kr(t) for t in T0])
+Kritp = LinearInterpolation(T0, [Kr(t) for t in T0]) # interpolate to simplify type
+
+plot(T0, [Kr(t)[1] for t in T0])
+plot!(T0, [Kr(t)[2] for t in T0])
 
 ##
-ξ = project(ξd, ipend, Kr, T)
+
+
+
+
 # p = (ipend, ξd, Kr, lc)
 # prob = ODEProblem(ẋl!, ξd.x(0), (0.0,T), p) # IC syntax?
 # solve(prob) # output syntax?
+x = project(ξd, ipend, Kr, T)
 u = PRONTO.project_u(ξd, x, Kr)
-u = LinearInterpolation(T0, [u(t) for t in T0])
-interp(fn, T0) = LinearInterpolation(T0, [fn(t) for t in T0])
-# return Trajectory(x, u), l
+ξ = Trajectory(x, u)
+# x_itp = LinearInterpolation(T0, [x(t) for t in T0]) # interpolate to simplify type
+# u_itp = LinearInterpolation(T0, [u(t) for t in T0]) # interpolate to simplify type
+# ξ = Trajectory(x_itp, u_itp)
 
 ##
 fig = Figure()
@@ -101,6 +116,7 @@ h = ξ -> PRONTO.build_h(l, m, ξ, T)
 Kᵣ = optKr(f, ξ, Qr, Rr, Pr₁, T) # ?
 ξ = project(ξd, f, Kᵣ, l, T)
 γ = 1
+ζ = search_direction(ipend, ξ, ξd, Qc, Rc, P₁, Kr, T);
 while γ > 0 # if keep γ as only condition, move initialization into loop?
     #TODO: is there a better way to check for convergence?
     ζ = search_direction()

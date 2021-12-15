@@ -11,6 +11,7 @@ Trajectory(x::Function, u) = Trajectory(x, t->u(t))
 Trajectory(x, u::Function) = Trajectory(t->x(t), u)
 Trajectory(x, u) = Trajectory(t->x(t), t->u(t))
 
+Base.show(io::IO, ::Trajectory) = println(io, "Trajectory")
 
 # Operators on two trajectories
 (+)(ξ1::Trajectory, ξ2::Trajectory) = Trajectory(
