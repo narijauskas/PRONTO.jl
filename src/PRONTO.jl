@@ -23,5 +23,6 @@ export optKr
 export project, pronto
 
 include("search_direction.jl")
+export search_direction
 
 end # module

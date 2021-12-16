@@ -9,7 +9,7 @@ function optKr(f, ξ, Q, R, P₁, T)
     A = Jx(f, ξ)
     B = Ju(f, ξ)
     # P₁,_ = arec(A(T), B(T)inv(R)B(T)', Q) # solve algebraic riccati eq at time T
-    P = solve(ODEProblem(riccati!, P₁, (T,0.0), (A,B,Q,R))) # solve differential riccati
+    return P = solve(ODEProblem(riccati!, P₁, (T, 0.0), (A,B,Q,R))) # solve differential riccati
     return Kᵣ = t->inv(R)*B(t)'*P(t)
 end
 
@@ -30,8 +30,8 @@ function project(ξ, f, Kᵣ, T)
     p = (f, ξ, Kᵣ)
     prob = ODEProblem(ẋl!, ξ.x(0), (0,T), p) # IC syntax?
     x = solve(prob) 
-    u = project_u(ξ, x, Kᵣ)
-    return Trajectory(x, u)
+    # u = project_u(ξ, x, Kᵣ)
+    return x
 end
 
 function armijo_backstep(ξ, ζ, f, Kᵣ, (h, ḣ, Dh), (α, β)=(.7,.4))
