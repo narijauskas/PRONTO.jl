@@ -172,12 +172,13 @@ end
 
 ## ---------------------------- useful plots ------------------------------ ##
 
-fig = Figure(); display(fig)
+x = solve(ODEProblem(fϕ!, [θ₀; θd₀], tspan, T))
 t = x.t
 ϕt = [[x[ix] for x in x.u] for ix in 1:N]
 dϕt = [[x[ix] for x in x.u] for ix in N+1:2N]
 
 
+fig = Figure(); display(fig)
 
 ax = Axis(fig[1,1]; title="ϕ(t)")
 for ϕ in ϕt
