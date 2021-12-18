@@ -54,13 +54,13 @@ prob = ODEProblem(f!, [θ₀; θd₀], tspan, T)
 x = solve(prob)
 
 ## -------------------- plotting helper functions --------------------- ##
-function theta2xy(θ, i)
+function phi2xy(θ, i)
     x = -l*sum(sin.(θ[1:i]))
     y = l*sum(cos.(θ[1:i]))
     return x, y
 end
 
-function thetas2points(θvec)
+function phis2points(θvec)
     return [Point2f(theta2xy(θvec, i)) for i=1:N]
 end
 
@@ -70,41 +70,79 @@ function colortomap(color, len)
     return cmap
 end
 
-# ---------------------------- simulate ------------------------------ #
+function kinetic(x)
+    ϕ = L * x[1:N]
+    ϕd = L * x[N+1:end]
+    T = 0
+    for i = 1:N
+        T += 1/2 * l^2 * m[i] * sum(sum([ϕd[j] * ϕd[k] * cos(ϕ[j]-ϕ[k]) for j = 1:i, k=1:i]))
+    end
+    return T
+end
 
+function potential(x)
+    ϕ = L * x[1:N]
+    V = 0
+    for i = 1:N
+        V += m[i] * sum([cos(ϕ[j]) for j = 1:i])
+    end
+    return V
+end
+
+## ---------------------------- simulate ------------------------------ #
+dt = .1
 tvec = tspan[1]:dt:tspan[2]
 numt = length(tvec)
 fps = Int(1/dt)
-# time = Node(0.0)
-# xplot = @lift(x($time))
 ICpoints = phis2points(θ₀)
 points = Node( [Node( [Point2f(ICpoints[i])] ) for i=1:N] )
 
+time = Node( [Float64(0.0)] )
+KE = Node( [Float64(kinetic([θ₀; θd₀]))] )
+PE = Node( [Float64(potential([θ₀; θd₀]))] )
+totE = Node( [Float64(KE[][1]+PE[][1])])
+
 colorsc = ColorSchemes.hawaii
 colorvec = [colorsc[i/N] for i = 0:N-1]
-# colors = Node( [Node( [colorvec[i]] ) for i=1:N] )
 colormaps = [colortomap(colorvec[i], length(tvec)) for i in 1:N]
 colors = Node( [Node( [Int(0)] ) for i=1:N] )
 
 lim = N*l
-fig, ax, _ = scatter(points[][1], color = colors[][1], colormap = colormaps[1],
-    transparency = true, axis = (; limits = (-lim, lim, -lim, lim)))
+fig = Figure()
+ax1 = Axis(fig[1, 1], limits=(-lim, lim, -lim, lim))
+ax2 = Axis(fig[1, 2], limits = (tspan[1], tspan[2], nothing, nothing))
+scatter!(ax1, points[][1], color = colors[][1], colormap = colormaps[1],
+    transparency = true)
 
 for i = 2:N
-    scatter!(points[][i], color = colors[][i], colormap = colormaps[i])
+    scatter!(ax1, points[][i], color = colors[][i], colormap = colormaps[i])
 end
 
+lines!(ax2, time, KE, color = :red)
+lines!(ax2, time, PE, color = :blue)
+lines!(ax2, time, totE, color = :purple)
+
+dx = zeros(2*N)
 fig
 record(fig, "Npend.mp4", 2:numt, framerate = fps) do frame
     t = tvec[frame]
     println(t)
     new_points = thetas2points(x(t)[1:N])
-    
     for i = 1:N
         points[][i][] = push!(points[][i][], new_points[i])
         colors[][i][] = (numt-frame):numt
     end
+    ke = kinetic(x(t))
+    pe = potential(x(t))
+    f!(dx, x(t), T, t)
+    println(dx)
+    push!(time[], t)
+    push!(KE[], ke)
+    push!(PE[], pe)
+    push!(totE[], ke+pe)
+
     sleep(1/fps)
     notify.((points[]))
+    notify.([KE, PE, time])
 end
 
