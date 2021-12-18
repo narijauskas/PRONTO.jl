@@ -10,7 +10,7 @@ using ColorSchemes
 # parameters
 g = 9.8
 l = 1
-N = 1
+N = 2
 # m = [1, 20, 1, 1]
 m = ones(N)
 T = t -> zeros(N)
@@ -38,7 +38,11 @@ M = ϕ -> l^2 .* ℳ .* 𝒞(ϕ)
 C = (ϕ, ϕd) -> l^2 .* ℳ .* 𝒮(ϕ) .* (v1*ϕd' - 2ϕd*v1') * ϕd
 
 # body force vector G:
+<<<<<<< HEAD
 G = @. ϕ -> -g*l*ℳvec*sin(ϕ)
+=======
+G = ϕ -> @. -g*l*ℳvec*sin(ϕ)
+>>>>>>> 336cfd0e0c25190addeefb85872cd2ba7c246163
 # G = ϕ -> g.*l.*ℳvec .* sin.(ϕ)
 
 
@@ -66,8 +70,8 @@ end
 # x = solve(prob)
 
 
-prob = ODEProblem(fϕ!, [θ₀; θd₀], tspan, T)
-x = solve(prob)
+# prob = ODEProblem(fϕ!, [θ₀; θd₀], tspan, T)
+# x = solve(prob)
 
 ## -------------------- plotting helper functions --------------------- ##
 function phi2xy(ϕ, i)
@@ -104,6 +108,13 @@ function potential(x)
     end
     return V
 end
+
+
+function ϕdϕ(x)
+    n = Int(length(x)/2)
+    return (x[1:n], x[n+1:end])
+end
+
 
 ## ---------------------------- simulate ------------------------------ #
 dt = .1
@@ -170,19 +181,27 @@ end
 ## ---------------------------- useful plots ------------------------------ ##
 
 x = solve(ODEProblem(fϕ!, [θ₀; θd₀], tspan, T))
-t = x.t
-ϕt = [[x[ix] for x in x.u] for ix in 1:N]
-dϕt = [[x[ix] for x in x.u] for ix in N+1:2N]
+t = x.t[1]:0.1:x.t[end]
+ϕt = [map(tx->x(tx)[ix], t) for ix in 1:N]
+dϕt = [map(tx->x(tx)[ix], t) for ix in [N+1:2N]]
 
 
 fig = Figure(); display(fig)
 
-ax = Axis(fig[1,1]; title="ϕ(t)")
+ax = Axis(fig[1:2,1]; title="ϕ(t)")
 for ϕ in ϕt
-    lines!(ax, ϕ)
+    lines!(ax, t, ϕ)
 end
 
 ax = Axis(fig[1,2]; title="G(t)")
-for ϕ in ϕt
-    lines!(ax, G(ϕ))
+for ix in 1:N
+    lines!(ax, t, map(tx->G(x(tx)[1:N])[ix], t))
+end
+
+
+# map(tx->C(ϕdϕ(x(tx))...), t)
+ax = Axis(fig[2,2]; title="C(t)")
+for ix in 1:N
+    lines!(ax, t, map(tx->C(ϕdϕ(x(tx))...)[ix], t)
+    )
 end
