@@ -56,9 +56,10 @@ prob = ODEProblem(f!, [θ₀; θd₀], tspan, T)
 x = solve(prob)
 
 ## -------------------- plotting helper functions --------------------- ##
-function thetas2xy(θ, i)
-    x = -l*sum(sin.(θ[1:i]))
-    y = l*sum(cos.(θ[1:i]))
+function theta2xy(θ, i)
+    ϕ = L*θ
+    x = -l*sum(sin.(ϕ[1:i]))
+    y = l*sum(cos.(ϕ[1:i]))
     return x, y
 end
 
