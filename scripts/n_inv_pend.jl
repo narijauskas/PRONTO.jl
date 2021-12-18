@@ -38,7 +38,11 @@ M = ϕ -> l^2 .* ℳ .* 𝒞(ϕ)
 C = (ϕ, ϕd) -> l^2 .* ℳ .* 𝒮(ϕ) .* (v1*ϕd' - 2ϕd*v1') * ϕd
 
 # body force vector G:
+<<<<<<< HEAD
+G = @. ϕ -> -g*l*ℳvec*sin(ϕ)
+=======
 G = ϕ -> @. -g*l*ℳvec*sin(ϕ)
+>>>>>>> 336cfd0e0c25190addeefb85872cd2ba7c246163
 # G = ϕ -> g.*l.*ℳvec .* sin.(ϕ)
 
 
@@ -70,15 +74,14 @@ end
 # x = solve(prob)
 
 ## -------------------- plotting helper functions --------------------- ##
-function theta2xy(θ, i)
-    ϕ = L*θ
+function phi2xy(ϕ, i)
     x = -l*sum(sin.(ϕ[1:i]))
     y = l*sum(cos.(ϕ[1:i]))
     return x, y
 end
 
-function thetas2points(θvec)
-    return [Point2f(theta2xy(θvec, i)) for i=1:N]
+function phis2points(ϕvec)
+    return [Point2f(theta2xy(ϕvec, i)) for i=1:N]
 end
 
 function colortomap(color, len)
@@ -88,8 +91,8 @@ function colortomap(color, len)
 end
 
 function kinetic(x)
-    ϕ = L * x[1:N]
-    ϕd = L * x[N+1:end]
+    ϕ = x[1:N]
+    ϕd = x[N+1:end]
     T = 0
     for i = 1:N
         T += 1/2 * l^2 * m[i] * sum(sum([ϕd[j] * ϕd[k] * cos(ϕ[j]-ϕ[k]) for j = 1:i, k=1:i]))
@@ -98,7 +101,7 @@ function kinetic(x)
 end
 
 function potential(x)
-    ϕ = L * x[1:N]
+    ϕ = x[1:N]
     V = 0
     for i = 1:N
         V += m[i] * g * l * sum([cos(ϕ[j]) for j = 1:i])
@@ -155,7 +158,7 @@ fig
 record(fig, "Npend.mp4", 2:numt, framerate = fps) do frame
     t = tvec[frame]
     println(t)
-    new_points = thetas2points(x(t)[1:N])
+    new_points = phis2points(x(t)[1:N])
     for i = 1:N
         points[][i][] = push!(points[][i][], new_points[i])
         colors[][i][] = (numt-frame):numt
@@ -164,12 +167,10 @@ record(fig, "Npend.mp4", 2:numt, framerate = fps) do frame
     pe = potential(x(t))
     # f!(dx, x(t), T, t)
 
-    θ = x(t)[1:N]; θd = x(t)[N+1:end]
-    ϕ = L * θ
-    ϕd = L * θd
-    θdd = Linv*inv(M(ϕ)) * (-C(ϕ, ϕd) - G(ϕ) + Linv*T(t))
-    println("C ", -C(ϕ, ϕd))
-    println("G ", -G(ϕ))
+    ϕ = x(t)[1:N]; ϕd = x(t)[N+1:end]
+    θdd = inv(M(ϕ)) * (-C(ϕ, ϕd) - G(ϕ) + Linv*T(t))
+    println("KE ", ke)
+    println("PE ", pe)
     # println(dx)
     push!(time[], t)
     push!(KE[], ke)
