@@ -84,7 +84,7 @@ function potential(x)
     ϕ = L * x[1:N]
     V = 0
     for i = 1:N
-        V += m[i] * sum([cos(ϕ[j]) for j = 1:i])
+        V += m[i] * g * l * sum([cos(ϕ[j]) for j = 1:i])
     end
     return V
 end
@@ -134,8 +134,15 @@ record(fig, "Npend.mp4", 2:numt, framerate = fps) do frame
     end
     ke = kinetic(x(t))
     pe = potential(x(t))
-    f!(dx, x(t), T, t)
-    println(dx)
+    # f!(dx, x(t), T, t)
+
+    θ = x(t)[1:N]; θd = x(t)[N+1:end]
+    ϕ = L * θ
+    ϕd = L * θd
+    θdd = Linv*inv(M(ϕ)) * (-C(ϕ, ϕd) - G(ϕ) + Linv*T(t))
+    println("C ", -C(ϕ, ϕd))
+    println("G ", -G(ϕ))
+    # println(dx)
     push!(time[], t)
     push!(KE[], ke)
     push!(PE[], pe)
