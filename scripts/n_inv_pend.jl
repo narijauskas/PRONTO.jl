@@ -4,10 +4,13 @@ using GLMakie
 using Colors
 using ColorSchemes
 
-## parameters
+
+## -------------------- build and solve ODE --------------------- ##
+
+# parameters
 g = 9.8
 l = 1
-N = 4
+N = 1
 # m = [1, 20, 1, 1]
 m = ones(N)
 T = t -> zeros(N)
@@ -17,7 +20,7 @@ tspan = (0.0, 20.0)
 θ₀[N] = .1
 θd₀ = zeros(N)
 
-## dynamics
+# dynamics
 # mass matrix M:
 U = UpperTriangular(ones(N,N))
 L = LowerTriangular(ones(N,N))
@@ -35,7 +38,7 @@ M = ϕ -> l^2 .* ℳ .* 𝒞(ϕ)
 C = (ϕ, ϕd) -> l^2 .* ℳ .* 𝒮(ϕ) .* (v1*ϕd' - 2ϕd*v1') * ϕd
 
 # body force vector G:
-G = ϕ -> @. g*l*ℳvec*sin(ϕ)
+G = @. ϕ -> g*l*ℳvec*sin(ϕ)
 # G = ϕ -> g.*l.*ℳvec .* sin.(ϕ)
 
 
@@ -49,10 +52,21 @@ function f!(dx, x, T, t)
     dx[1:N] = θd; dx[N+1:end] = θdd
 end
 
+function fϕ!(dx, x, T, t)
+    # x = [ϕ,dϕ], dx = [dϕ,ddϕ]
+    ϕ = x[1:N]
+    dϕ = dx[1:N] .= x[N+1:end]
+    dx[N+1:end] .= inv(M(ϕ)) * (-C(ϕ, dϕ) - G(ϕ) + Linv*T(t))
+end
+
 # function KE(x)
 
-## solve ODE
-prob = ODEProblem(f!, [θ₀; θd₀], tspan, T)
+# solve ODE
+# prob = ODEProblem(f!, [θ₀; θd₀], tspan, T)
+# x = solve(prob)
+
+
+prob = ODEProblem(fϕ!, [θ₀; θd₀], tspan, T)
 x = solve(prob)
 
 ## -------------------- plotting helper functions --------------------- ##
@@ -156,3 +170,21 @@ record(fig, "Npend.mp4", 2:numt, framerate = fps) do frame
     notify.([KE, PE, time])
 end
 
+## ---------------------------- useful plots ------------------------------ ##
+
+fig = Figure(); display(fig)
+t = x.t
+ϕt = [[x[ix] for x in x.u] for ix in 1:N]
+dϕt = [[x[ix] for x in x.u] for ix in N+1:2N]
+
+
+
+ax = Axis(fig[1,1]; title="ϕ(t)")
+for ϕ in ϕt
+    lines!(ax, ϕ)
+end
+
+ax = Axis(fig[1,2]; title="G(t)")
+for ϕ in ϕt
+    lines!(ax, G(ϕ))
+end
