@@ -35,7 +35,9 @@ M = ϕ -> l^2 .* ℳ .* 𝒞(ϕ)
 C = (ϕ, ϕd) -> l^2 .* ℳ .* 𝒮(ϕ) .* (v1*ϕd' - 2ϕd*v1') * ϕd
 
 # body force vector G:
-G = ϕ -> g.*l.*ℳvec .* sin.(ϕ)
+G = ϕ -> @. g*l*ℳvec*sin(ϕ)
+# G = ϕ -> g.*l.*ℳvec .* sin.(ϕ)
+
 
 # ODE solver formulation:
 function f!(dx, x, T, t)
