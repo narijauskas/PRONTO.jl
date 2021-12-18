@@ -54,13 +54,13 @@ prob = ODEProblem(f!, [θ₀; θd₀], tspan, T)
 x = solve(prob)
 
 ## -------------------- plotting helper functions --------------------- ##
-function phi2xy(θ, i)
+function thetas2xy(θ, i)
     x = -l*sum(sin.(θ[1:i]))
     y = l*sum(cos.(θ[1:i]))
     return x, y
 end
 
-function phis2points(θvec)
+function thetas2points(θvec)
     return [Point2f(theta2xy(θvec, i)) for i=1:N]
 end
 
