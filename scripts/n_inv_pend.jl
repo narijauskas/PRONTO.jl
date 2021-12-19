@@ -10,12 +10,12 @@ using ColorSchemes
 # parameters
 g = 9.8
 l = 1
-N = 4
+N = 2
 # m = [1, 20, 1, 1]
 m = ones(N)
 T = t -> zeros(N)
 
-tspan = (0.0, 20.0)
+tspan = (0.0, 40.0)
 θ₀ = zeros(N)
 θ₀[N] = π/2
 θd₀ = zeros(N)
@@ -77,7 +77,7 @@ function phi2xy(ϕ, i)
 end
 
 function phis2points(ϕvec)
-    return [Point2f(theta2xy(ϕvec, i)) for i=1:N]
+    return [Point2f(phi2xy(ϕvec, i)) for i=1:N]
 end
 
 function colortomap(color, len)
@@ -117,10 +117,10 @@ function getϕ(x)
 end
 
 ## ---------------------------- simulate ------------------------------ #
-dt = .1
-tvec = tspan[1]:dt:tspan[2]
+fps = 30
+dt = 1/fps
+tvec = x.t[1]:dt:x.t[end]
 numt = length(tvec)
-fps = Int(1/dt)
 ICpoints = phis2points(θ₀)
 points = Node( [Node( [Point2f(ICpoints[i])] ) for i=1:N] )
 
@@ -151,6 +151,8 @@ lines!(ax2, time, totE, color = :purple)
 
 dx = zeros(2*N)
 fig
+##
+
 record(fig, "Npend.mp4", 2:numt, framerate = fps) do frame
     t = tvec[frame]
     println(t)
@@ -180,17 +182,28 @@ end
 
 ## ---------------------------- useful plots ------------------------------ ##
 
-x = solve(ODEProblem(fϕ!, [θ₀; θd₀], tspan, T))
+x1 = solve(ODEProblem(fϕ!, [θ₀; θd₀], tspan, T), Rosenbrock23()) # matlab ode23s
+x2 = solve(ODEProblem(fϕ!, [θ₀; θd₀], tspan, T), TRBDF2())
+x3 = solve(ODEProblem(fϕ!, [θ₀; θd₀], tspan, T), BS3()) # matlab ode23
+x = x1
+x = x2
+x = x3
+##
 t = x.t[1]:0.01:x.t[end]
 ϕt = [map(tx->x(tx)[ix], t) for ix in 1:N]
-dϕt = [map(tx->x(tx)[ix], t) for ix in [N+1:2N]]
+dϕt = [map(tx->x(tx)[ix], t) for ix in N+1:2N]
 
 
 fig = Figure(); display(fig)
 
-ax = Axis(fig[1:2,1]; title="ϕ(t)")
+ax = Axis(fig[1,1]; title="ϕ(t)")
 for ϕ in ϕt
     lines!(ax, t, ϕ)
+end
+
+ax = Axis(fig[2,1]; title="dϕ(t)")
+for dϕ in dϕt
+    lines!(ax, t, dϕ)
 end
 
 ax = Axis(fig[1,2]; title="G(t)")
