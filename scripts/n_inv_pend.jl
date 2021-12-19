@@ -10,14 +10,14 @@ using ColorSchemes
 # parameters
 g = 9.8
 l = 1
-N = 2
+N = 4
 # m = [1, 20, 1, 1]
 m = ones(N)
 T = t -> zeros(N)
 
 tspan = (0.0, 20.0)
 θ₀ = zeros(N)
-θ₀[N] = .1
+θ₀[N] = π/2
 θd₀ = zeros(N)
 
 # dynamics
@@ -111,6 +111,10 @@ function ϕdϕ(x)
     return (x[1:n], x[n+1:end])
 end
 
+function getϕ(x)
+    n = Int(length(x)/2)
+    return x[1:n]
+end
 
 ## ---------------------------- simulate ------------------------------ #
 dt = .1
@@ -177,7 +181,7 @@ end
 ## ---------------------------- useful plots ------------------------------ ##
 
 x = solve(ODEProblem(fϕ!, [θ₀; θd₀], tspan, T))
-t = x.t[1]:0.1:x.t[end]
+t = x.t[1]:0.01:x.t[end]
 ϕt = [map(tx->x(tx)[ix], t) for ix in 1:N]
 dϕt = [map(tx->x(tx)[ix], t) for ix in [N+1:2N]]
 
@@ -198,6 +202,11 @@ end
 # map(tx->C(ϕdϕ(x(tx))...), t)
 ax = Axis(fig[2,2]; title="C(t)")
 for ix in 1:N
-    lines!(ax, t, map(tx->C(ϕdϕ(x(tx))...)[ix], t)
-    )
+    lines!(ax, t, map(tx->C(ϕdϕ(x(tx))...)[ix], t))
 end
+
+# @. potential(getϕ(x(t)))
+ax = Axis(fig[1:2,3]; title="energy")
+lines!(ax, t, @. potential(x(t)))
+lines!(ax, t, @. kinetic(x(t)))
+lines!(ax, t, @. potential(x(t)) + kinetic(x(t)))
