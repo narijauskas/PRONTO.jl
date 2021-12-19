@@ -149,7 +149,6 @@ lines!(ax2, time, KE, color = :red)
 lines!(ax2, time, PE, color = :blue)
 lines!(ax2, time, totE, color = :purple)
 
-dx = zeros(2*N)
 fig
 record(fig, "Npend.mp4", 2:numt, framerate = fps) do frame
     t = tvec[frame]
