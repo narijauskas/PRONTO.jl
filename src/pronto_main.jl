@@ -9,7 +9,7 @@ function optKr(f, ξ, Q, R, P₁, T)
     A = Jx(f, ξ)
     B = Ju(f, ξ)
     # P₁,_ = arec(A(T), B(T)inv(R)B(T)', Q) # solve algebraic riccati eq at time T
-    return P = solve(ODEProblem(riccati!, P₁, (T, 0.0), (A,B,Q,R))) # solve differential riccati
+    P = solve(ODEProblem(riccati!, P₁, (T, 0.0), (A,B,Q,R))) # solve differential riccati
     return Kᵣ = t->inv(R)*B(t)'*P(t)
 end
 
