@@ -59,9 +59,7 @@ function search_direction(f, ξ, ξd, Qc, Rc, P₁, Kr, T)
     # do we want to recalculate P1 on each loop?
     # P₁,_ = arec(A(T), B(T), R₀(T), Q₀(T), S₀(T))
     # reuse r₁
-    # P,r = solve(ODEProblem(backstep!, [P₁;r₁], (T,0), (a,b,R₀,S₀,Q₀,A,B)))
-    # return K₀ = inv(R₀(t))*(S₀(t)' + B(t)'P) # instantaneous P
-    # return (a,b,R₀,S₀,Q₀,A,B)
+    
     println("solving pstep!")
     P = solve(ODEProblem(pstep!, P₁, (T,0), (a,b,R₀,S₀,Q₀,A,B)))
     println("ODE solved")
@@ -72,10 +70,9 @@ function search_direction(f, ξ, ξd, Qc, Rc, P₁, Kr, T)
     r = solve(ODEProblem(rstep!, r₁, (T,0), (a,b,A,B,K₀)))
     println("ODE solved")
 
-    # K₀ = t -> inv(R₀(t))(S₀(t)' + B(t)'P(t)) # P is a function of time
     v₀ = t -> -inv(R₀(t))*(B(t)'r(t) + b(t))
 
-    return (A,B,K₀,v₀)
+    # return (A,B,K₀,v₀)
     println("solving zstep!")
     z₀ = zeros(size(ξ.x(T))...) #TODO: what is z(0)?
     z = solve(ODEProblem(zstep!, z₀, (0,T), (A,B,K₀,v₀)))
@@ -108,14 +105,6 @@ function rstep!(dr, r, p, t)
     # dP .= -A(t)'P - P*A(t) + K₀'R₀(t)K₀ + Q₀
     dr .= -(A(t)-B(t)K₀(t))'r - a(t) + K₀(t)'b(t)
 end
-
-# function backstep!((Ṗ,ṙ), [P,r], p, t)
-#     (a,b,R₀,S₀,Q₀,A,B) = p
-
-#     K₀ = inv(R₀(t))*(S₀(t)' + B(t)'P) # instantaneous P
-#     Ṗ .= -A(t)'P - P*A(t) + K₀'R₀(t)K₀ + Q₀
-#     ṙ .= -(A(t)-B(t)K₀)'r - a(t) + K₀*b(t)
-# end
 
 function zstep!(dz, z, (A,B,K₀,v₀), t)
     v = -K₀(t)z + v₀(t)
