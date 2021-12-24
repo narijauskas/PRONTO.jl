@@ -1,3 +1,4 @@
+# see jupyter notebook
 using LinearAlgebra
 using DifferentialEquations
 using GLMakie
