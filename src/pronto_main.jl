@@ -24,7 +24,7 @@ end
 # u = μ + Kᵣ*(α - x)
 project_u(ξ, x, Kᵣ) = (t) -> ξ.u(t) + Kᵣ(t) * (ξ.x(t) - x(t))
 
-# project an arbitrary trajectory ξ onto the trajectory manifold of the system f, using the optimal controller Kᵣ, and the cost functional h
+# project an arbitrary trajectory ξ  onto the trajectory manifold of the system f, using the optimal controller Kᵣ, and the cost functional h
 function project(ξ, f, Kᵣ, T)
     # project desired curve onto trajectory manifold using Kr
     p = (f, ξ, Kᵣ)
@@ -68,3 +68,16 @@ function pronto(ξd, Q, R, (m, l), f)
     end
     return ξ, Kᵣ
 end
+
+
+
+
+
+#= #YO: user provides
+ * symbolic Hamiltonian (f(x,u))
+ * symbolic cost function lxu(t) + m(T)
+    (incremental + terminal)
+    (must be function of x,u,t)
+ * solver parameters
+
+=#

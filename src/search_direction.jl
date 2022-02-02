@@ -38,7 +38,7 @@ function search_direction(f, ξ, ξd, Qc, Rc, P₁, Kr, T)
     R₀ = t -> Rc .+ sum(map((qk,fk) -> qk*fk, q(t), fuu(t)))
     # R₀ = t -> luu(t) + sum(map((qk,fk) -> qk*fk, q(t), fuu(t)))
     
-    if false && isposdef(R₀(T))
+    if isposdef(R₀(T))
         #TODO: only do 2nd order after first iteration
         println("Using 2nd order descent")
         # Q₀ = t -> lxx(t) + sum(map((qk,fk) -> qk*fk, q(t), fxx(t)))

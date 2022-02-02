@@ -4,8 +4,9 @@ using ForwardDiff
 using ForwardDiff: derivative, gradient
 using BenchmarkTools
 
-ff(t) = cos(t) + cos(t)
-df(t) = derivative(ff, t)
+fn(t) = cos(t) + cos(t)
+df(t) = derivative(fn, t)
+df_manual(t) = -sin(t) - sin(t0)
 
 T = 0.0
 
