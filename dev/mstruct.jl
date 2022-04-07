@@ -1,5 +1,5 @@
 # an object which (almost) mimics the convenient behavior of MATLAB structs
-# ie, a Dict with dot accessed fields
+# ie, a Dict with dot access
 # not thread-safe
 
 struct MStruct

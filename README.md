@@ -37,3 +37,8 @@ julia -t auto
 ## Usage
 This code is still very much not done, stay tuned for usage instructions.
 
+## Organization
+`src` - package source files
+`test` - package test files
+`scripts` - examples, notebooks, etc.
+`dev` - experimental code
