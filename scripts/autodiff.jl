@@ -6,18 +6,19 @@ using BenchmarkTools
 
 fn(t) = cos(t) + cos(t)
 df(t) = derivative(fn, t)
-df_manual(t) = -sin(t) - sin(t0)
+df_manual(t) = -sin(t) - sin(t)
 
 T = 0.0
 
-@code_typed ff(T)
+@code_typed fn(T)
 @code_typed df(T)
 
-@code_native ff(T)
+@code_native fn(T)
 @code_native df(T)
 
-@btime ff(T)
+@btime fn(T)
 @btime df(T)
+@btime df_manual(T)
 
 ##
 fig = Figure(); ax = Axis(fig[1,1])
