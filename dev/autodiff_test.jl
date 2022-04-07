@@ -1,6 +1,9 @@
 using PRONTO
 using ForwardDiff
 using DifferentialEquations
+using Symbolics
+
+
 
 H0 = [0 0 1 0;
       0 0 0 -1;
@@ -12,7 +15,10 @@ H1 = [0 -1 0 0;
       0 0 0 -1;
       0 0 1 0]
 
- f(x,u,t) =(H0 + u*H1)*x;
+f(x,u,t) =(H0 + u*H1)*x;
+
+@variables x u t
+fx_sym = Symbolics.derivative(f(x,u,t), x)
 
 fx(x,u,t) = H0 + u*H1;
 fu(x,u,t) = H1*x;
