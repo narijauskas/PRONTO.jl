@@ -30,6 +30,8 @@ function Hxu(f, X, U)
     return t->permutedims(reshape(hess(t), nx, nu, nx), (2,3,1))
 end
 
+# build the jacobian as an autodiff anonymous function
+# eg. A(t) = fx@ξ
 Jx(f, ξ) = Jx(f, ξ.x, ξ.u)
 Ju(f, ξ) = Ju(f, ξ.x, ξ.u)
 

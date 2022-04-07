@@ -29,8 +29,8 @@ ddϕ = t -> derivative(dϕ, t)
 # lines(T0, dϕ.(T0))
 
 g = 9.8; l = 0.5;
-u = t -> [(g*sin(ϕ(t)) - l*ddϕ(t)) / cos(ϕ(t))] # blows up
-u = t -> [0]
+u = t -> [(g*sin(ϕ(t)) - l*ddϕ(t)) / cos(ϕ(t))]
+# u = t -> [0]
 
 x = t->[ϕ(t),dϕ(t)]
 ξd = Trajectory(x,u)
@@ -58,7 +58,7 @@ function ipend(x, u)
 end
 
 ## linearize around desired trajectory
-A = Jx(ipend, ξd)
+A = Jx(ipend, ξd) # 0.1 μs
 B = Ju(ipend, ξd)
 
 # create cost functional around linearized ξd
