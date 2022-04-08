@@ -4,7 +4,7 @@ using Symbolics
 using PRONTO
 using PRONTO: jacobian
 
-
+##
 @variables x[1:2] u[1:1]
 # dynamics
 g = 9.81
@@ -19,8 +19,6 @@ fxu = jacobian(u, fx, x, u)
 fuu = jacobian(u, fu, x, u)
 
 
-
-# fx(x,u)
 
 
 
