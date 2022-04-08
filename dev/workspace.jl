@@ -3,6 +3,7 @@ using BenchmarkTools
 using DataInterpolations
 using Symbolics
 using Symbolics: derivative
+using MatrixEquations
 
 # @benchmark g = t->sin(t+mean(x))
 # g = t->sin(t+mean(x))
@@ -10,9 +11,9 @@ using Symbolics: derivative
 
 # g(1)
 
+println("hello!")
 
 # fx = jacobian(f_x)
-
 
 
 # to compare against PRONTO for Dummies

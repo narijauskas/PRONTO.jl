@@ -3,8 +3,7 @@
 # create t vector, pre-allocate x(t) & u(t) (defines output dimensions)
 # each iteration modifies the trajectory in-place
 pronto!(x, u, t, fxns...; opts...)
-
-
+pronto!(ξ, fxns...; opts...)
 pronto!(ξ, f, l, p; opts...)
 
 # trajectory type
@@ -27,3 +26,5 @@ p(x)
 project()
 # ways to make f,l,p
 ξ = ξ_init(x_eq, u_guess, t)
+
+
