@@ -3,6 +3,8 @@
 # create t vector, pre-allocate x(t) & u(t) (defines output dimensions)
 # each iteration modifies the trajectory in-place
 pronto!(x, u, t, fxns...; opts...)
+
+
 pronto!(ξ, f, l, p; opts...)
 
 # trajectory type
@@ -12,7 +14,7 @@ pronto!(ξ, f, l, p; opts...)
 # maybe: built in projection?
 
 
-# maybe: debug/diagnostic version -> saves each iteration step
+# maybe: debug/diagnostic version -> sa ves each iteration step
 # pronto(x, u, t, fxns...; opts...)
 
 # user provided functions:
