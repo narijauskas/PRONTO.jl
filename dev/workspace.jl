@@ -1,7 +1,43 @@
 import Pkg; Pkg.activate(".")
 using BenchmarkTools
-using DataInterpolations
 using Symbolics
+using PRONTO
+using PRONTO: jacobian
+
+
+@variables x[1:2] u[1:1]
+# dynamics
+g = 9.81
+L = 2
+f(x,u) = [x[2];   g/L*sin(x[1])-u[1]*cos(x[1])/L]
+
+fx = jacobian(x, f, x, u)
+fu = jacobian(u, f, x, u)
+
+fxx = jacobian(x, fx, x, u)
+fxu = jacobian(u, fx, x, u)
+fuu = jacobian(u, fu, x, u)
+
+
+
+# fx(x,u)
+
+
+
+##
+
+
+
+
+
+
+
+
+
+
+
+
+using DataInterpolations
 using Symbolics: derivative
 using MatrixEquations
 
