@@ -3,8 +3,11 @@ using BenchmarkTools
 using Symbolics
 using PRONTO
 using PRONTO: jacobian
+using DifferentialEquations
+using LinearAlgebra
 
 ##
+
 @variables x[1:2] u[1:1]
 # dynamics
 g = 9.81
@@ -17,7 +20,6 @@ fu = jacobian(u, f, x, u)
 fxx = jacobian(x, fx, x, u)
 fxu = jacobian(u, fx, x, u)
 fuu = jacobian(u, fu, x, u)
-
 
 
 
@@ -87,6 +89,10 @@ T = 10
 t = 0:0.01:T # 99 ns
 X = LinearInterpolation(zeros(2, length(t)), t) # 12 μs
 U = LinearInterpolation(zeros(length(t)), t)
+# α = ..
+# μ = ..
+
+X.u = []
 
 # non-allocating, lazily evaluated only at values needed by ode solver
 A = t -> fx(X(t), U(t))
@@ -96,14 +102,17 @@ B = t -> fu(X(t), U(t))
 Qr = diagm([10, 1])
 Rr = 1e-3
 
+#P_lqr is an *option* for Pr
 P_lqr,_ = arec(A(T), B(T)inv(Rr)B(T)', Qr) # solve algebraic riccati eq at time T
 
-function riccati!(dP, P, (A,B,Q,R), t)
-    Kr = inv(Rr)*B(t)'*P
-    dP .= -A(t)'P - P*A(t) + Kr'*Rr*Kr - Q
+function riccati!(dPr, Pr, (Ar,Br,Qr,Rr), t)
+    Kr = inv(Rr)*Br(t)'*Pr
+    dPr .= -Ar(t)'Pr - Pr*Ar(t) + Kr'*Rr*Kr - Qr
 end
+ prob = ODEProblem(riccati!, P_lqr, (T, 0.0), (A,B,Qr,Rr))
+@benchmark Pr = solve(prob) # solve differential riccati backwards in time
 
-P = solve(ODEProblem(riccati!, P_lqr, (T, 0.0), (A,B,Qr,Rr))) # solve differential riccati backwards in time
+Kr = t->inv(Rr(t))*Br(t)'*Pr(t)
 
-Kr = t->inv(Rr)*B(t)'*P(t)
-
+fxn(u,p,t) -> du
+fxn!(du,u,p,t) -> nothing
