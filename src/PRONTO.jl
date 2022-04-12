@@ -10,7 +10,6 @@ using DataInterpolations
 # using ControlSystems # provides lqr
 using MatrixEquations # provides arec
 
-
 # helper functions
 tau(f, t) = LinearInterpolation(hcat(map(f, t)...), t)
 
@@ -28,5 +27,7 @@ include("projection.jl")
 # export project!, projection
 
 include("cost.jl")
+
+include("gradient_descent.jl")
 
 end # module

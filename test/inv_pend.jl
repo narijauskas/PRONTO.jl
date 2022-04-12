@@ -47,6 +47,8 @@ lxx = jacobian(x, l_x, x, u)
 lxu = jacobian(u, l_x, x, u)
 luu = jacobian(u, l_u, x, u)
 
+
+
 ## --------------------------- build estimate --------------------------- ##
 # solve dynamics with zero input
 
@@ -56,6 +58,36 @@ x0 = [2π/3; 0]
 
 U = LinearInterpolation(zeros(1, length(t)), t)
 X = LinearInterpolation(zeros(2, length(t)), t)
+
+
+
+A = fx(X(T), U(T))
+B = fu(X(T), U(T))
+Q = lxx(X(T), U(T))
+R = luu(X(T), U(T))
+S = lxu(X(T), U(T))
+Po,_ = arec(A, B, R, Q ,S)
+
+p(x) = 1/2*collect(x)'*Po*collect(x)
+px = jacobian(x, p, x)
+pxx = jacobian(x, px, x)
+# P = arec(A(T), B(T)inv(R(T))B(T)', Q(T), S(T))
+
+
+model = Dict(
+    :f => f,
+    :fx => fx,
+    :fu => fu,
+    :l => l,
+    :l_x => l_x,
+    :l_u => l_u,
+    :lxx => lxx,
+    :lxu => lxu,
+    :luu => luu,
+    :p => p,
+    :px => px,
+    :pxx => pxx,
+)
 
 # dynamics!(dx, x, u, t) = dx .= f(x, u(t))
 # sln = solve(ODEProblem(dynamics!, x0, (0.0, T), U))
@@ -98,4 +130,21 @@ lines!(ax, t, map(τ->X1(τ)[1], t))
 lines!(ax, t, map(τ->X1(τ)[2], t))
 display(fig)
 
-L = cost(X1,U1,t,l)
+# L = cost(X1,U1,t,l)
+
+
+
+
+A = t->model[:fx](X1(t), U1(t))
+B = t->model[:fu](X1(t), U1(t))
+Q = t->model[:lxx](X1(t), U1(t))
+R = t->model[:luu](X1(t), U1(t))
+S = t->model[:lxu](X1(t), U1(t))
+
+
+Ko = PRONTO.gradient_descent(X1,U1,t,model);
+fig = Figure(); ax = Axis(fig[1,1])
+lines!(ax, t, map(τ->Ko(τ)[1], t))
+lines!(ax, t, map(τ->Ko(τ)[2], t))
+display(fig)
+
