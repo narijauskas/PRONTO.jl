@@ -43,7 +43,8 @@ dal(al,_,t) = f(al,U(t))
 al0 = [1;0;0;0]
 al = solve(ODEProblem(dal,al0,(0,T)))
 
-X = LinearInterpolation(al.u, al.t)
+# X = LinearInterpolation(al.u, al.t)
+X = LinearInterpolation(al.(t), t)
 
 ##
 
@@ -68,8 +69,7 @@ function riccati!(dPr, Pr, (Ar,Br,Qr,Rr), t)
     dPr .= -Ar(t)'Pr - Pr*Ar(t) + Kr'*Rr(t)*Kr - Qr(t)
 end
 
-Prob = ODEProblem(riccati!, Pr_terminal, (T, 0.0), (Ar,Br,Qr,Rr))
-Pr = solve(Prob)  
+Pr = solve(ODEProblem(riccati!, Pr_terminal, (T, 0.0), (Ar,Br,Qr,Rr)))  
 
 Kr = t->inv(Rr(t))*Br(t)'*Pr(t)
 
