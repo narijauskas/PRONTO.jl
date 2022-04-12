@@ -10,6 +10,12 @@ using DataInterpolations
 # using ControlSystems # provides lqr
 using MatrixEquations # provides arec
 
+
+# helper functions
+tau(f, t) = LinearInterpolation(hcat(map(f, t)...), t)
+
+
+
 include("autodiff.jl")
 # export jacobian
 # export hessian
@@ -20,5 +26,7 @@ include("regulator.jl")
 
 include("projection.jl")
 # export project!, projection
+
+include("cost.jl")
 
 end # module

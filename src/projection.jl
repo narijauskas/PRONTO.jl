@@ -15,12 +15,14 @@ function stabilized_dynamics!(dx, x, (μ,α,Kr,f), t)
 end
 
 # simulates dynamics and control law
-function projection(α, μ, t, Kr, x0, f, T)
+function projection(α, μ, t, Kr, x0, f)
+    T = last(t)
     # solve ode problem for x
-    sln = solve(ODEProblem(stabilized_dynamics!, x0, (0.0,T), (μ,α,Kr,f)))
-    # remap u
-    u = LinearInterpolation(hcat(map(τ->μ(τ) - Kr(τ)*(sln(τ)-α(τ)), t)...), t)
-    x = LinearInterpolation(hcat(map(τ->sln(τ), t)...), t)
+    x = solve(ODEProblem(stabilized_dynamics!, x0, (0.0,T), (μ,α,Kr,f)))
+    # u = LinearInterpolation(hcat(map(τ->μ(τ) - Kr(τ)*(sln(τ)-α(τ)), t)...), t)
+    # x = LinearInterpolation(hcat(map(τ->sln(τ), t)...), t)
+    u = tau(τ->μ(τ) - Kr(τ)*(x(τ)-α(τ)), t)
+    x = tau(τ->x(τ), t)
     return x,u
 end
 

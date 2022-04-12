@@ -8,7 +8,7 @@ using DifferentialEquations
 using GLMakie; plot(rand(10))
 
 using PRONTO
-using PRONTO: jacobian, regulator, projection
+using PRONTO: jacobian, regulator, projection, cost
 
 ## --------------------------- problem definition --------------------------- ##
 
@@ -92,8 +92,10 @@ display(fig)
 # μ = 
 
 
-X1,U1 = projection(X, U, t, Kr, x0, f, T);
+X1,U1 = projection(X, U, t, Kr, x0, f);
 fig = Figure(); ax = Axis(fig[1,1])
 lines!(ax, t, map(τ->X1(τ)[1], t))
 lines!(ax, t, map(τ->X1(τ)[2], t))
 display(fig)
+
+L = cost(X1,U1,t,l)
