@@ -3,11 +3,12 @@ module PRONTO
 
 
 using LinearAlgebra
-using MatrixEquations
 using Symbolics
 using Symbolics: derivative
 using DifferentialEquations
-
+using DataInterpolations
+# using ControlSystems # provides lqr
+using MatrixEquations # provides arec
 
 include("autodiff.jl")
 # export jacobian
@@ -16,5 +17,8 @@ include("autodiff.jl")
 
 include("regulator.jl")
 # export regulator
+
+include("projection.jl")
+# export project!, projection
 
 end # module

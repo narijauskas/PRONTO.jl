@@ -2,10 +2,13 @@
 using Revise, BenchmarkTools
 using Symbolics
 using LinearAlgebra
+using DataInterpolations
+using DifferentialEquations
 
+using GLMakie; plot(rand(10))
 
 using PRONTO
-using PRONTO: jacobian, regulator
+using PRONTO: jacobian, regulator, projection
 
 ## --------------------------- problem definition --------------------------- ##
 
@@ -23,7 +26,7 @@ f(x,u) = [x[2];   g/L*sin(x[1])-u[1]*cos(x[1])/L]
 # Q = collect(I(2))
 # R = [1;;]
 # l(x,u) = 1/2*x'*Q*x + 1/2*u'*R*u
-# temporary workaround, while Symbolics gets array variable support
+# temporary workaround, until Symbolics gets array variable support
 l(x,u) = 1/2*(x[1]^2 + x[2]^2 + u[1]^2)
 
 
@@ -49,24 +52,48 @@ luu = jacobian(u, l_u, x, u)
 
 T = 10
 t = 0:0.001:T
+x0 = [2π/3; 0]
 
-X = LinearInterpolation(zeros(2, length(t)), t) 
 U = LinearInterpolation(zeros(1, length(t)), t)
+X = LinearInterpolation(zeros(2, length(t)), t)
+
+# dynamics!(dx, x, u, t) = dx .= f(x, u(t))
+# sln = solve(ODEProblem(dynamics!, x0, (0.0, T), U))
+# X = LinearInterpolation(hcat(sln.(t)...), t) 
 
 
-
+# now we have an estimate trajectory (X,U,t)
+# where X(t) and U(t) are callable
 
 ## --------------------------- regulator --------------------------- ##
 
-x0 = [2π/3; 0]
+# set x_eq, u_eq
+X.u[:,end] .= x_eq = [0.0,0.0]
 
 # % LQR stage costs
-# reg.Qr = diag([10 1]);
-# reg.Rr = 1e-3;
+Qr = t->diagm([10,1])
+Rr = t->1e-3
 
+
+Kr,Pt = regulator(X, U, t, Rr, Qr, fx, fu);
 # % Regulator equilibrium
 # reg.xr = @(xT) 0*xT;
 # reg.ur = @(xT) [0 0]*xT;
 
+
+# anonymous = 2.4ms to build, 1μs to execute
+# regular function = 2.4ms to build, 1μs to execute (but, has nasty typedef)
+
+fig = Figure(); ax = Axis(fig[1,1])
+lines!(ax, t, map(τ->Kr(τ)[1], t))
+lines!(ax, t, map(τ->Kr(τ)[2], t))
+display(fig)
 # α = 
 # μ = 
+
+
+X1,U1 = projection(X, U, t, Kr, x0, f, T);
+fig = Figure(); ax = Axis(fig[1,1])
+lines!(ax, t, map(τ->X1(τ)[1], t))
+lines!(ax, t, map(τ->X1(τ)[2], t))
+display(fig)

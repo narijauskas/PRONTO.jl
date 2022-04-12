@@ -8,6 +8,8 @@
 
 # not just trajectory, but timeseries
 
+# plotable, callable, have dimensionality
+# helps wrap/abstract away some of the madness that are the current return types
 
 
 Kr = regulator(...)

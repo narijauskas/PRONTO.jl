@@ -18,9 +18,11 @@ function regulator(X, U, t, R, Q, fx, fu)
 
     # solve algebraic riccati eq at time T to get terminal cost
     T = last(t)
-    Pt,_ = arec(A(T), B(T)inv(R(T))B(T)', Q)
+    Pt,_ = arec(A(T), B(T)inv(R(T))B(T)', Q(T))
 
     # solve differential riccati, return regulator
-    P = solve(ODEProblem(riccati!, Pt, (T,0.0), (A,B,Q,R)))  
-    return K(t) = inv(R(t))*B(t)'*P(t) # K as a closure with captured R,B,P
+    P = solve(ODEProblem(riccati!, Pt, (T,0.0), (A,B,Q,R)))
+    # P = LinearInterpolation(hcat(P.(t)...),t) 
+    Kr = t->inv(R(t))*B(t)'*P(t) # K as a closure with captured R,B,P
+    return Kr,Pt
 end
