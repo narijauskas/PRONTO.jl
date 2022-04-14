@@ -7,7 +7,7 @@ using DataInterpolations
 using DifferentialEquations
 using MatrixEquations
 
-using GLMakie; plot(rand(10))
+using GLMakie; #plot(rand(10))
 
 using PRONTO
 using PRONTO: jacobian, regulator, projection, cost
