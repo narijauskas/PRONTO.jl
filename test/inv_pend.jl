@@ -4,6 +4,7 @@ using Symbolics
 using LinearAlgebra
 using DataInterpolations
 using DifferentialEquations
+using MatrixEquations
 
 using GLMakie; plot(rand(10))
 
@@ -23,11 +24,12 @@ f(x,u) = [x[2];   g/L*sin(x[1])-u[1]*cos(x[1])/L]
 
 
 # cost function
-# Q = collect(I(2))
-# R = [1;;]
-# l(x,u) = 1/2*x'*Q*x + 1/2*u'*R*u
-# temporary workaround, until Symbolics gets array variable support
-l(x,u) = 1/2*(x[1]^2 + x[2]^2 + u[1]^2)
+Q = I
+R = I
+l(x,u) = 1/2*collect(x)'*Q*collect(x) + 1/2*collect(u)'*R*collect(u)
+
+# temporary workaround, until Symbolics gets full array variable support
+# l(x,u) = 1/2*(x[1]^2 + x[2]^2 + u[1]^2)
 
 
 
@@ -38,15 +40,15 @@ fu = jacobian(u, f, x, u)
 
 fxx = jacobian(x, fx, x, u)
 fxu = jacobian(u, fx, x, u)
+fux = jacobian(x, fu, x, u)
 fuu = jacobian(u, fu, x, u)
 
-l_x = jacobian(x, l, x, u)
-l_u = jacobian(u, l, x, u)
+Main.lx = jacobian(x, l, x, u)
+Main.lu = jacobian(u, l, x, u)
 
 lxx = jacobian(x, l_x, x, u)
 lxu = jacobian(u, l_x, x, u)
 luu = jacobian(u, l_u, x, u)
-
 
 
 ## --------------------------- build estimate --------------------------- ##
@@ -58,8 +60,6 @@ x0 = [2π/3; 0]
 
 U = LinearInterpolation(zeros(1, length(t)), t)
 X = LinearInterpolation(zeros(2, length(t)), t)
-
-
 
 A = fx(X(T), U(T))
 B = fu(X(T), U(T))
@@ -78,9 +78,12 @@ model = Dict(
     :f => f,
     :fx => fx,
     :fu => fu,
+    :fxx => fxx,
+    :fxu => fxu,
+    :fuu => fuu,
     :l => l,
-    :l_x => l_x,
-    :l_u => l_u,
+    :lx => l_x,
+    :lu => l_u,
     :lxx => lxx,
     :lxu => lxu,
     :luu => luu,
@@ -122,7 +125,7 @@ lines!(ax, t, map(τ->Kr(τ)[2], t))
 display(fig)
 # α = 
 # μ = 
-
+##
 
 X1,U1 = projection(X, U, t, Kr, x0, f);
 fig = Figure(); ax = Axis(fig[1,1])
@@ -134,17 +137,44 @@ display(fig)
 
 
 
+A = t->Main.fx(X1(t), U1(t))
+B = t->Main.fu(X1(t), U1(t))
+a = t->Main.l_x(X1(t), U1(t))
+b = t->Main.l_u(X1(t), U1(t))
+Q = t->Main.lxx(X1(t), U1(t))
+R = t->Main.luu(X1(t), U1(t))
+S = t->Main.lxu(X1(t), U1(t))
 
-A = t->model[:fx](X1(t), U1(t))
-B = t->model[:fu](X1(t), U1(t))
-Q = t->model[:lxx](X1(t), U1(t))
-R = t->model[:luu](X1(t), U1(t))
-S = t->model[:lxu](X1(t), U1(t))
+Ko,vo,q = PRONTO.gradient_descent(X1,U1,t,model,Kr,zeros(2));
+
+R₀ = t -> R(t) .+ sum(map((qk,fk) -> qk*fk, q(t), Main.fuu(X1(t), U1(t))))
+Q₀ = t -> Q(t) .+ sum(map((qk,fk) -> qk*fk, q(t), Main.fxx(X1(t), U1(t))))
+S₀ = t -> S(t) .+ sum(map((qk,fk) -> qk*fk, q(t), Main.fxu(X1(t), U1(t))))
+
+swapdims(x) = permutedims(x, collect)
+
+Ro = R
+Ro += q*f
 
 
-Ko = PRONTO.gradient_descent(X1,U1,t,model);
+##
+S₀ = t -> S(t) .+ sum(map(k->q(τ)[k]*Main.fuu(x(τ),u(τ))[k,:,:], 1:length(q(τ))))
+
+S₀ = τ -> S(τ) .+ sum(map( 1:length(q(τ)) ) do k
+    q(τ)[k]*fuu(x(τ), u(τ))[k,:,:]
+end)
+end
+
+##
+
+N = 2
+Y = q
+
 fig = Figure(); ax = Axis(fig[1,1])
-lines!(ax, t, map(τ->Ko(τ)[1], t))
-lines!(ax, t, map(τ->Ko(τ)[2], t))
+
+for i in 1:N
+    lines!(ax, t, map(τ->Y(τ)[i], t))
+end
+
 display(fig)
 

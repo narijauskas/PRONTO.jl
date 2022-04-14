@@ -18,7 +18,7 @@ end
 function projection(α, μ, t, Kr, x0, f)
     T = last(t)
     # solve ode problem for x
-    x = solve(ODEProblem(stabilized_dynamics!, x0, (0.0,T), (μ,α,Kr,f)))
+    x = solve(ODEProblem(stabilized_dynamics!, x0, (0.0,T), (μ,α,Kr,f)), dt=0.001)
     # u = LinearInterpolation(hcat(map(τ->μ(τ) - Kr(τ)*(sln(τ)-α(τ)), t)...), t)
     # x = LinearInterpolation(hcat(map(τ->sln(τ), t)...), t)
     u = tau(τ->μ(τ) - Kr(τ)*(x(τ)-α(τ)), t)
