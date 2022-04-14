@@ -44,8 +44,8 @@ fxu = jacobian(u, fx, x, u)
 fux = jacobian(x, fu, x, u)
 fuu = jacobian(u, fu, x, u)
 
-Main.lx = jacobian(x, l, x, u)
-Main.lu = jacobian(u, l, x, u)
+l_x = jacobian(x, l, x, u)
+l_u = jacobian(u, l, x, u)
 
 lxx = jacobian(x, l_x, x, u)
 lxu = jacobian(u, l_x, x, u)
@@ -107,8 +107,11 @@ model = Dict(
 X.u[:,end] .= x_eq = [0.0,0.0]
 
 # % LQR stage costs
-Qr = t->diagm([10,1])
-Rr = t->1e-3
+# Pr(x)
+# Qr(x,u,t)
+# Rr(x,u,t)
+Qr = t->diagm([10,1]) # needs to capture X(t)
+Rr = t->1e-3 # needs to capture X(t)
 
 
 Kr,Pt = regulator(X, U, t, Rr, Qr, fx, fu);
@@ -126,7 +129,10 @@ lines!(ax, t, map(τ->Kr(τ)[2], t))
 display(fig)
 # α = 
 # μ = 
-##
+
+
+
+## --------------------------- projection --------------------------- ##
 
 X1,U1 = projection(X, U, t, Kr, x0, f);
 fig = Figure(); ax = Axis(fig[1,1])
@@ -138,6 +144,9 @@ display(fig)
 
 
 
+## --------------------------- gradient desent --------------------------- ##
+
+
 A = t->Main.fx(X1(t), U1(t))
 B = t->Main.fu(X1(t), U1(t))
 a = t->Main.l_x(X1(t), U1(t))
@@ -147,6 +156,17 @@ R = t->Main.luu(X1(t), U1(t))
 S = t->Main.lxu(X1(t), U1(t))
 
 Ko,vo,q = PRONTO.gradient_descent(X1,U1,t,model,Kr,zeros(2));
+
+##
+
+
+
+fig = Figure(); ax = Axis(fig[1,1])
+lines!(ax, t, map(τ->X1(τ)[1], t))
+lines!(ax, t, map(τ->X1(τ)[2], t))
+display(fig)
+
+##
 
 R₀ = t -> R(t) .+ sum(map((qk,fk) -> qk*fk, q(t), Main.fuu(X1(t), U1(t))))
 Q₀ = t -> Q(t) .+ sum(map((qk,fk) -> qk*fk, q(t), Main.fxx(X1(t), U1(t))))
@@ -169,7 +189,7 @@ end)
 ##
 
 N = 2
-Y = q
+Y = 
 
 fig = Figure(); ax = Axis(fig[1,1])
 
