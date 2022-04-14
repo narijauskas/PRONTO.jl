@@ -1,4 +1,5 @@
 # to compare against PRONTO for Dummies
+import Pkg; Pkg.activate(".")
 using Revise, BenchmarkTools
 using Symbolics
 using LinearAlgebra
@@ -163,7 +164,7 @@ S₀ = t -> S(t) .+ sum(map(k->q(τ)[k]*Main.fuu(x(τ),u(τ))[k,:,:], 1:length(q
 S₀ = τ -> S(τ) .+ sum(map( 1:length(q(τ)) ) do k
     q(τ)[k]*fuu(x(τ), u(τ))[k,:,:]
 end)
-end
+# end
 
 ##
 
