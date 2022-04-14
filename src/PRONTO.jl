@@ -1,32 +1,33 @@
 module PRONTO
 # __precompile__(false)
 
-# using ForwardDiff
-# using ForwardDiff: jacobian, gradient, hessian
+
 using LinearAlgebra
-using MatrixEquations
-# using DifferentialEquations
+using Symbolics
+using Symbolics: derivative
+using DifferentialEquations
+using DataInterpolations
+# using ControlSystems # provides lqr
+using MatrixEquations # provides arec
+
+# helper functions
+tau(f, t) = LinearInterpolation(hcat(map(f, t)...), t)
+
+
 
 include("autodiff.jl")
 # export jacobian
+# export hessian
 
 
-# include("trajectories.jl")
-# export Trajectory
+include("regulator.jl")
+# export regulator
 
-# include("implicit_diff.jl")
-# export Jx, Ju
-# export Hxx, Hxu, Huu
+include("projection.jl")
+# export project!, projection
 
-# include("cost.jl")
-# export build_LQ_cost
+include("cost.jl")
 
-
-# include("pronto_main.jl")
-# export optKr
-# export project, pronto
-
-# include("search_direction.jl")
-# export search_direction
+include("gradient_descent.jl")
 
 end # module

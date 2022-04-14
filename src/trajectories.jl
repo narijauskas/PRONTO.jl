@@ -1,36 +1,18 @@
-import Base: +, -, *
-export Trajectory 
 
-mutable struct Trajectory
-    x :: Function
-    u :: Function
-    Trajectory(x::Function, u::Function) = new(x,u)
-end
+# trajectory object
 
-Trajectory(x::Function, u) = Trajectory(x, t->u(t))
-Trajectory(x, u::Function) = Trajectory(t->x(t), u)
-Trajectory(x, u) = Trajectory(t->x(t), t->u(t))
+# constructor from (x,u,t)
+# constructor from ODESolution
+# constructor from f,t?
 
-Base.show(io::IO, ::Trajectory) = println(io, "Trajectory")
 
-# Operators on two trajectories
-(+)(ξ1::Trajectory, ξ2::Trajectory) = Trajectory(
-    (t) -> (ξ1.x(t) + ξ2.x(t)),
-    (t) -> (ξ1.u(t) + ξ2.u(t)))
+# not just trajectory, but timeseries
 
-(-)(ξ1::Trajectory, ξ2::Trajectory) = Trajectory(
-    (t) -> (ξ1.x(t) - ξ2.x(t)),
-    (t) -> (ξ1.u(t) - ξ2.u(t)))
+# plotable, callable, have dimensionality
+# helps wrap/abstract away some of the madness that are the current return types
 
-(*)(ξ1::Trajectory, ξ2::Trajectory) = Trajectory( # maybe call this .* instead?
-    (t) -> (ξ1.x(t) * ξ2.x(t)),
-    (t) -> (ξ1.u(t) * ξ2.u(t)))
 
-# Operators on a trajectory and tuple of scalars
-(*)(γ::Tuple{Real, Real}, ξ::Trajectory) = Trajectory(
-    (t) -> (ξ.x(t) * γ[1]),
-    (t) -> (ξ.u(t) * γ[2]))
-
-(*)(ξ::Trajectory, γ::Tuple{Real, Real}) = γ*ξ
-
-#MAYBE: support single scalar multiplication
+Kr = regulator(...)
+plot(Kr) # will break
+plot(Timeseries(Kr, t))
+plot(Timeseries(Kr.(t)))

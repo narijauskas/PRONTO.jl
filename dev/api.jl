@@ -28,3 +28,14 @@ project()
 ξ = ξ_init(x_eq, u_guess, t)
 
 
+
+
+
+# intermediary functions:
+# compute the trajectory ξ stabilized around the initial guess ξ0
+Kr = regulator((α,μ,t); Rr, Qr, Pr0, fx, fu)
+
+(x,u,t) = projection(f, (α,μ,t), Kr)
+projection!(f, (x,u,t), Kr; f, x0)
+
+cost(l, p, (x,u,t))
