@@ -21,7 +21,8 @@ lines(t, sol(t).u)
 lines!(t, xq.(t))
 
 
-
+#TODO:
+#CITE:
 # does this work with a matrix?
 @btime y = collect([sin(t) cos(t)] for t in t) # 0.5 μs
 @btime LinearInterpolation(y,t) # 0.7 μs
