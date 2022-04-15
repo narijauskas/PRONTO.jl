@@ -30,9 +30,14 @@ function update_dynamics!(dz, z, (A,B,Ko,vo), t)
     dz .= A(t)*z+B(t)*v
 end
 
+function cost_derivatives!(dy, y, (z,v,a,b,Qo,So,Ro), t)
+    dy[1] = a(t)'*z(t)+b(t)'*v(t)
+    dy[2] = z(t)'*Qo(t)*z(t)+2*z(t)'*So(t)*v(t)+v(t)'*Ro(t)*v(t)
+end
+
+    
 
 function search_direction(x,u,t,model,Kr,x_eq)
-
     # define tangent space
     A = t->Main.fx(x(t), u(t))
     B = t->Main.fu(x(t), u(t))
@@ -62,7 +67,21 @@ function search_direction(x,u,t,model,Kr,x_eq)
 
     z0 = 0 .* x_eq
     z = solve(ODEProblem(update_dynamics!, z0, (0.0,T), (A,B,Ko,vo)))
-    return Ko,vo,q,z
+    v = t -> -Ko(t)*z(t)+vo(t)
+
+    #YO: temporary
+    Ro = R
+    Qo = Q
+    So = S
+
+    y0 = [0;0]
+    y = solve(ODEProblem(cost_derivatives!, y0, (0.0,T), (z,v,a,b,Qo,So,Ro)))
+    Dh = y(T)[1] + rT'*z(T)
+    D2g = y(T)[2] + z(T)'*PT*z(T)
+    # Dh  = update.y1.Data(end)+rT'*update.z.Data(end,:)';
+    # Dg2 = update.y2.Data(end)+update.z.Data(end,:)*PT*update.z.Data(end,:)';
+
+    return Ko,vo,q,z,v,y,Dh,D2g
 end
 
 

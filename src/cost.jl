@@ -1,8 +1,10 @@
 
-stage_cost!(dL, L, (l,x,u), t) = dL .= l(x(t), u(t))
+function stage_cost!(dh, h, (l,x,u), t)
+    dh .= l(x(t), u(t))
+end
 
 function cost(x,u,t,l)
     T = last(t)
-    L = solve(ODEProblem(stage_cost!, [0], (0.0,T), (l,x,u)))
-    return L
+    h = solve(ODEProblem(stage_cost!, [0], (0.0,T), (l,x,u)))
+    return h
 end

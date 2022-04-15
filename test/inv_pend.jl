@@ -172,8 +172,7 @@ S = t->Main.lxu(X1(t), U1(t))
 
 
 # for now:
-Ko,vo,q,z = PRONTO.search_direction(X1, U1, t, model, Kr, zeros(2));
-v = t -> -Ko(t)*z(t)+vo(t)
+Ko,vo,q,z,v,y,Dh,D2g = PRONTO.search_direction(X1, U1, t, model, Kr, zeros(2));
 
 
 fig = Figure()
@@ -203,11 +202,15 @@ lines!(ax, t, map(τ->v(τ)[1], t))
 display(fig)
 
 ## --------------------------- search direction --------------------------- ##
+fig = Figure()
+ax = Axis(fig[1,1])
+lines!(ax, t, map(τ->y(τ)[1], t))
+lines!(ax, t, map(τ->y(τ)[2], t))
+display(fig)
 
-
-R₀ = R
-Q₀ = Q
-S₀ = S
+# R₀ = R
+# Q₀ = Q
+# S₀ = S
 
 # R₀ = t -> R(t) .+ mapreduce((qk,fk)->qk*fk, sum, q(t), fuu(X1(t), U1(t)))
 
@@ -232,11 +235,31 @@ S₀ = S
 
 
 
-
 # armijo_backstep:
-
+    γ = 1
     # generate estimate
+    α = PRONTO.tau(t->X1(t) + γ*z(t), t);
+    μ = PRONTO.tau(t->U1(t) + γ*v(t), t);
+    X2,U2 = projection(α, μ, t, Kr, x0, f);
+
+
+    
+    fig = Figure()
+    ax = Axis(fig[1,1])
+    lines!(ax, t, map(τ->X2(τ)[1], t))
+    lines!(ax, t, map(τ->X2(τ)[2], t))
+
+    ax = Axis(fig[2,1])
+    lines!(ax, t, map(τ->U2(τ)[1], t))
+    display(fig)
+
+
     # compute cost
+    J = cost(X1,U1,t,l)
+    h = J(T)[1] + p(X1(T))
+    J = cost(X2,U2,t,l)
+    g = J(T)[1] + p(X2(T))
+
     # check armijo rule
 
 
