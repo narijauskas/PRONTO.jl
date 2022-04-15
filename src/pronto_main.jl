@@ -34,7 +34,7 @@ function project(ξ, f, Kᵣ, T)
     return x
 end
 
-function armijo_backstep(ξ, ζ, f, Kᵣ, (h, ḣ, Dh), (α, β)=(.7,.4))
+function armijo_backstep(ξ, ζ, f, Kᵣ, (h, hdot, Dh), (α, β)=(.7,.4))
     while γ > β^(12) # TODO: make min γ a parameter?
         # g(ξ + γ*ζ) < α*Dh(ξ, γ*ζ) ? (return γ) : (γ *= β)
         ξi = project(ξ + γ*ζ, f, Kᵣ, T)
@@ -52,7 +52,7 @@ fréchet() = println("je suis extra")
 function pronto(ξd, Q, R, (m, l), f)
     # linearize
     h = ξ -> build_h(l, m, ξ, T)
-    ḣ = l
+    hdot = l
     Kᵣ = optKr(f, ξ, Q, R, P₁, T)
     ξ = project(ξd, f, Kᵣ, T)
     while γ > 0 # if keep γ as only condition, move initialization into loop?
@@ -60,7 +60,7 @@ function pronto(ξd, Q, R, (m, l), f)
         ζ = search_direction()
         Dh = build_Dh(a, b, r1) # returns Dh(ζ)
         # check for convergence here
-        γ = armijo_backstep(ξ, ζ, f, Kᵣ, (h, ḣ, Dh))
+        γ = armijo_backstep(ξ, ζ, f, Kᵣ, (h, hdot, Dh))
         ξ = ξ + γ*ζ
         Kᵣ = optKr(f, ξ, Q, R, P₁, T)
         ξ = project(ξ, f, Kᵣ, T) # update trajectory
@@ -68,6 +68,7 @@ function pronto(ξd, Q, R, (m, l), f)
     end
     return ξ, Kᵣ
 end
+
 
 
 

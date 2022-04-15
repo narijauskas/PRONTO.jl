@@ -135,16 +135,21 @@ display(fig)
 ## --------------------------- projection --------------------------- ##
 
 X1,U1 = projection(X, U, t, Kr, x0, f);
-fig = Figure(); ax = Axis(fig[1,1])
+
+fig = Figure()
+ax = Axis(fig[1,1])
 lines!(ax, t, map(τ->X1(τ)[1], t))
 lines!(ax, t, map(τ->X1(τ)[2], t))
+
+ax = Axis(fig[2,1])
+lines!(ax, t, map(τ->X1(τ)[1], t))
 display(fig)
 
 # L = cost(X1,U1,t,l)
 
 
 
-## --------------------------- gradient desent --------------------------- ##
+## --------------------------- tangent space --------------------------- ##
 
 
 A = t->Main.fx(X1(t), U1(t))
@@ -155,10 +160,90 @@ Q = t->Main.lxx(X1(t), U1(t))
 R = t->Main.luu(X1(t), U1(t))
 S = t->Main.lxu(X1(t), U1(t))
 
-Ko,vo,q = PRONTO.gradient_descent(X1,U1,t,model,Kr,zeros(2));
 
-##
+## --------------------------- search direction --------------------------- ##
+# include("search_direction.jl")
 
+
+# compute q
+# check if posdef R
+# newton method or gradient descent
+# get Ko,vo,Ro,Qo,So
+
+
+# for now:
+Ko,vo,q,z = PRONTO.search_direction(X1, U1, t, model, Kr, zeros(2));
+v = t -> -Ko(t)*z(t)+vo(t)
+
+
+fig = Figure()
+ax = Axis(fig[1,1])
+lines!(ax, t, map(τ->Ko(τ)[1], t))
+lines!(ax, t, map(τ->Ko(τ)[2], t))
+
+ax = Axis(fig[2,1])
+lines!(ax, t, map(τ->vo(τ)[1], t))
+display(fig)
+
+ax = Axis(fig[3,1])
+lines!(ax, t, map(τ->q(τ)[1], t))
+lines!(ax, t, map(τ->q(τ)[2], t))
+
+display(fig)
+
+## --------------------------- search direction --------------------------- ##
+
+fig = Figure()
+ax = Axis(fig[1,1])
+lines!(ax, t, map(τ->z(τ)[1], t))
+lines!(ax, t, map(τ->z(τ)[2], t))
+
+ax = Axis(fig[2,1])
+lines!(ax, t, map(τ->v(τ)[1], t))
+display(fig)
+
+## --------------------------- search direction --------------------------- ##
+
+
+R₀ = R
+Q₀ = Q
+S₀ = S
+
+# R₀ = t -> R(t) .+ mapreduce((qk,fk)->qk*fk, sum, q(t), fuu(X1(t), U1(t)))
+
+# R₀ = t -> R(t) .+ sum(map((qk,fk) -> qk*fk, q(t), Main.fuu(X1(t), U1(t))))
+# Q₀ = t -> Q(t) .+ sum(map((qk,fk) -> qk*fk, q(t), Main.fxx(X1(t), U1(t))))
+# S₀ = t -> S(t) .+ sum(map((qk,fk) -> qk*fk, q(t), Main.fxu(X1(t), U1(t))))
+
+
+
+
+
+
+
+
+
+
+
+# ζ = (z,v)
+
+## --------------------------- next estimate --------------------------- ##
+
+
+
+
+
+# armijo_backstep:
+
+    # generate estimate
+    # compute cost
+    # check armijo rule
+
+
+
+
+
+## --------------------------- ?? --------------------------- ##
 
 
 fig = Figure(); ax = Axis(fig[1,1])
@@ -167,10 +252,6 @@ lines!(ax, t, map(τ->X1(τ)[2], t))
 display(fig)
 
 ##
-
-R₀ = t -> R(t) .+ sum(map((qk,fk) -> qk*fk, q(t), Main.fuu(X1(t), U1(t))))
-Q₀ = t -> Q(t) .+ sum(map((qk,fk) -> qk*fk, q(t), Main.fxx(X1(t), U1(t))))
-S₀ = t -> S(t) .+ sum(map((qk,fk) -> qk*fk, q(t), Main.fxu(X1(t), U1(t))))
 
 swapdims(x) = permutedims(x, collect)
 
@@ -186,16 +267,16 @@ S₀ = τ -> S(τ) .+ sum(map( 1:length(q(τ)) ) do k
 end)
 # end
 
-##
+
+## --------------------------- plot --------------------------- ##
 
 N = 2
-Y = 
+Y = Ko
 
 fig = Figure(); ax = Axis(fig[1,1])
-
 for i in 1:N
     lines!(ax, t, map(τ->Y(τ)[i], t))
 end
-
 display(fig)
 
+## --------------------------- # --------------------------- ##
