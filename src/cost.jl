@@ -8,3 +8,4 @@ function cost(x,u,t,l)
     h = solve(ODEProblem(stage_cost!, [0], (0.0,T), (l,x,u)))
     return h
 end
+ 

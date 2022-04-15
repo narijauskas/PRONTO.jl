@@ -24,5 +24,6 @@ function regulator(X, U, t, R, Q, fx, fu)
     P = solve(ODEProblem(riccati!, Pt, (T,0.0), (A,B,Q,R)), Rosenbrock23(), dt=0.001)
     # P = LinearInterpolation(hcat(P.(t)...),t) 
     Kr = t->inv(R(t))*B(t)'*P(t) # K as a closure with captured R,B,P
+    # Kr = tau(τ->inv(R(τ))*B(τ)'*P(τ), t)
     return Kr,Pt
 end

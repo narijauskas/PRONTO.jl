@@ -33,36 +33,11 @@ Base.iterate(φ::Trajectory, state=1) = state <= length(φ) ? (return (φ[state]
 
 # resample!(φ, t)
 
-
-t = ξ.t
-fig = Figure(); ax = Axis(fig[1,1])
-for v in ξ
-    lines!(ax, t, v.(t))
-end
-
-
-f(x(t),u(t),t)
-
-Trajectory(τ->f(τ), t)
-
-
 # scalar multiplication
 
-
-
-
-# constructor from (x,u,t)
-# constructor from ODESolution
-# constructor from f,t?
 
 
 # not just trajectory, but timeseries
 
 # plotable, callable, have dimensionality
 # helps wrap/abstract away some of the madness that are the current return types
-
-
-Kr = regulator(...)
-plot(Kr) # will break 
-plot(Timeseries(Kr, t))
-plot(Timeseries(Kr.(t)))

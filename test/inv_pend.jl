@@ -122,7 +122,7 @@ Kr,Pt = regulator(X, U, t, Rr, Qr, fx, fu);
 
 # anonymous = 2.4ms to build, 1μs to execute
 # regular function = 2.4ms to build, 1μs to execute (but, has nasty typedef)
-
+##
 fig = Figure(); ax = Axis(fig[1,1])
 lines!(ax, t, map(τ->Kr(τ)[1], t))
 lines!(ax, t, map(τ->Kr(τ)[2], t))
@@ -136,6 +136,8 @@ display(fig)
 
 X1,U1 = projection(X, U, t, Kr, x0, f);
 
+
+##
 fig = Figure()
 ax = Axis(fig[1,1])
 lines!(ax, t, map(τ->X1(τ)[1], t))
@@ -174,6 +176,7 @@ S = t->Main.lxu(X1(t), U1(t))
 # for now:
 Ko,vo,q,z,v,y,Dh,D2g = PRONTO.search_direction(X1, U1, t, model, Kr, zeros(2));
 
+v = PRONTO.tau(τ->v(τ),t);
 
 fig = Figure()
 ax = Axis(fig[1,1])
@@ -232,37 +235,7 @@ display(fig)
 
 ## --------------------------- next estimate --------------------------- ##
 
-
-
-
-# armijo_backstep:
-    γ = 1
-    # generate estimate
-    α = PRONTO.tau(t->X1(t) + γ*z(t), t);
-    μ = PRONTO.tau(t->U1(t) + γ*v(t), t);
-    X2,U2 = projection(α, μ, t, Kr, x0, f);
-
-
-    
-    fig = Figure()
-    ax = Axis(fig[1,1])
-    lines!(ax, t, map(τ->X2(τ)[1], t))
-    lines!(ax, t, map(τ->X2(τ)[2], t))
-
-    ax = Axis(fig[2,1])
-    lines!(ax, t, map(τ->U2(τ)[1], t))
-    display(fig)
-
-
-    # compute cost
-    J = cost(X1,U1,t,l)
-    h = J(T)[1] + p(X1(T))
-    J = cost(X2,U2,t,l)
-    g = J(T)[1] + p(X2(T))
-
-    # check armijo rule
-
-
+γ = PRONTO.armijo_backstep(X1,U1,t,z,v,Kr,x0,f,l,p,Dh)
 
 
 
