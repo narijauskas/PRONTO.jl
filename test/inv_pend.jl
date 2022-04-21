@@ -25,9 +25,9 @@ f(x,u) = [x[2];   g/L*sin(x[1])-u[1]*cos(x[1])/L]
 
 
 # cost function
-Q = I
-R = I
-l(x,u) = 1/2*collect(x)'*Q*collect(x) + 1/2*collect(u)'*R*collect(u)
+Ql = I
+Rl = I
+l(x,u) = 1/2*collect(x)'*Ql*collect(x) + 1/2*collect(u)'*Rl*collect(u)
 
 # temporary workaround, until Symbolics gets full array variable support
 # l(x,u) = 1/2*(x[1]^2 + x[2]^2 + u[1]^2)
@@ -52,6 +52,25 @@ lxu = jacobian(u, l_x, x, u)
 luu = jacobian(u, l_u, x, u)
 
 
+
+## --------------------------- helper plot trajectories/timeseries --------------------------- ##
+
+function plot_trajectory!(ax, t, X, n; kw...)
+    for i in 1:n
+        lines!(ax, t, map(τ->X(τ)[i], t); kw...)
+    end
+    return ax
+end
+
+function plot_trajectory(t, X, n; kw...)
+    fig = Figure(; kw...)
+    ax = Axis(fig[1,1]; kw...)
+
+    plot_trajectory!(ax, t, X, n; kw...)
+    return fig
+end
+
+
 ## --------------------------- build estimate --------------------------- ##
 # solve dynamics with zero input
 
@@ -61,6 +80,8 @@ x0 = [2π/3; 0]
 
 U = LinearInterpolation(zeros(1, length(t)), t)
 X = LinearInterpolation(zeros(2, length(t)), t)
+display(plot_trajectory(t, X, 2))
+
 
 A = fx(X(T), U(T))
 B = fu(X(T), U(T))
@@ -93,9 +114,13 @@ model = Dict(
     :pxx => pxx,
 )
 
-# dynamics!(dx, x, u, t) = dx .= f(x, u(t))
-# sln = solve(ODEProblem(dynamics!, x0, (0.0, T), U))
-# X = LinearInterpolation(hcat(sln.(t)...), t) 
+
+## --------------------------- solve dynamics --------------------------- ##
+
+dynamics!(dx, x, u, t) = dx .= f(x, u(t))
+sln = solve(ODEProblem(dynamics!, x0, (0.0, T), U))
+Xt = LinearInterpolation(hcat(sln.(t)...), t) 
+display(plot_trajectory(t, Xt, 2))
 
 
 # now we have an estimate trajectory (X,U,t)
@@ -115,20 +140,17 @@ Rr = t->1e-3 # needs to capture X(t)
 
 
 Kr,Pt = regulator(X, U, t, Rr, Qr, fx, fu);
+display(plot_trajectory(t, Kr, 2))
+
 # % Regulator equilibrium
 # reg.xr = @(xT) 0*xT;
 # reg.ur = @(xT) [0 0]*xT;
 
 
 # anonymous = 2.4ms to build, 1μs to execute
-# regular function = 2.4ms to build, 1μs to execute (but, has nasty typedef)
+# regular function = 2.4ms to build, 1μs to execute
 ##
-fig = Figure(); ax = Axis(fig[1,1])
-lines!(ax, t, map(τ->Kr(τ)[1], t))
-lines!(ax, t, map(τ->Kr(τ)[2], t))
-display(fig)
-# α = 
-# μ = 
+
 
 
 
@@ -136,16 +158,11 @@ display(fig)
 
 X1,U1 = projection(X, U, t, Kr, x0, f);
 
-
-##
 fig = Figure()
-ax = Axis(fig[1,1])
-lines!(ax, t, map(τ->X1(τ)[1], t))
-lines!(ax, t, map(τ->X1(τ)[2], t))
-
-ax = Axis(fig[2,1])
-lines!(ax, t, map(τ->X1(τ)[1], t))
+ax = Axis(fig[1,1]; title = "X1"); plot_trajectory!(ax, t, X1, 2)
+ax = Axis(fig[2,1]; title = "U1"); plot_trajectory!(ax, t, U1, 1)
 display(fig)
+
 
 # L = cost(X1,U1,t,l)
 
@@ -158,10 +175,26 @@ A = t->Main.fx(X1(t), U1(t))
 B = t->Main.fu(X1(t), U1(t))
 a = t->Main.l_x(X1(t), U1(t))
 b = t->Main.l_u(X1(t), U1(t))
+
+fig = Figure()
+ax = Axis(fig[1,1]; title = "A"); plot_trajectory!(ax, t, A, 2)
+ax = Axis(fig[1,2]; title = "B"); plot_trajectory!(ax, t, B, 1)
+ax = Axis(fig[2,1]; title = "a"); plot_trajectory!(ax, t, a, 1)
+ax = Axis(fig[2,2]; title = "b"); plot_trajectory!(ax, t, b, 1)
+display(fig)
+
+## --------------------------- tangent space cont'd --------------------------- ##
+
+
 Q = t->Main.lxx(X1(t), U1(t))
 R = t->Main.luu(X1(t), U1(t))
 S = t->Main.lxu(X1(t), U1(t))
 
+fig = Figure()
+ax = Axis(fig[1,1]; title = "Q"); plot_trajectory!(ax, t, Q, 2)
+ax = Axis(fig[2,1]; title = "R"); plot_trajectory!(ax, t, R, 1)
+ax = Axis(fig[3,1]; title = "S"); plot_trajectory!(ax, t, S, 1)
+display(fig)
 
 ## --------------------------- search direction --------------------------- ##
 # include("search_direction.jl")
@@ -179,63 +212,82 @@ Ko,vo,q,z,v,y,Dh,D2g = PRONTO.search_direction(X1, U1, t, model, Kr, zeros(2));
 v = PRONTO.tau(τ->v(τ),t);
 
 fig = Figure()
-ax = Axis(fig[1,1])
-lines!(ax, t, map(τ->Ko(τ)[1], t))
-lines!(ax, t, map(τ->Ko(τ)[2], t))
-
-ax = Axis(fig[2,1])
-lines!(ax, t, map(τ->vo(τ)[1], t))
+ax = Axis(fig[1,1]; title = "Ko"); plot_trajectory!(ax, t, Ko, 2)
+ax = Axis(fig[2,1]; title = "vo"); plot_trajectory!(ax, t, vo, 1)
+ax = Axis(fig[3,1]; title = "q"); plot_trajectory!(ax, t, q, 2)
 display(fig)
 
-ax = Axis(fig[3,1])
-lines!(ax, t, map(τ->q(τ)[1], t))
-lines!(ax, t, map(τ->q(τ)[2], t))
-
-display(fig)
 
 ## --------------------------- search direction --------------------------- ##
 
 fig = Figure()
-ax = Axis(fig[1,1])
-lines!(ax, t, map(τ->z(τ)[1], t))
-lines!(ax, t, map(τ->z(τ)[2], t))
-
-ax = Axis(fig[2,1])
-lines!(ax, t, map(τ->v(τ)[1], t))
+ax = Axis(fig[1,1]; title = "z"); plot_trajectory!(ax, t, z, 2)
+ax = Axis(fig[2,1]; title = "v"); plot_trajectory!(ax, t, v, 1)
+ax = Axis(fig[3,1]; title = "y"); plot_trajectory!(ax, t, y, 2)
 display(fig)
-
-## --------------------------- search direction --------------------------- ##
-fig = Figure()
-ax = Axis(fig[1,1])
-lines!(ax, t, map(τ->y(τ)[1], t))
-lines!(ax, t, map(τ->y(τ)[2], t))
-display(fig)
-
-# R₀ = R
-# Q₀ = Q
-# S₀ = S
-
-# R₀ = t -> R(t) .+ mapreduce((qk,fk)->qk*fk, sum, q(t), fuu(X1(t), U1(t)))
-
-# R₀ = t -> R(t) .+ sum(map((qk,fk) -> qk*fk, q(t), Main.fuu(X1(t), U1(t))))
-# Q₀ = t -> Q(t) .+ sum(map((qk,fk) -> qk*fk, q(t), Main.fxx(X1(t), U1(t))))
-# S₀ = t -> S(t) .+ sum(map((qk,fk) -> qk*fk, q(t), Main.fxu(X1(t), U1(t))))
-
-
-
-
-
-
-
-
-
-
 
 # ζ = (z,v)
 
-## --------------------------- next estimate --------------------------- ##
+## --------------------------- armijo --------------------------- ##
 
 γ = PRONTO.armijo_backstep(X1,U1,t,z,v,Kr,x0,f,l,p,Dh)
+
+## --------------------------- next estimate --------------------------- ##
+
+α = PRONTO.tau(t->(X1(t) + γ*z(t)), t);
+μ = PRONTO.tau(t->(U1(t) + γ*v(t)), t);
+X2,U2 = projection(α, μ, t, Kr, x0, f);
+fig = Figure()
+ax = Axis(fig[1,1]; title = "X1"); plot_trajectory!(ax, t, X1, 2)
+ax = Axis(fig[2,1]; title = "U1"); plot_trajectory!(ax, t, U1, 1)
+ax = Axis(fig[1,2]; title = "X2"); plot_trajectory!(ax, t, X2, 2)
+ax = Axis(fig[2,2]; title = "U2"); plot_trajectory!(ax, t, U2, 1)
+display(fig)
+
+
+
+
+
+
+
+
+
+# check Dh
+Dh > 0 ? (@error "increased cost from update direction") : nothing
+-Dh < 1e-8 ? (@error "converged - this is good") : nothing
+
+
+
+## --------------------------- pronto loop --------------------------- ##
+
+X0 = X; U0 = U
+
+for iter in 1:200
+    @show iter
+    Kr,Pt = regulator(X0, U0, t, Rr, Qr, fx, fu);
+    X1,U1 = projection(X0, U0, t, Kr, x0, f);
+    Ko,vo,q,z,v,y,Dh,D2g = PRONTO.search_direction(X1, U1, t, model, Kr, zeros(2));
+
+    # end condition - always error
+    @show Dh
+    Dh > 0 ? (@error "increased cost from update direction") : nothing
+    -Dh < 1e-8 ? (@error "converged - this is good") : nothing
+
+    v = PRONTO.tau(τ->v(τ),t);
+    γ = PRONTO.armijo_backstep(X1,U1,t,z,v,Kr,x0,f,l,p,Dh)
+    α = PRONTO.tau(t->(X1(t) + γ*z(t)), t);
+    μ = PRONTO.tau(t->(U1(t) + γ*v(t)), t);
+    X0,U0 = projection(α, μ, t, Kr, x0, f);
+end
+
+fig = Figure()
+ax = Axis(fig[1,1]; title = "X (opt)"); plot_trajectory!(ax, t, X0, 2)
+ax = Axis(fig[2,1]; title = "U (opt)"); plot_trajectory!(ax, t, U0, 1)
+display(fig)
+
+
+
+
 
 
 
@@ -276,3 +328,27 @@ end
 display(fig)
 
 ## --------------------------- # --------------------------- ##
+
+
+## ---------------------------  --------------------------- ##
+
+
+# R₀ = R
+# Q₀ = Q
+# S₀ = S
+
+# R₀ = t -> R(t) .+ mapreduce((qk,fk)->qk*fk, sum, q(t), fuu(X1(t), U1(t)))
+
+# R₀ = t -> R(t) .+ sum(map((qk,fk) -> qk*fk, q(t), Main.fuu(X1(t), U1(t))))
+# Q₀ = t -> Q(t) .+ sum(map((qk,fk) -> qk*fk, q(t), Main.fxx(X1(t), U1(t))))
+# S₀ = t -> S(t) .+ sum(map((qk,fk) -> qk*fk, q(t), Main.fxu(X1(t), U1(t))))
+
+
+
+
+
+
+
+
+
+
