@@ -24,7 +24,14 @@ end
 
 
 Base.size(U::Timeseries) = u.size
-# Base.show()
+# Base.show(io::IO, U::Timeseries)
 
 
-# dims
+
+
+# maybe:
+# φ[1](t) # fundamentally inefficient with the current implementation
+# Base.getindex(φ::Trajectory, i::Int) = 1 <= i <= length(φ) ? (return t->φ(t)[i]) : throw(BoundsError(φ, i))
+# for v in φ; v(t); end
+# Base.iterate(φ::Trajectory, state=1) = state <= length(φ) ? (return (φ[state], state+1)) : (return nothing)
+
