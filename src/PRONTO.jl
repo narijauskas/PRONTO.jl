@@ -1,6 +1,12 @@
 module PRONTO
 # __precompile__(false)
 
+using DataInterpolations
+include("timeseries.jl")
+export Timeseries
+
+#=
+
 
 using LinearAlgebra
 using Symbolics
@@ -10,8 +16,10 @@ using DataInterpolations
 # using ControlSystems # provides lqr
 using MatrixEquations # provides arec
 
+
 # helper functions
 tau(f, t) = LinearInterpolation(hcat(map(f, t)...), t)
+
 
 
 
@@ -64,6 +72,6 @@ function armijo_backstep(x,u,t,z,v,Kr,x0,f,l,p,Dh)
 end
 
 
-
+=#
 
 end # module

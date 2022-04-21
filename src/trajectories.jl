@@ -9,11 +9,10 @@
 
 #note: this is a sloppy initial implementation that should be optimized later
 
-struct Trajectory
-    n::Int # number of states
-    v # any call-able thing which returns an array length n
-    t::AbstractVector # time range of validity
-end
+
+# 
+
+
 
 Trajectory(v,t) = Trajectory(length(v(first(t))), v, t)
 
