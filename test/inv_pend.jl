@@ -7,7 +7,7 @@ using DataInterpolations
 using DifferentialEquations
 using MatrixEquations
 
-using GLMakie; #plot(rand(10))
+using GLMakie; plot(rand(10))
 
 using PRONTO
 using PRONTO: jacobian, regulator, projection, cost
@@ -117,7 +117,10 @@ model = Dict(
 
 ## --------------------------- solve dynamics --------------------------- ##
 
-dynamics!(dx, x, u, t) = dx .= f(x, u(t))
+function dynamics!(dx, x, u, t) 
+    dx .= f(x, u(t))
+end
+
 sln = solve(ODEProblem(dynamics!, x0, (0.0, T), U))
 Xt = LinearInterpolation(hcat(sln.(t)...), t) 
 display(plot_trajectory(t, Xt, 2))
@@ -162,7 +165,6 @@ fig = Figure()
 ax = Axis(fig[1,1]; title = "X1"); plot_trajectory!(ax, t, X1, 2)
 ax = Axis(fig[2,1]; title = "U1"); plot_trajectory!(ax, t, U1, 1)
 display(fig)
-
 
 # L = cost(X1,U1,t,l)
 
@@ -252,12 +254,6 @@ display(fig)
 
 
 
-# check Dh
-Dh > 0 ? (@error "increased cost from update direction") : nothing
--Dh < 1e-8 ? (@error "converged - this is good") : nothing
-
-
-
 ## --------------------------- pronto loop --------------------------- ##
 
 X0 = X; U0 = U
@@ -270,8 +266,8 @@ for iter in 1:200
 
     # end condition - always error
     @show Dh
-    Dh > 0 ? (@error "increased cost from update direction") : nothing
-    -Dh < 1e-8 ? (@error "converged - this is good") : nothing
+    Dh > 0 ? (@error "increased cost from update direction"; break) : nothing
+    -Dh < 1e-2 ? (@error "converged - this is good"; break) : nothing
 
     v = PRONTO.tau(τ->v(τ),t);
     γ = PRONTO.armijo_backstep(X1,U1,t,z,v,Kr,x0,f,l,p,Dh)
