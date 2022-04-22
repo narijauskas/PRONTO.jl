@@ -21,10 +21,25 @@ include("autodiff.jl")
 # export hessian
 #TODO: build pronto model
 
+# t
+# R,Q (for regulator)
+# x0 (for projection)
+# f,fx,fu
+# fxx,fxu,fuu
+# ...
+# solver kw
 
 
 include("regulator.jl")
 # export regulator
+
+
+
+include("projection.jl")
+# export project!, projection
+
+include("cost.jl")
+
 
 #=
 
@@ -36,12 +51,6 @@ tau(f, t) = LinearInterpolation(hcat(map(f, t)...), t)
 
 
 
-
-
-include("projection.jl")
-# export project!, projection
-
-include("cost.jl")
 
 include("search_direction.jl")
 # gradient_descent
