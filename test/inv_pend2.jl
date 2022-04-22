@@ -4,8 +4,9 @@ using Revise, BenchmarkTools
 using Symbolics
 using LinearAlgebra
 using MatrixEquations
+using DataInterpolations
 
-using GLMakie; display(lines(rand(10)))
+# using GLMakie; display(lines(rand(10)))
 using PRONTO
 using PRONTO: jacobian, hessian
 
@@ -72,7 +73,7 @@ model = merge(model, (
 
 
 ## --------------------------- autodiff & terminal cost --------------------------- ##
-include("build_model.jl")
+include("build_model.jl");
 
 
 ## --------------------------- zero initial trajectory --------------------------- ##
@@ -82,7 +83,7 @@ x0 = Timeseries(t->[0;0;], model.t)
 
 
 ## --------------------------- or, solve zero input dynamics --------------------------- ##
-# function dynamics!(dx, x, u, t) 
+# function dynamics!(dx, x, u, t)
 #     dx .= f(x, u(t))
 # end
 
@@ -92,7 +93,7 @@ x0 = Timeseries(t->[0;0;], model.t)
 # ξ = (x0,u0)
 
 ## --------------------------- optimize --------------------------- ##
-ξ = pronto(ξ, model)
+@time ξ = pronto(ξ, model)
 
 
 ## --------------------------- plot --------------------------- ##

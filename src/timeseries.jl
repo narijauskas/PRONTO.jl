@@ -23,7 +23,7 @@ end
 (U::Timeseries{T})(t) where {T} = U.u(t)
 
 
-Base.size(U::Timeseries) = u.size
+Base.size(U::Timeseries) = U.size
 # Base.show(io::IO, U::Timeseries)
 
 

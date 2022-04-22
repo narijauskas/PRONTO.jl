@@ -8,6 +8,8 @@ function armijo_backstep(x,u,Kr,z,v,Dh,model)
     # compute cost
     J = cost(x,u,model)
     h = J(T)[1] + model.p(x(T))
+    ξ = 0
+
     while γ > model.β^12
         # generate estimate
         α = Timeseries(t->(x(t) + γ*z(t)), model.t)
