@@ -21,6 +21,8 @@ end
 # Interpolation
 # U(t) -> u (of type T)
 (U::Timeseries{T})(t) where {T} = U.u(t)
+#TODO: benchmark with and without type annotation
+# (U::Timeseries{T})(t) where {T} = U.u(t)::T
 
 
 Base.size(U::Timeseries) = U.size
