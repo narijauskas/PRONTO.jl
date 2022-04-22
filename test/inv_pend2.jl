@@ -3,8 +3,6 @@ import Pkg; Pkg.activate(".")
 using Revise, BenchmarkTools
 using Symbolics
 using LinearAlgebra
-# using DataInterpolations
-# using DifferentialEquations
 using MatrixEquations
 
 using GLMakie; display(lines(rand(10)))
@@ -33,7 +31,8 @@ end
 ## --------------------------- problem definition --------------------------- ##
 
 # symbolic states
-nx = 2; nu = 1
+nx = 2
+nu = 1
 @variables x[1:nx] u[1:nu]
 #NOTE: Symbolics.jl is still actively working on array symbolic variable support. # Things are limited. Things will change.
 
@@ -57,7 +56,7 @@ model = (
     f = f,
     l = l,
     maxiters = 100,
-    tol = 1e-2,
+    tol = 1e-3,
     β = 0.7,
     α = 0.4,
 );
@@ -77,9 +76,9 @@ include("build_model.jl")
 
 
 ## --------------------------- zero initial trajectory --------------------------- ##
-u = Timeseries(t->[0;], model.t)
-x = Timeseries(t->[0;0;], model.t)
-ξ = (x,u)
+u0 = Timeseries(t->[0;], model.t)
+x0 = Timeseries(t->[0;0;], model.t)
+ξ = (x0,u0)
 
 
 ## --------------------------- or, solve zero input dynamics --------------------------- ##
@@ -88,9 +87,9 @@ x = Timeseries(t->[0;0;], model.t)
 # end
 
 # T = last(model.t)
-# x = solve(ODEProblem(dynamics!, model.x0, (0.0, T), u))
-# x = Timeseries(t->x(t), model.t)
-# ξ = (x,u)
+# x0 = solve(ODEProblem(dynamics!, model.x0, (0, T), u0))
+# x0 = Timeseries(t->x0(t), model.t)
+# ξ = (x0,u0)
 
 ## --------------------------- optimize --------------------------- ##
 ξ = pronto(ξ, model)
