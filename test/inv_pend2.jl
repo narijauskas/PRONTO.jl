@@ -1,6 +1,7 @@
 # to compare against PRONTO for Dummies
-import Pkg; Pkg.activate(".")
+import Pkg; Pkg.activate()
 using Revise, BenchmarkTools
+Pkg.activate(".")
 using Symbolics
 using LinearAlgebra
 using MatrixEquations
@@ -8,7 +9,7 @@ using DataInterpolations
 
 # using GLMakie; display(lines(rand(10)))
 using PRONTO
-using PRONTO: jacobian, hessian
+using PRONTO: jacobian, hessian]
 
 ## --------------------------- helper plot trajectories/timeseries --------------------------- ##
 
@@ -49,12 +50,6 @@ Ql = I
 Rl = I
 l = (x,u) -> 1/2*collect(x)'*Ql*collect(x) + 1/2*collect(u)'*Rl*collect(u)
 
-## --------------------------- regulator parameters --------------------------- ##
-
-Qr = Timeseries(t->diagm([10,1]), model.t) # needs to capture X(t)
-Rr = Timeseries(t->1e-3, model.t) # needs to capture X(t)
-
-
 ## --------------------------- build model --------------------------- ##
 
 model = (
@@ -67,11 +62,17 @@ model = (
     tol = 1e-3,
     β = 0.7,
     α = 0.4,
-    Qr=Qr,
-    Rr=Rr,
 );
 
 
+## --------------------------- regulator parameters --------------------------- ##
+
+Qr = Timeseries(t->diagm([10,1]), model.t) # needs to capture X(t)
+Rr = Timeseries(t->1e-3, model.t) # needs to capture X(t)
+model = merge(model, (
+    Qr=Qr,
+    Rr=Rr,
+))
 
 
 ## --------------------------- autodiff & terminal cost --------------------------- ##
