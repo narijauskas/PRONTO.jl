@@ -1,16 +1,23 @@
 module PRONTO
 # __precompile__(false)
+using LinearAlgebra
 
 using DataInterpolations
 include("timeseries.jl")
 export Timeseries
 
+
+using Symbolics
+using Symbolics: derivative
+
+include("autodiff.jl")
+# export jacobian
+# export hessian
+
 #=
 
 
-using LinearAlgebra
-using Symbolics
-using Symbolics: derivative
+
 using DifferentialEquations
 using DataInterpolations
 # using ControlSystems # provides lqr
@@ -23,9 +30,6 @@ tau(f, t) = LinearInterpolation(hcat(map(f, t)...), t)
 
 
 
-include("autodiff.jl")
-# export jacobian
-# export hessian
 
 
 include("regulator.jl")
