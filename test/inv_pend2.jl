@@ -5,7 +5,7 @@ using Symbolics
 using LinearAlgebra
 # using DataInterpolations
 # using DifferentialEquations
-# using MatrixEquations
+using MatrixEquations
 
 using GLMakie; plot(rand(10))
 using PRONTO
@@ -15,7 +15,8 @@ using PRONTO: jacobian, hessian
 ## --------------------------- problem definition --------------------------- ##
 
 # symbolic states
-@variables x[1:2] u[1:1]
+nx = 2; nu = 1
+@variables x[1:nx] u[1:nu]
 #NOTE: Symbolics.jl is still actively working on array symbolic variable support. # Things are limited. Things will change.
 
 
@@ -37,56 +38,44 @@ model = (
     x_eq = [0; 0],
     f = f,
     l = l,
-)
+    maxiters = 10,
+    tol = 1e-2,
+    β = 0.7,
+    α = 0.4,
+);
 
 ## --------------------------- regulator parameters --------------------------- ##
 
-Qr = t->diagm([10,1]) # needs to capture X(t)
-Rr = t->1e-3 # needs to capture X(t)
-model = merge(model, (Qr=Qr, Rr=Rr))
+Qr = Timeseries(t->diagm([10,1]), model.t) # needs to capture X(t)
+Rr = Timeseries(t->1e-3, model.t) # needs to capture X(t)
+model = merge(model, (
+    Qr=Qr,
+    Rr=Rr,
+));
 
 
 ## --------------------------- autodiff --------------------------- ##
 
-
-function fdiffs(model)
-    model = merge(model, (
-        fx = jacobian(x, model.f, x, u),
-        fu = jacobian(u, model.f, x, u),
-    ))
-    model = merge(model, (
-        fxx = jacobian(x, model.fx, x, u),
-        fxu = jacobian(u, model.fx, x, u),
-        fuu = jacobian(u, model.fu, x, u),
-    ))
-    return model
-end
-
-
-function ldiffs(model)
-    model = merge(model, (
-        lx = jacobian(x, model.l, x, u),
-        lu = jacobian(u, model.l, x, u),
-    ))
-    model = merge(model, (
-        lxx = jacobian(x, model.lx, x, u),
-        lxu = jacobian(u, model.lx, x, u),
-        luu = jacobian(u, model.lu, x, u),
-    ))
-    return model
-end
-
-
-function pdiffs(model)
-    model = merge(model, (px = jacobian(x, model.p, x),))
-    model = merge(model, (pxx = jacobian(x, model.px, x),))
-    return model
-end
+model = merge(model, (
+    fx = jacobian(x, model.f, x, u),
+    fu = jacobian(u, model.f, x, u),
+))
+model = merge(model, (
+    fxx = jacobian(x, model.fx, x, u),
+    fxu = jacobian(u, model.fx, x, u),
+    fuu = jacobian(u, model.fu, x, u),
+))
+model = merge(model, (
+    lx = jacobian(x, model.l, x, u),
+    lu = jacobian(u, model.l, x, u),
+))
+model = merge(model, (
+    lxx = jacobian(x, model.lx, x, u),
+    lxu = jacobian(u, model.lx, x, u),
+    luu = jacobian(u, model.lu, x, u),
+))
 
 ## --------------------------- terminal cost --------------------------- ##
-
-model = fdiffs(model)
-model = ldiffs(model)
 
 xt = [0;0]
 ut = [0]
@@ -100,7 +89,10 @@ Po,_ = arec(A, B, R, Q ,S)
 p = x -> 1/2*collect(x)'*Po*collect(x)
 
 model = merge(model, (p=p,))
-model = pdiffs(model)
+model = merge(model, (px = jacobian(x, model.p, x),))
+model = merge(model, (pxx = jacobian(x, model.px, x),))
+
+
 
 
 
@@ -141,7 +133,7 @@ x = Timeseries(t->[0;0;], model.t)
 # ξ = (x,u)
 
 ## --------------------------- optimize --------------------------- ##
-ξ = pronto(ξ..., model)
+ξ = pronto(ξ, model)
 
 
 

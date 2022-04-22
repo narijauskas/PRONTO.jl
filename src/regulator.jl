@@ -9,17 +9,17 @@ end
 
 # function regulator(X, U, t, R, Q, fx, fu)
 
-function regulator(X, U, model)
+function regulator(x, u, model)
     # local, non-allocating, lazily evaluated only at values needed by ode solver
     # A = t -> model.fx(X(t), U(t))
     # B = t -> model.fu(X(t), U(t))
     # timeseries provide type stability
-    A = Timeseries(t -> model.fx(X(t), U(t)), model.t)
-    B = Timeseries(t -> model.fu(X(t), U(t)), model.t)
+    A = Timeseries(t -> model.fx(x(t), u(t)), model.t)
+    B = Timeseries(t -> model.fu(x(t), u(t)), model.t)
 
 
     # solve algebraic riccati eq at time T to get terminal cost
-    T = last(model.t); R = model.R; Q = model.Q
+    T = last(model.t); R = model.Rr; Q = model.Qr
     Pt,_ = arec(A(T), B(T)inv(R(T))B(T)', Q(T))
 
 
