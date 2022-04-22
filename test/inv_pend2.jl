@@ -49,6 +49,13 @@ Ql = I
 Rl = I
 l = (x,u) -> 1/2*collect(x)'*Ql*collect(x) + 1/2*collect(u)'*Rl*collect(u)
 
+## --------------------------- regulator parameters --------------------------- ##
+
+Qr = Timeseries(t->diagm([10,1]), model.t) # needs to capture X(t)
+Rr = Timeseries(t->1e-3, model.t) # needs to capture X(t)
+
+
+## --------------------------- build model --------------------------- ##
 
 model = (
     t = 0:0.001:10,
@@ -60,16 +67,11 @@ model = (
     tol = 1e-3,
     β = 0.7,
     α = 0.4,
-);
-
-## --------------------------- regulator parameters --------------------------- ##
-
-Qr = Timeseries(t->diagm([10,1]), model.t) # needs to capture X(t)
-Rr = Timeseries(t->1e-3, model.t) # needs to capture X(t)
-model = merge(model, (
     Qr=Qr,
     Rr=Rr,
-));
+);
+
+
 
 
 ## --------------------------- autodiff & terminal cost --------------------------- ##
