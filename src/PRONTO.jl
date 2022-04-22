@@ -24,70 +24,58 @@ include("autodiff.jl")
 # t
 # R,Q (for regulator)
 # x0 (for projection)
+# x_eq (for search direction)
+
 # f,fx,fu
 # fxx,fxu,fuu
+
+# l,lx,lu
 # ...
+
+# p, px, pxx
+
 # solver kw
 
 
 include("regulator.jl")
-# export regulator
-
-
-
 include("projection.jl")
-# export project!, projection
-
 include("cost.jl")
-
-
-#=
-
-
-
-
-# helper functions
-tau(f, t) = LinearInterpolation(hcat(map(f, t)...), t)
-
-
-
-
 include("search_direction.jl")
-# gradient_descent
-# 
+include("armijo.jl")
 
 
-
-# armijo_backstep:
-function armijo_backstep(x,u,t,z,v,Kr,x0,f,l,p,Dh)
-    γ = 1
-    aβ=0.7
-    aα=0.4
-    T = last(t)
-
-    # compute cost
-    J = cost(x,u,t,l)
-    h = J(T)[1] + p(x(T))
+function pronto(ξ, model)
     
+    # ξ is guess
+    # (X,U) = ξ
+    for i in 1:model.maxiters
+        @info "iteration: $i"
+        # ξ -> Kr # regulator
+        Kr = regulator(ξ..., model)
 
-    while γ > aβ^12
-        # generate estimate
-        α = PRONTO.tau(t->(x(t) + γ*z(t)), t);
-        μ = PRONTO.tau(t->(u(t) + γ*v(t)), t);
-        X2,U2 = projection(α, μ, t, Kr, x0, f);
+        # ξ,Kr -> φ # projection
+        φ = projection(ξ..., Kr, model)
 
-        J = cost(X2,U2,t,l)
-        g = J(T)[1] + p(X2(T))
+        @info "finding search direction"
+        # φ,Kr -> ζ,Dh # search direction
+        ζ,Dh = search_direction(φ..., Kr, model)
 
-        # check armijo rule
-        println("γ=$γ, h-g=$(h-g)")
-        h-g >= -aα*γ*Dh ? break : (γ *= aβ)
+        # check Dh criteria -> return ξ,Kr
+        @info "Dh is $Dh"
+        Dh > 0 && (@warn "increased cost - quitting"; return ξ)
+        -Dh < model.tol && (@info "PRONTO converged"; return ξ)
+        
+        @info "calculating new trajectory:"
+        # φ,ζ,Kr -> γ -> ξ # armijo
+        ξ = armijo_backstep(φ..., Kr, ζ..., Dh, model)
+
     end
+    # ξ is optimal (or last iteration)
 
-    return γ
+    @warn "maxiters"
+    return ξ
 end
 
 
-=#
 
 end # module
