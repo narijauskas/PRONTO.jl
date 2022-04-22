@@ -31,25 +31,63 @@ Rl = I
 l = (x,u) -> 1/2*collect(x)'*Ql*collect(x) + 1/2*collect(u)'*Rl*collect(u)
 
 
-## --------------------------- autodiff --------------------------- ##
 model = (
     t = 0:0.001:10,
     x0 = [2π/3; 0],
+    x_eq = [0; 0],
     f = f,
-    fx = jacobian(x, f, x, u),
-    fu = jacobian(u, f, x, u),
-    fxx = hessian(x, x, f, x, u),
-    fxu = hessian(x, u, f, x, u),
-    fuu = hessian(u, u, f, x, u),
     l = l,
-    lx = jacobian(x, l, x, u),
-    lu = jacobian(u, l, x, u),
-    lxx = hessian(x, x, l, x, u),
-    lxu = hessian(x, u, l, x, u),
-    luu = hessian(u, u, l, x, u),
 )
 
+## --------------------------- regulator parameters --------------------------- ##
+
+Qr = t->diagm([10,1]) # needs to capture X(t)
+Rr = t->1e-3 # needs to capture X(t)
+model = merge(model, (Qr=Qr, Rr=Rr))
+
+
+## --------------------------- autodiff --------------------------- ##
+
+
+function fdiffs(model)
+    model = merge(model, (
+        fx = jacobian(x, model.f, x, u),
+        fu = jacobian(u, model.f, x, u),
+    ))
+    model = merge(model, (
+        fxx = jacobian(x, model.fx, x, u),
+        fxu = jacobian(u, model.fx, x, u),
+        fuu = jacobian(u, model.fu, x, u),
+    ))
+    return model
+end
+
+
+function ldiffs(model)
+    model = merge(model, (
+        lx = jacobian(x, model.l, x, u),
+        lu = jacobian(u, model.l, x, u),
+    ))
+    model = merge(model, (
+        lxx = jacobian(x, model.lx, x, u),
+        lxu = jacobian(u, model.lx, x, u),
+        luu = jacobian(u, model.lu, x, u),
+    ))
+    return model
+end
+
+
+function pdiffs(model)
+    model = merge(model, (px = jacobian(x, model.p, x),))
+    model = merge(model, (pxx = jacobian(x, model.px, x),))
+    return model
+end
+
 ## --------------------------- terminal cost --------------------------- ##
+
+model = fdiffs(model)
+model = ldiffs(model)
+
 xt = [0;0]
 ut = [0]
 
@@ -61,16 +99,11 @@ S = model.lxu(xt, ut)
 Po,_ = arec(A, B, R, Q ,S)
 p = x -> 1/2*collect(x)'*Po*collect(x)
 
-merge(model, (
-    p = p,
-    px = jacobian(x, p, x),
-    pxx = hessian(x, x, p, x),
-))
+model = merge(model, (p=p,))
+model = pdiffs(model)
 
-## --------------------------- regulator parameters --------------------------- ##
-Qr = t->diagm([10,1]) # needs to capture X(t)
-Rr = t->1e-3 # needs to capture X(t)
-merge(model, (Qr=Qr, Rr=Rr))
+
+
 
 
 ## --------------------------- helper plot trajectories/timeseries --------------------------- ##
