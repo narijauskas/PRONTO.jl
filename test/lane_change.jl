@@ -12,22 +12,40 @@ using PRONTO: jacobian, hessian
 
 ## --------------------------- helper plot trajectories/timeseries --------------------------- ##
 
-function plot_timeseries!(ax, t, X, n; kw...)
-    for i in 1:n
-        lines!(ax, t, map(τ->X(τ)[i], t); kw...)
-    end
-    return ax
-end
+include("plot_setup.jl")
+function plot_all(t, X, U)
 
-function plot_timeseries(t, X, n; kw...)
-    fig = Figure(; kw...)
-    ax = Axis(fig[1,1]; kw...)
+    fig = Figure(resolution = (1800, 1800),)
 
-    plot_timeseries!(ax, t, X, n; kw...)
+    ax = Axis(fig[1,1:2]; title = "Lateral Position")
+    lines!(ax, t, map(τ->X(τ)[1], t))
+
+    ax = Axis(fig[1,3:4]; title = "Lateral Velocity")
+    lines!(ax, t, map(τ->X(τ)[2], t))
+
+    ax = Axis(fig[2,1:2]; title = "Yaw Angle")
+    lines!(ax, t, map(τ->X(τ)[3], t))
+
+    ax = Axis(fig[2,3:4]; title = "Angular Velocity")
+    lines!(ax, t, map(τ->X(τ)[4], t))
+
+    ax = Axis(fig[3,1:2]; title = "Steering Angle")
+    hlines!(ax, deg2rad(30); linestyle=:dash,color=clr[1])
+    hlines!(ax, deg2rad(-30); linestyle=:dash,color=clr[1])
+    lines!(ax, t, map(τ->X(τ)[5], t); color=clr[1])
+    hlines!(ax, deg2rad(6); linestyle=:dash,color=clr[2])
+    hlines!(ax, deg2rad(-6); linestyle=:dash,color=clr[2])
+    lines!(ax, t, map(τ->X(τ)[6], t); color=clr[2])
+
+    ax = Axis(fig[3,3:4]; title = "Steering Rate")
+    hlines!(ax, 1; linestyle=:dash, color=clr_mg)
+    hlines!(ax, -1; linestyle=:dash, color=clr_mg)
+    lines!(ax, t, map(τ->U(τ)[1], t))
+    lines!(ax, t, map(τ->U(τ)[2], t))
+
+    display(fig)
     return fig
 end
-
-
 
 ## --------------------------- problem definition --------------------------- ##
 
@@ -93,12 +111,7 @@ model = (
 );
 
 
-
 ## --------------------------- regulator parameters --------------------------- ##
-
-# Qr = Timeseries(t->diagm([10,1]), model.t) # needs to capture X(t)
-# Rr = Timeseries(t->1e-3, model.t) # needs to capture X(t)
-
 ϵ = 0
 Qlqr = Timeseries(t->diagm([1,ϵ,1,ϵ,ϵ,ϵ]), model.t)
 Rlqr = Timeseries(t->0.1*diagm([1,1]), model.t)
@@ -109,8 +122,7 @@ model = merge(model, (
 ))
 
 ## --------------------------- autodiff & terminal cost --------------------------- ##
-include("build_model.jl");
-
+include("build_model.jl")
 
 ## --------------------------- zero initial trajectory --------------------------- ##
 u0 = Timeseries(t->zeros(NU), model.t)
@@ -118,20 +130,10 @@ x0 = Timeseries(t->zeros(NX), model.t)
 ξ = (x0,u0)
 
 
-## --------------------------- or, solve zero input dynamics --------------------------- ##
-# function dynamics!(dx, x, u, t)
-#     dx .= f(x, u(t))
-# end
-
-# T = last(model.t)
-# x0 = solve(ODEProblem(dynamics!, model.x0, (0, T), u0))
-# x0 = Timeseries(t->x0(t), model.t)
-# ξ = (x0,u0)
-
 ## --------------------------- optimize --------------------------- ##
 @time ξ = pronto(ξ, model)
 
 
 ## --------------------------- plot --------------------------- ##
-plot_timeseries(model.t, ξ[1], 6)
+fig = plot_all(model.t, ξ...)
 
