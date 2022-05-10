@@ -22,8 +22,8 @@ model = merge(model, (
 
 ## --------------------------- terminal cost --------------------------- ##
 
-xt = [0;0]
-ut = [0]
+xt = model.x_eq
+ut = model.u_eq
 
 A = model.fx(xt, ut)
 B = model.fu(xt, ut)
