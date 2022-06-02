@@ -14,9 +14,8 @@ function regulator(x, u, model)
     # A = t->model.fx(x(t), u(t))
     # B = t->model.fu(x(t), u(t))
     # timeseries provide type stability
-    A = Timeseries(t -> model.fx(x(t), u(t)), model.t)
-    B = Timeseries(t -> model.fu(x(t), u(t)), model.t)
-
+    A = Timeseries(t->Float64.(model.fx(x(t), u(t))))
+    B = Timeseries(t->Float64.(model.fu(x(t), u(t))))
 
     # solve algebraic riccati eq at time T to get terminal cost
     T = last(model.t); R = model.Rr; Q = model.Qr
@@ -24,10 +23,8 @@ function regulator(x, u, model)
 
 
     # solve differential riccati, return regulator
-    P = solve(ODEProblem(riccati!, Pt, (T,0.0), (A,B,Q,R)), Rosenbrock23(), dt=0.001)
-    return P
-    Kr = Timeseries(t->inv(R(t))*B(t)'*P(t), model.t)
-    # P = LinearInterpolation(hcat(P.(t)...),t) 
+    P = Timeseries(solve(ODEProblem(riccati!, Pt, (T,0.0), (A,B,Q,R)), Rosenbrock23()))
+    Kr = Timeseries(t->inv(R(t))*B(t)'*P(t))
     # Kr = t->inv(R(t))*B(t)'*P(t) # K as a closure with captured R,B,P
     return Kr
 end

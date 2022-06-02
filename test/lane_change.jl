@@ -7,7 +7,7 @@ using Revise, BenchmarkTools
 using Symbolics
 using LinearAlgebra
 using MatrixEquations
-using DataInterpolations
+# using DataInterpolations
 @info "loading plots"
 using GLMakie; display(lines(rand(10)))
 @info "loading PRONTO"
@@ -108,7 +108,7 @@ model = (
     u_eq = zeros(NU),
     f = f,
     l = l,
-    maxiters = 100,
+    maxiters = 1,
     tol = 1e-3,
     β = 0.7,
     α = 0.4,
@@ -117,8 +117,8 @@ model = (
 
 ## --------------------------- regulator parameters --------------------------- ##
 ϵ = 0
-Qlqr = Timeseries(t->diagm([1,ϵ,1,ϵ,ϵ,ϵ]), model.t)
-Rlqr = Timeseries(t->0.1*diagm([1,1]), model.t)
+Qlqr = Timeseries(t->diagm([1,ϵ,1,ϵ,ϵ,ϵ]))
+Rlqr = Timeseries(t->0.1*diagm([1,1]))
 
 model = merge(model, (
     Qr = Qlqr,
@@ -166,17 +166,17 @@ model = merge(model, (pxx = jacobian(x, model.px, x),))
 
 
 ## --------------------------- zero initial trajectory --------------------------- ##
-u0 = Timeseries(t->zeros(NU), model.t)
-x0 = Timeseries(t->zeros(NX), model.t)
+u0 = Timeseries(t->zeros(NU))
+x0 = Timeseries(t->zeros(NX))
 ξ = (x0,u0)
 
 
 ## --------------------------- optimize --------------------------- ##
-# @time ξ = pronto(ξ, model)
+@time ξ = pronto(ξ, model)
 # ProfileView.@profview ξ = pronto(ξ, model)
 
 ## --------------------------- plot --------------------------- ##
-# fig = plot_all(model.t, ξ...)
+fig = plot_all(model.t, ξ...)
 
 ## --------------------------- testing --------------------------- ##
-P = PRONTO.regulator(ξ..., model)
+# P = PRONTO.regulator(ξ..., model)

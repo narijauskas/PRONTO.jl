@@ -1,11 +1,11 @@
 module PRONTO
 # __precompile__(false)
 using LinearAlgebra
-using DataInterpolations
+using SciMLBase
+# using DataInterpolations
 using Symbolics
 using Symbolics: derivative
 using DifferentialEquations
-using DataInterpolations
 # using ControlSystems # provides lqr
 using MatrixEquations # provides arec
 
