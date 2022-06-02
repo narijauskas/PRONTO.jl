@@ -39,3 +39,5 @@ So,
 2. make a constructor which takes generic ODESolutions
 3. make it callable, forwarding to the internal solution type
 4. nospecialize if needed
+
+This will result in *slightly* less optimal code with *substantially* smaller compile overhead
