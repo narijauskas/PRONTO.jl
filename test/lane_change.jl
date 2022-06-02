@@ -1,12 +1,14 @@
 # to compare against PRONTO for Dummies
-import Pkg; Pkg.activate(".")
+import Pkg; Pkg.activate("."); Pkg.instantiate()
+@info "loading dependencies"
 using Revise, BenchmarkTools
 using Symbolics
 using LinearAlgebra
 using MatrixEquations
 using DataInterpolations
-
+@info "loading plots"
 using GLMakie; display(lines(rand(10)))
+@info "loading PRONTO"
 using PRONTO
 using PRONTO: jacobian, hessian
 
