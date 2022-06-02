@@ -51,6 +51,7 @@ function pronto(ξ, model)
     for i in 1:model.maxiters
         @info "iteration: $i"
         # ξ -> Kr # regulator
+        @info "building regulator"
         Kr = regulator(ξ..., model)
 
         # ξ,Kr -> φ # projection
@@ -69,6 +70,8 @@ function pronto(ξ, model)
         # φ,ζ,Kr -> γ -> ξ # armijo
         ξ = armijo_backstep(φ..., Kr, ζ..., Dh, model)
 
+        @info "resampling solution"
+        ξ = resample(ξ...,model)
     end
     # ξ is optimal (or last iteration)
 
