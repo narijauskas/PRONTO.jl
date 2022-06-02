@@ -39,7 +39,7 @@ set_theme!(
         linewidth = 2,
         markersize = 21,
         fontsize = 28,
-        font = "Inter Light",
+        # font = "Inter Light",
         color = clr_fg,
         # colormap = cmap,
         palette = (

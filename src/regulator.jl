@@ -11,8 +11,8 @@ end
 
 function regulator(x, u, model)
     # local, non-allocating, lazily evaluated only at values needed by ode solver
-    # A = t -> model.fx(X(t), U(t))
-    # B = t -> model.fu(X(t), U(t))
+    # A = t->model.fx(x(t), u(t))
+    # B = t->model.fu(x(t), u(t))
     # timeseries provide type stability
     A = Timeseries(t -> model.fx(x(t), u(t)), model.t)
     B = Timeseries(t -> model.fu(x(t), u(t)), model.t)
@@ -25,6 +25,7 @@ function regulator(x, u, model)
 
     # solve differential riccati, return regulator
     P = solve(ODEProblem(riccati!, Pt, (T,0.0), (A,B,Q,R)), Rosenbrock23(), dt=0.001)
+    return P
     Kr = Timeseries(t->inv(R(t))*B(t)'*P(t), model.t)
     # P = LinearInterpolation(hcat(P.(t)...),t) 
     # Kr = t->inv(R(t))*B(t)'*P(t) # K as a closure with captured R,B,P

@@ -1,6 +1,8 @@
 # to compare against PRONTO for Dummies
-import Pkg; Pkg.activate("."); Pkg.instantiate()
+import Pkg; Pkg.activate("."); #Pkg.instantiate()
 @info "loading dependencies"
+using SciMLBase
+using OrdinaryDiffEq
 using Revise, BenchmarkTools
 using Symbolics
 using LinearAlgebra
@@ -11,7 +13,7 @@ using GLMakie; display(lines(rand(10)))
 @info "loading PRONTO"
 using PRONTO
 using PRONTO: jacobian, hessian
-
+@info "ready, running file"
 ## --------------------------- helper plot trajectories/timeseries --------------------------- ##
 
 include("plot_setup.jl")
@@ -170,9 +172,11 @@ x0 = Timeseries(t->zeros(NX), model.t)
 
 
 ## --------------------------- optimize --------------------------- ##
-@time ξ = pronto(ξ, model)
-
+# @time ξ = pronto(ξ, model)
+# ProfileView.@profview ξ = pronto(ξ, model)
 
 ## --------------------------- plot --------------------------- ##
-fig = plot_all(model.t, ξ...)
+# fig = plot_all(model.t, ξ...)
 
+## --------------------------- testing --------------------------- ##
+P = PRONTO.regulator(ξ..., model)

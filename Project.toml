@@ -13,10 +13,11 @@ GLMakie = "e9467ef8-e4e7-5192-8a1a-b1aee30e663a"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 MatrixEquations = "99c1a7ee-ab34-5fd5-8076-27c950a045f4"
 QuadGK = "1fd47b50-473d-5c70-9696-f719f8f3bcdc"
+SciMLBase = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
 Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
 
 [compat]
-DataInterpolations = "3.9.0" #FIX: very rigid, change eventually
+DataInterpolations = "3.9.0"
 
 [extras]
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
