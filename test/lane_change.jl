@@ -7,6 +7,7 @@ using Revise, BenchmarkTools
 using Symbolics
 using LinearAlgebra
 using MatrixEquations
+using DifferentialEquations
 # using DataInterpolations
 @info "loading plots"
 using GLMakie; display(lines(rand(10)))

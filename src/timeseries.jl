@@ -46,6 +46,7 @@ function Timeseries(f::Function; t₀=0.0)
     FunctionalTimeseries{typeof(f(t₀))}(f)
 end
 
+# allows X(t) -> returns type T
 function (X::FunctionalTimeseries{T})(t)::T where {T}
     X.f(t)
 end
