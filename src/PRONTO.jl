@@ -21,6 +21,10 @@ include("autodiff.jl")
 # export hessian
 #TODO: build pronto model
 
+
+include("model.jl")
+
+
 # t
 # R,Q (for regulator)
 # x0 (for projection)
@@ -35,7 +39,6 @@ include("autodiff.jl")
 # p, px, pxx
 
 # solver kw
-
 
 include("regulator.jl")
 include("projection.jl")
