@@ -62,8 +62,9 @@ function search_direction(x,u,Kr,model)
 
     #YO: fails with Rosenbrock23()
     r = Timeseries(solve(ODEProblem(costate_dynamics!, rT, (T,0.0), (A,B,a,b,Ko))))
-
     vo = Timeseries(t->(-R(t)\(B(t)'*r(t)+b(t))))
+    
+    
     qT = rT # use x_eq
     q = Timeseries(solve(ODEProblem(costate_dynamics!, qT, (T,0.0), (A,B,a,b,Kr))))
     q = Timeseries(t->q(t))
