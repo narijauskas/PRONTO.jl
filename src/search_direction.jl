@@ -23,6 +23,19 @@ function cost_derivatives!(dy, y, (z,v,a,b,Qo,So,Ro), t)
 end
 
     
+
+# 1. create integrator (with model? at package level? at model construction?)
+
+# 2. re-init integrator at [x0]
+# 3. for each t in ξ.t
+    # 3.1 solve integrator to t 
+    # 3.2 update value of interpolant (which is NOT used to solve #3)
+
+# 4. use value for next solution
+
+#MAYBE: create solver object, containing the "internal" solutions
+# eg, trajectories like ξ/ζ, and internal solutions like Kr,P,r,q
+
 function search_direction(x,u,Kr,model)
     #MAYBE: split this into parts?
 

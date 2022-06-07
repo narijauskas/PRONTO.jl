@@ -9,6 +9,8 @@ using DifferentialEquations
 # using ControlSystems # provides lqr
 using MatrixEquations # provides arec
 
+#include("trajectories.jl")
+#include("model.jl")
 
 
 
@@ -20,9 +22,6 @@ include("autodiff.jl")
 # export jacobian
 # export hessian
 #TODO: build pronto model
-
-
-include("model.jl")
 
 
 # t
@@ -46,6 +45,10 @@ include("cost.jl")
 include("search_direction.jl")
 include("armijo.jl")
 
+
+# update_regulator!(Kr, ξ, model)
+# update_projection!(φ, ξ, Kr, model)
+# Dh = update_search_direction!(ζ, φ, Kr, model)
 
 function pronto(ξ, model)
     

@@ -4,6 +4,8 @@ function stabilized_dynamics!(dx, x, (α,μ,Kr,f), t)
     dx .= f(x,u)
 end
 
+
+# project φ,Kr->ξ
 # simulates dynamics and control law
 function projection(α, μ, Kr, model)
     T = last(model.t)

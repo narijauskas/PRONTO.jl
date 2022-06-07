@@ -1,39 +1,39 @@
 using Symbolics
 
-struct Model
-    # model functions...
-    f::Function
-    fx::Function
-    fu::Function
-    fxx::Function
-    fxu::Function
-    fuu::Function
-    l::Function
-    lx::Function
-    lu::Function
-    lxx::Function
-    lxu::Function
-    luu::Function
-    p::Function
-    px::Function
-    pxx::Function
-    # ... and their return types
-    fT::DataType
-    fxT::DataType
-    fuT::DataType
-    fxxT::DataType
-    fxuT::DataType
-    fuuT::DataType
-    lT::DataType
-    lxT::DataType
-    luT::DataType
-    lxxT::DataType
-    lxuT::DataType
-    luuT::DataType
-    pT::DataType
-    pxT::DataType
-    pxxT::DataType
-end
+# struct Model
+#     # model functions...
+#     f::Function
+#     fx::Function
+#     fu::Function
+#     fxx::Function
+#     fxu::Function
+#     fuu::Function
+#     l::Function
+#     lx::Function
+#     lu::Function
+#     lxx::Function
+#     lxu::Function
+#     luu::Function
+#     p::Function
+#     px::Function
+#     pxx::Function
+#     # ... and their return types (or can we generate these?)
+#     fT::DataType
+#     fxT::DataType
+#     fuT::DataType
+#     fxxT::DataType
+#     fxuT::DataType
+#     fuuT::DataType
+#     lT::DataType
+#     lxT::DataType
+#     luT::DataType
+#     lxxT::DataType
+#     lxuT::DataType
+#     luuT::DataType
+#     pT::DataType
+#     pxT::DataType
+#     pxxT::DataType
+# end
 # model = pronto_model(...)
 
 
