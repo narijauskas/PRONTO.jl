@@ -38,8 +38,8 @@ end
 
 # update values of X by evaluating f(t) for each t
 function update!(f, X::Interpolant)
-    for (i,t) in enumerate(itp.t)
-        setindex!(X, f(t), i)
+    for (i,t) in enumerate(X.itp.t)
+        X[i] = f(t) # setindex!(X, f(t), i)
     end
 end
 

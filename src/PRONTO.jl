@@ -46,6 +46,12 @@ include("search_direction.jl")
 include("armijo.jl")
 
 
+@inline A(model,ξ,t) = model.fx(ξ.x(t),ξ.u(t))
+@inline B(model,ξ,t) = model.fu(ξ.x(t),ξ.u(t))
+# A = model.fx(ξ.x(t),ξ.u(t))
+# B = model.fu(ξ.x(t),ξ.u(t))
+
+
 # update_regulator!(Kr, ξ, model)
 # update_projection!(φ, ξ, Kr, model)
 # Dh = update_search_direction!(ζ, φ, Kr, model)
