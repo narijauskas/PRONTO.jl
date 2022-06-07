@@ -15,3 +15,18 @@ function projection(α, μ, Kr, model)
     ξ = (x,u)
     return ξ
 end
+
+
+
+# projection setup
+
+function stabilized_dynamics!(dx, x, model, t)
+    # captures φ? Kr?
+
+    μ = φ.μ(t)
+    α = φ.α(t)
+    Kr = Kr(model, t)
+
+    u = μ - Kr*(x-α)
+    dx .= model.f(x,u)
+end

@@ -37,6 +37,7 @@ end
 # regulator setup
 
 function riccati!(dP, P, model, t)
+    # captures ξ?
     Rr = model.Rr(t)
     Qr = model.Qr(t)
     A = model.fx(ξ.x(t),ξ.u(t))
@@ -60,10 +61,13 @@ end
 Pr = Interpolant(?, t)
 Pr_integrator = init(ODEProblem(riccati!, PT(model,ξ), (T,0.0)), Tsit5())
 # Kr(t) = inv(Rr(t))*B(t)'*P(t)
-function Kr(model,ξ,Pr,t)
+
+# captures ξ, Pr
+function Kr(model, t)
     Rr = model.Rr(t)
     B = model.fu(ξ.x(t),ξ.u(t))
-    return inv(Rr)*B'*Pr(t) # instantenously evaluated K
+    Pr = Pr(t)
+    return inv(Rr)*B'*Pr # instantenously evaluated K
     # return inv(Rr(t))*B(t)'*P(t)
 end
 
@@ -75,6 +79,13 @@ end
 # B = model.fu(ξ.x(t),ξ.u(t))
 # PT,_ = arec(A(T), B(T)inv(Rr(T))B(T)', Qr(T))
 
-resolve!(Pr, Pr_integrator, PT(model,ξ))
+# map ξ -> Kr
+function update_regulator!(model, data)
+    Pr = data.Pr
+    Pr_integrator = data.Pr
+    ξ = data.ξ
+    resolve!(Pr, Pr_integrator, PT(model,ξ))
+    return nothing
+end
 # now Kr is up to date
 

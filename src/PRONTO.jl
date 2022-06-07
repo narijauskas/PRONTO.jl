@@ -46,8 +46,24 @@ include("search_direction.jl")
 include("armijo.jl")
 
 
-@inline A(model,ξ,t) = model.fx(ξ.x(t),ξ.u(t))
-@inline B(model,ξ,t) = model.fu(ξ.x(t),ξ.u(t))
+function pronto(ξ, model)
+
+    # declare interpolant objects
+    # ξ,φ
+    # declare integrators to solve them
+    # declare functions (capturing above)
+
+
+    # pronto loop - update integrators
+
+end
+
+
+
+
+
+@inline A(model,ξ,t) = model.fx(ξ.x(t),ξ.u(t))::model.fxT
+@inline B(model,ξ,t) = model.fu(ξ.x(t),ξ.u(t))::model.fuT
 # A = model.fx(ξ.x(t),ξ.u(t))
 # B = model.fu(ξ.x(t),ξ.u(t))
 
