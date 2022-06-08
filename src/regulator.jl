@@ -82,7 +82,7 @@ end
 # map ξ -> Kr
 function update_regulator!(model, data)
     Pr = data.Pr
-    Pr_integrator = data.Pr
+    Pr_integrator = data.Pr_integrator
     ξ = data.ξ
     resolve!(Pr, Pr_integrator, PT(model,ξ))
     return nothing

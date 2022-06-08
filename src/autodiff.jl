@@ -9,7 +9,9 @@ function jacobian(dx, f, args...; inplace = false)
         end
     end...; dims = ndims(f_sym)+1)
 
-    return eval(build_function(fx_sym, args...)[inplace ? 2 : 1])
+    # return eval(build_function(fx_sym, args...)[inplace ? 2 : 1])
+    fx_ex = build_function(fx_sym, args...)[inplace ? 2 : 1]
+    return @eval $fx_ex
 end
 
 

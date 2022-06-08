@@ -2,6 +2,7 @@ module PRONTO
 # __precompile__(false)
 using LinearAlgebra
 using SciMLBase
+using SciMLBase: @def
 # using DataInterpolations
 using Symbolics
 using Symbolics: derivative
@@ -13,6 +14,7 @@ using MatrixEquations # provides arec
 #include("model.jl")
 
 
+include("mstruct.jl")
 
 include("timeseries.jl")
 export Timeseries
@@ -23,6 +25,15 @@ include("autodiff.jl")
 # export hessian
 #TODO: build pronto model
 
+
+function build_model(f,l,p; NX=1, NU=1)
+    model = MStruct();
+    model.f = f; model.l = l; model.p = p
+    model.fx = jacobian()
+    fx = jacobian(x, f, x, u),
+    fu = jacobian(u, f, x, u),
+    return model
+end
 
 # t
 # R,Q (for regulator)
