@@ -27,12 +27,14 @@ hessian(dx1, dx2, f, args...; inplace=false) = jacobian(dx2, jacobian(dx1, f, ar
 # function autodiff(f=(x,u)->(x),l=(x,u)->(x),p=(x)->(x); NX=1, NU=1)
 function autodiff(f,l,p; NX=1, NU=1)
     model = MStruct()
-    autodiff!(model,f,l,p;NX,NU)
+    model.NX = NX
+    model.NU = NU
+    autodiff!(model,f,l,p)
     return model
 end
 
-function autodiff!(model,f,l,p;NX,NU)
-    @variables x[1:NX] u[1:NU]
+function autodiff!(model,f,l,p)
+    @variables x[1:model.NX] u[1:model.NU]
 
     model.f = f
     model.fx = jacobian(x,f,x,u)

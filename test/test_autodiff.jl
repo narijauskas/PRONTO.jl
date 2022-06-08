@@ -37,8 +37,8 @@ fu_manual(x,u) = [-x[2]; x[1]; -x[4]; x[3];;]
 
 # --------------------- test full autodiff --------------------- #
 
-# f = (x,u)->collect((H0 + u[1]*H1)*x)
-# l = (x,u)->(x)
-# p = (x)->(x)
+f = (x,u)->collect((H0 + u[1]*H1)*x)
+l = (x,u)->collect(x)
+p = (x)->collect(x)
 
-# model = autodiff(f,l,p;NX=4,NU=1)
+model = autodiff(f,l,p;NX=4,NU=1)
