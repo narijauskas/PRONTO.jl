@@ -1,26 +1,11 @@
-
 #=
 to allow more interpolant types in the future:
     import SciMLBase: AbstractDiffEqInterpolation as AbstractInterpolation
     import SciMLBase: LinearInterpolation, ConstantInterpolation
 or possibly:
     abstract type AbstractInterpolation end
-
-for now: 
 =#
 import SciMLBase: LinearInterpolation
-
-# intermediate type to add custom functionality, and prevent type piracy and unwanted behaviors
-# struct Interpolant{T}
-#     itp::LinearInterpolation
-#     t::Ref
-
-#     function Interpolant(f,t)
-#         itp = LinearInterpolation(t, map(τ->f(τ),t))
-#         t = Ref(itp.t)
-#         new(itp, t)
-#     end
-# end
 
 
 struct Interpolant#{T}
@@ -33,8 +18,9 @@ end
 #X(t)
 (X::Interpolant)(tvals) = SciMLBase.interpolation(tvals,X.itp,nothing,Val{0},nothing,:left)
 (X::Interpolant)(val,tvals) = SciMLBase.interpolation!(val,tvals,X.itp,nothing,Val{0},nothing,:left)
-# (X::Interpolant{T})(tvals) where {T} = SciMLBase.interpolation(tvals,X.itp,nothing,Val{0},nothing,:left)::T
-# (X::Interpolant{T})(val,tvals) where {T} = SciMLBase.interpolation!(val,tvals,X.itp,nothing,Val{0},nothing,:left)::T
+
+# X[i] = val
+Base.setindex!(X::Interpolant, val, inds...) = setindex!(X.itp.u, val, inds...)
 
 # update values of X by evaluating f(t) for each t
 function update!(f, X::Interpolant)
@@ -43,28 +29,24 @@ function update!(f, X::Interpolant)
     end
 end
 
-Base.setindex!(X::Interpolant, val, inds...) = setindex!(X.itp.u, val, inds...)
+
+#MAYBE: Interpolant{T} variants (may be much faster)
+# (X::Interpolant{T})(tvals) where {T} = SciMLBase.interpolation(tvals,X.itp,nothing,Val{0},nothing,:left)::T
+# (X::Interpolant{T})(val,tvals) where {T} = SciMLBase.interpolation!(val,tvals,X.itp,nothing,Val{0},nothing,:left)::T
+# Base.setindex!(X::Interpolant{T}, val, inds...) where {T} = setindex!(X.itp.u, val, inds...)::T
 
 
+#MAYBE: to re-use time vector from interpolation:
+# struct Interpolant{T}
+#     itp::LinearInterpolation
+#     t::Ref
 
-#MAYBE: by making it an abstractarray subtype, we might get all sorts of functionality for free
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+#     function Interpolant(f,t)
+#         itp = LinearInterpolation(t, map(τ->f(τ),t))
+#         t = Ref(itp.t)
+#         new(itp, t)
+#     end
+# end
 
 
 
@@ -76,6 +58,16 @@ Base.setindex!(X::Interpolant, val, inds...) = setindex!(X.itp.u, val, inds...)
 
 
 
+
+
+
+
+
+
+
+
+
+#=TODO: clean up, re-add trajectory
 
 
 # allows for x(t)
@@ -90,6 +82,8 @@ Base.setindex!(X::Interpolant, val, inds...) = setindex!(X.itp.u, val, inds...)
 # x and u are interpolants on StaticArrays? Arrays?
 # have constant, known return types XT,UT?
 
+
+#FIX: re-add trajectory type
 struct Trajectory#{XT,UT}
     x::Interpolation # x::AbstractInterpolation
     u::Interpolation # u::AbstractInterpolation
@@ -162,3 +156,4 @@ end
 function set_u!(ξ, ?)
 end
 
+=#

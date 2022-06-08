@@ -3,37 +3,28 @@ module PRONTO
 using LinearAlgebra
 using SciMLBase
 using SciMLBase: @def
-# using DataInterpolations
 using Symbolics
 using Symbolics: derivative
 using DifferentialEquations
 # using ControlSystems # provides lqr
 using MatrixEquations # provides arec
 
-#include("trajectories.jl")
-#include("model.jl")
 
 
 include("mstruct.jl")
 
-include("timeseries.jl")
-export Timeseries
-
+include("interpolants.jl")
+export Interpolant
 
 include("autodiff.jl")
+export autodiff
 # export jacobian
 # export hessian
 #TODO: build pronto model
+# model = autodiff(f,l,p;NX,NU)
+# autodiff!(model, f,l,p;NX,NU)
 
 
-function build_model(f,l,p; NX=1, NU=1)
-    model = MStruct();
-    model.f = f; model.l = l; model.p = p
-    model.fx = jacobian()
-    fx = jacobian(x, f, x, u),
-    fu = jacobian(u, f, x, u),
-    return model
-end
 
 # t
 # R,Q (for regulator)
@@ -50,6 +41,9 @@ end
 
 # solver kw
 
+
+
+#=
 include("regulator.jl")
 include("projection.jl")
 include("cost.jl")
@@ -119,5 +113,5 @@ function pronto(ξ, model)
 end
 
 export pronto
-
+=#
 end # module

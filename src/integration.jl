@@ -21,7 +21,14 @@ qx = jacobian(x,q,x)
 model = MStruct()
 model.qx = qx
 
-X = Interpolant(t->qx(x0), ts)
+function qx_manual(x)
+    return [
+        -sin(x[1]) 0 0;
+        0 -sin(x[2]) 0;
+        0 0 -sin(x[3]);
+    ]
+end
+X = Interpolant(t->qx_manual(x0), ts)
 Xfxn(t) = sin.(X(t)) # a function that captures X
 
 # p = Interpolant(t->1.01, ts)
@@ -33,5 +40,7 @@ X_intg = init(ODEProblem(fxn,model.qx(x0),extrema(ts),model), Tsit5())
 @benchmark Xfxn(3)
 @benchmark resolve!(X,X_intg,qx(x0))
 
+# quick benchmark result: symbolically derived jacobian stored in an MStruct
+# performs as well as a directly-defined function
 
 
