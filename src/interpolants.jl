@@ -29,8 +29,10 @@ function update!(f, X::Interpolant)
     end
 end
 
+Base.length(X::Interpolant) = length(X.t)
+Base.show(io::IO, X::Interpolant) = print(io, "Interpolant on t∈$(extrema(X.t))")
 
-#MAYBE: Interpolant{T} variants (may be much faster)
+#TODO: Interpolant{T} variants (may be much faster)
 # (X::Interpolant{T})(tvals) where {T} = SciMLBase.interpolation(tvals,X.itp,nothing,Val{0},nothing,:left)::T
 # (X::Interpolant{T})(val,tvals) where {T} = SciMLBase.interpolation!(val,tvals,X.itp,nothing,Val{0},nothing,:left)::T
 # Base.setindex!(X::Interpolant{T}, val, inds...) where {T} = setindex!(X.itp.u, val, inds...)::T

@@ -25,7 +25,7 @@ hessian(dx1, dx2, f, args...; inplace=false) = jacobian(dx2, jacobian(dx1, f, ar
 
 
 # function autodiff(f=(x,u)->(x),l=(x,u)->(x),p=(x)->(x); NX=1, NU=1)
-function autodiff(f,l,p; NX=1, NU=1)
+function autodiff(f,l,p; NX,NU)
     model = MStruct()
     model.NX = NX
     model.NU = NU

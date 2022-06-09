@@ -47,7 +47,7 @@ function riccati!(dP, P, model, t)
     dP .= -A'P - P*A + K'*Rr*K - Qr
 end
 
-function PT(model, ξ)
+function PT(ξ, model)
     Rr = model.Rr(T)
     Qr = model.Qr(T)
     A = model.fx(ξ.x(T),ξ.u(T))
@@ -59,7 +59,7 @@ end
 
 # PT,_ = arec(A(T), B(T)inv(Rr(T))B(T)', Qr(T))
 Pr = Interpolant(?, t)
-Pr_integrator = init(ODEProblem(riccati!, PT(model,ξ), (T,0.0)), Tsit5())
+Pr_integrator = init(ODEProblem(riccati!, PT(ξ,model), (T,0.0)), Tsit5())
 # Kr(t) = inv(Rr(t))*B(t)'*P(t)
 
 # captures ξ, Pr

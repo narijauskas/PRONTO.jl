@@ -1,3 +1,4 @@
+# reinitialize and solve integrator, saving steps to X
 function resolve!(X,integrator,x0)
     reinit!(integrator,x0)
     for (i,(x,t)) in enumerate(TimeChoiceIterator(integrator, X.t))
