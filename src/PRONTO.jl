@@ -57,6 +57,10 @@ function riccati!(dP, P, (A,B,Q,R), t)
     dP .= -A(t)'P - P*A(t) + K'*R(t)*K - Q(t)
 end
 
+function stabilized_dynamics!(dx,x,(f,Kr,α,μ),t)
+    u = μ(t) - Kr(t)*(x-α(t))
+    dx .= f(x,u)
+end
 
 
 
@@ -89,33 +93,30 @@ function pronto(model, α0, μ0)
     Br(t) = B(X_α,U_μ,t) # captures (X_α) and (U_μ)
     Qr(t) = model.Qr(t)
     Rr(t) = model.Rr(t)
-    Kr(t) = inv(Rr(t))*B(X_α,U_μ,t)'*Pr(t) # captures Pr, (X_α) and (U_μ)
+    # Kr(t) = inv(Rr(t))*B(X_α,U_μ,t)'*Pr(t) # captures Pr, (X_α) and (U_μ)
 
     T = last(model.ts)
     # regulator
-    function Pr_T(x,u)
+    function Pr_T()
         T = last(model.ts)
         PT,_ = arec(Ar(T), Br(T)*inv(Rr(T))*Br(T)', Qr(T))
         return PT
     end
 
-    Pr = Interpolant((t)->Pr_T(X_α,U_μ), model.ts)
+    Pr = Interpolant((t)->Pr_T(), model.ts)
+    Kr = Interpolant(t->zeros(model.NU,model.NX), model.ts)
 
-    ode = ODEProblem(riccati!, Pr_T(X_α,U_μ), (T,0.0), (Ar,Br,Qr,Rr))
+    ode = ODEProblem(riccati!, Pr_T(), (T,0.0), (Ar,Br,Qr,Rr))
     Pr_ode = init(ode, Tsit5())
 
     # update the value of Kr (by updating Pr) using X_α,U_μ
     function update_Kr!()
-        resolve!(Pr_ode, Pr_T(X_α,U_μ), Pr)
+        resolve!(Pr_ode, Pr_T(), Pr)
+        update!(t->inv(Rr(t))*Br(t)'*Pr(t), Kr)
         return nothing
     end
 
-    function stabilized_dynamics!(dx,x,(Kr,α,μ),t)
-        u = μ(t) - Kr(t)*(x-α(t))
-        dx .= model.f(x,u)
-    end
-
-    ode = ODEProblem(stabilized_dynamics!, model.x0, (0.0,T), (Kr,X_α,U_μ))
+    ode = ODEProblem(stabilized_dynamics!, model.x0, (0.0,T), (model.f,Kr,X_α,U_μ))
     X_x_ode = init(ode, Tsit5())
 
     # resample and save a new (X_x) and (U_u)
