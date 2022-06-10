@@ -63,7 +63,8 @@ function stabilized_dynamics!(dx,x,(f,Kr,α,μ),t)
 end
 
 
-
+# @def Ar (t->model.fx(x(t),u(t)))
+# (@Ar)(t)
 
 
 # --------------------------- main loop --------------------------- #
@@ -88,33 +89,34 @@ function pronto(model, α0, μ0)
     A(x,u,t) = model.fx(x(t),u(t))
     B(x,u,t) = model.fu(x(t),u(t))
 
-    
     Ar(t) = A(X_α,U_μ,t) # captures (X_α) and (U_μ)
     Br(t) = B(X_α,U_μ,t) # captures (X_α) and (U_μ)
     Qr(t) = model.Qr(t)
     Rr(t) = model.Rr(t)
+    
+    T = last(model.ts)
+    PT,_ = arec(Ar(T), Br(T)*inv(Rr(T))*Br(T)', Qr(T))
+    # PT will always be around x_eq/u_eq
+    ode = ODEProblem(riccati!, PT, (T,0.0), (Ar,Br,Qr,Rr))
+    Pr_ode = init(ode, Tsit5())
+    # regulator
+    KrT = inv(Rr(T))*Br(T)'*PT
+    Kr = Interpolant((t)->KrT, model.ts)
+    # Kr = Interpolant(t->zeros(model.NU,model.NX), model.ts)
     # Kr(t) = inv(Rr(t))*B(X_α,U_μ,t)'*Pr(t) # captures Pr, (X_α) and (U_μ)
 
-    T = last(model.ts)
-    # regulator
-    function Pr_T()
-        T = last(model.ts)
-        PT,_ = arec(Ar(T), Br(T)*inv(Rr(T))*Br(T)', Qr(T))
-        return PT
-    end
-
-    Pr = Interpolant((t)->Pr_T(), model.ts)
-    Kr = Interpolant(t->zeros(model.NU,model.NX), model.ts)
-
-    ode = ODEProblem(riccati!, Pr_T(), (T,0.0), (Ar,Br,Qr,Rr))
-    Pr_ode = init(ode, Tsit5())
-
-    # update the value of Kr (by updating Pr) using X_α,U_μ
+    # update the value of Kr (by solving Pr) using X_α,U_μ
     function update_Kr!()
-        resolve!(Pr_ode, Pr_T(), Pr)
-        update!(t->inv(Rr(t))*Br(t)'*Pr(t), Kr)
+        reinit!(Pr_ode,PT)
+        for (i,(Pr,t)) in enumerate(TimeChoiceIterator(Pr_ode, Kr.t))
+            Kr[i] = inv(Rr(t))*Br(t)'*Pr
+        end
+        # resolve!(Pr_ode, PT, Pr)
+        # update!(t->inv(Rr(t))*Br(t)'*Pr(t), Kr)
         return nothing
     end
+
+  
 
     ode = ODEProblem(stabilized_dynamics!, model.x0, (0.0,T), (model.f,Kr,X_α,U_μ))
     X_x_ode = init(ode, Tsit5())
@@ -126,7 +128,7 @@ function pronto(model, α0, μ0)
         return nothing
     end
 
-    for i in 1:model.maxiters
+    # for i in 1:model.maxiters
 
         # φ->Kr
         @info "regulator update"
@@ -144,11 +146,11 @@ function pronto(model, α0, μ0)
         # γ # armijo sub-loop
         # ξ,ζ,γ->φ # new estimate
         # φ,Kr->ξ # projection
-    end
+    # end
     
 
 
-    @warn "maxiters"
+    # @warn "maxiters"
     return (X_x,U_u)
 end
 

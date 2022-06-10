@@ -14,6 +14,7 @@ Match = "7eb4fadd-790c-5f42-8a69-bfa0b872bfbf"
 MatrixEquations = "99c1a7ee-ab34-5fd5-8076-27c950a045f4"
 QuadGK = "1fd47b50-473d-5c70-9696-f719f8f3bcdc"
 SciMLBase = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
 
 [compat]

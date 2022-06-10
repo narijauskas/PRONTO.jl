@@ -6,6 +6,7 @@ model = MStruct()
 model.ts = 0:0.001:10
 model.NX = 6
 model.NU = 2
+# model.x0 = [-5.0;zeros(model.NX-1)]
 model.x0 = zeros(model.NX)
 model.maxiters = 10
 
@@ -51,10 +52,13 @@ p = (x)-> 1/2*collect(x)'collect(x)
 PRONTO.autodiff!(model,fxn,l,p)
 
 # can also make these anonymous functions
-model.Qr = Interpolant(t->diagm([1,0,1,0,0,0]), model.ts)
+model.Qr = Interpolant(t->1.0*diagm([1,0,1,0,0,0]), model.ts)
 model.Rr = Interpolant(t->0.1*diagm([1,1]), model.ts)
 
 u0 = Interpolant(t->zeros(model.NU),model.ts)
 x0 = Interpolant(t->zeros(model.NX),model.ts)
 
 x,u = pronto(model,x0,u0)
+
+using JET
+# @report_opt x,u = pronto(model,x0,u0)

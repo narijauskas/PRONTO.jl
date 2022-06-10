@@ -6,35 +6,112 @@ or possibly:
     abstract type AbstractInterpolation end
 =#
 import SciMLBase: LinearInterpolation
+using StaticArrays
+
+# Interpolant{T}(ts) where {T} = 
+
+# function Interpolant{T}(ts) where {T}
+#     # pre-allocate a matrix for each t in ts
+#     itp = LinearInterpolation(ts, map(t->zeros(T),ts))
+#     new{T}(itp)
+# end    
+
+function Interpolant(f,ts)
+    x0 = f(first(ts))
+    T = SArray{Tuple{size(x0)...},eltype(x0)}
+    LinearInterpolation(ts, map(t->zeros(T),ts))
+    # T = eltype(x0)
+    # LinearInterpolation(ts, map(t->ones(T,size(x0)...),ts))
 
 
-struct Interpolant#{T}
+    # LinearInterpolation(ts, map(t->f(t),ts))
+
+    # Interpolant{T}(ts)
+    # T = SMatrix{size(x0)...,eltype(x0)}
+    # x0 = @SArray f(first(ts))
+    # get T as StaticArray ...or MMatrix for inplace updates?
+    # Interpolant{typeof(x0)}(ts)
+end
+
+(X::LinearInterpolation)(tvals) = SciMLBase.interpolation(tvals,X,nothing,Val{0},nothing,:left)
+(X::LinearInterpolation)(val,tvals) = SciMLBase.interpolation!(val,tvals,X,nothing,Val{0},nothing,:left)
+
+Base.setindex!(X::LinearInterpolation, val, inds...) = setindex!(X.u, val, inds...)
+
+function update!(f, X)
+    for (i,t) in enumerate(X.t)
+        X[i] = f(t) # setindex!(X, f(t), i)
+        # SMatrix or MMatrix?
+    end
+end
+
+#=
+struct Interpolant{T}
     itp::LinearInterpolation
-    t
-    Interpolant(f,t) = new(LinearInterpolation(t, map(τ->f(τ),t)), t)
+
+    function Interpolant{T}(ts) where {T}
+        # pre-allocate a matrix for each t in ts
+        itp = LinearInterpolation(ts, map(t->zeros(T),ts))
+        new{T}(itp)
+    end    
 end
 
 
+function Interpolant(f,ts)
+    x0 = f(first(ts))
+    T = SArray{Tuple{size(x0)...},eltype(x0)}
+    Interpolant{T}(ts)
+    # T = SMatrix{size(x0)...,eltype(x0)}
+    # x0 = @SArray f(first(ts))
+    # get T as StaticArray ...or MMatrix for inplace updates?
+    # Interpolant{typeof(x0)}(ts)
+end
+
+# function Interpolant(f,t)
+#     itp = LinearInterpolation(t, map(τ->f(τ),t))
+#     T = typeof(first(itp.u))
+#     return Interpolant{T}(itp)
+# end
+
+#getproperty returns union?
+function Base.getproperty(x::Interpolant, name::Symbol)
+    itp = getfield(x, :itp)
+    T = fieldtype(typeof(itp), name)
+    getproperty(itp, name)::T
+end
+Base.setindex!(X::Interpolant, val, inds...) = setindex!(X.u, val, inds...)
+Base.eltype(::Type{Interpolant{T}}) where {T} = T
+
+
+
 #X(t)
-(X::Interpolant)(tvals) = SciMLBase.interpolation(tvals,X.itp,nothing,Val{0},nothing,:left)
-(X::Interpolant)(val,tvals) = SciMLBase.interpolation!(val,tvals,X.itp,nothing,Val{0},nothing,:left)
+(X::Interpolant{T})(tvals) where {T} = SciMLBase.interpolation(tvals,getfield(X, :itp),nothing,Val{0},nothing,:left)::T
+(X::Interpolant{T})(val,tvals) where {T} = SciMLBase.interpolation!(val,tvals,getfield(X, :itp),nothing,Val{0},nothing,:left)::T
+# (X::Interpolant)(tvals) = SciMLBase.interpolation(tvals,X.itp,nothing,Val{0},nothing,:left)
+# (X::Interpolant)(val,tvals) = SciMLBase.interpolation!(val,tvals,X.itp,nothing,Val{0},nothing,:left)
 
 # X[i] = val
-Base.setindex!(X::Interpolant, val, inds...) = setindex!(X.itp.u, val, inds...)
 
 # update values of X by evaluating f(t) for each t
-function update!(f, X::Interpolant)
-    for (i,t) in enumerate(X.itp.t)
+function update!(f, X::Interpolant{T}) where {T}
+    for (i,t) in enumerate(X.t::AbstractVector{Number})
+        X[i] = T(f(t)) # setindex!(X, f(t), i)
+        # SMatrix or MMatrix?
+    end
+end
+
+function update!(f, X)
+    for (i,t) in enumerate(X.t)
         X[i] = f(t) # setindex!(X, f(t), i)
+        # SMatrix or MMatrix?
     end
 end
 
 Base.length(X::Interpolant) = length(X.t)
-Base.show(io::IO, X::Interpolant) = print(io, "Interpolant on t∈$(extrema(X.t))")
+Base.show(io::IO, X::Interpolant{T}) where {T} = print(io, "Interpolant{$T} on t∈$(extrema(X.t))")
 
 #TODO: Interpolant{T} variants (may be much faster)
-# (X::Interpolant{T})(tvals) where {T} = SciMLBase.interpolation(tvals,X.itp,nothing,Val{0},nothing,:left)::T
-# (X::Interpolant{T})(val,tvals) where {T} = SciMLBase.interpolation!(val,tvals,X.itp,nothing,Val{0},nothing,:left)::T
+
 # Base.setindex!(X::Interpolant{T}, val, inds...) where {T} = setindex!(X.itp.u, val, inds...)::T
 
 
@@ -51,7 +128,7 @@ Base.show(io::IO, X::Interpolant) = print(io, "Interpolant on t∈$(extrema(X.t)
 # end
 
 
-
+=#
 
 
 
