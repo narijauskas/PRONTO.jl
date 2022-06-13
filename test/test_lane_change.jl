@@ -1,5 +1,5 @@
 # using Test
-using PRONTO
+# using PRONTO
 using LinearAlgebra
 
 model = MStruct()
@@ -49,16 +49,20 @@ l = (x,u) -> 1/2*collect(x)'*Ql*collect(x) + 1/2*collect(u)'*Rl*collect(u)
 p = (x)-> 1/2*collect(x)'collect(x)
 
 
-PRONTO.autodiff!(model,fxn,l,p)
+autodiff!(model,fxn,l,p)
 
 # can also make these anonymous functions
-model.Qr = Interpolant(t->1.0*diagm([1,0,1,0,0,0]), model.ts)
-model.Rr = Interpolant(t->0.1*diagm([1,1]), model.ts)
+Qr = Interpolant(t->1.0*diagm([1,0,1,0,0,0]), model.ts)
+Rr = Interpolant(t->0.1*diagm([1,1]), model.ts)
+invRr = Interpolant(t->inv(Rr(t)), model.ts)
 
-u0 = Interpolant(t->zeros(model.NU),model.ts)
-x0 = Interpolant(t->zeros(model.NX),model.ts)
+α0 = Interpolant(t->zeros(model.NX),model.ts)
+μ0 = Interpolant(t->zeros(model.NU),model.ts)
 
-x,u = pronto(model,x0,u0)
+
+# x,u = pronto(model,x0,u0)
 
 using JET
+# @time x,u = pronto(model,x0,u0)
 # @report_opt x,u = pronto(model,x0,u0)
+# @profview x,u = pronto(model,x0,u0)

@@ -17,14 +17,14 @@ using StaticArrays
 # end    
 
 function Interpolant(f,ts)
-    x0 = f(first(ts))
-    T = SArray{Tuple{size(x0)...},eltype(x0)}
-    LinearInterpolation(ts, map(t->zeros(T),ts))
+    # x0 = f(first(ts))
+    # T = SArray{Tuple{size(x0)...},eltype(x0)}
+    # LinearInterpolation(ts, map(t->zeros(T),ts))
     # T = eltype(x0)
     # LinearInterpolation(ts, map(t->ones(T,size(x0)...),ts))
 
 
-    # LinearInterpolation(ts, map(t->f(t),ts))
+    LinearInterpolation(ts, map(t->f(t),ts))
 
     # Interpolant{T}(ts)
     # T = SMatrix{size(x0)...,eltype(x0)}

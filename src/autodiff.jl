@@ -21,6 +21,13 @@ hessian(dx1, dx2, f, args...; inplace=false) = jacobian(dx2, jacobian(dx1, f, ar
 #     jacobian(dx2, Base.invokelatest(jacobian(dx1, f, args...)), args...; inplace)
 
 
+# @kwdef
+
+struct Model{NX,NU}
+
+end
+
+
 
 
 
