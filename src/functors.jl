@@ -11,6 +11,10 @@ struct Functor1{FT,S}
     fxn::FT
 end
 
+# struct Functor2{FT,S,N}
+#     buf::MArray{S,Float64,N}
+#     fxn!::FT
+# end
 # Kr!(src, invRr, Br, Pr) = ... # inplace version!
 # Kr = Functor(Kr!, dims, invRr, Br, Pr)
 
@@ -21,18 +25,26 @@ end
 #     fxn!(buf, args...)
 # end
 
-function Functor1(fxn!, dims, args...)
+
+function Functor1(fxn, dims)
     buf = MArray{Tuple{dims...},Float64}(undef) #FIX: generalize T beyond F64?
-    fxn = t->fxn!(buf, (arg(t) for arg in args)...)
+    # fxn = t->fxn!(buf, (arg(t) for arg in args)...)
     # Functor1{typeof(fxn), Tuple{dims...}}(buf,fxn)
     Functor1(buf, fxn)
 end
 
+# function Functor1(fxn!, dims, args...)
+#     buf = MArray{Tuple{dims...},Float64}(undef) #FIX: generalize T beyond F64?
+#     fxn = t->fxn!(buf, (arg(t) for arg in args)...)
+#     # Functor1{typeof(fxn), Tuple{dims...}}(buf,fxn)
+#     Functor1(buf, fxn)
+# end
+
 # update!(A::Functor1, t) = A.fxn(t) # update buffer
-function(A::Functor1{S})(t) where {S}
+function(A::Functor1{FT,S})(t) where {FT,S}
     # update!(A,t)
-    A.fxn(t)
-    return SArray(A.buf)::SArray{S,Float64} # enforce type? ::MArray{S,Float64}
+    A.fxn(A.buf,t)
+    return A.buf
 end
 
 
