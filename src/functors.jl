@@ -50,7 +50,7 @@ end
 function update!(A::Functor3, t)
     # in-place update to buf
     # A.buf .= A.fxn(A.X(t), A.U(t))
-    A.buf .= _update!(A.fxn, A.X(t), A.U(t))
+    A.buf .= _update!(A.fxn, A.X(t), A.U(t)) 
     # map!(t->(), A.buf, 1.0)
 end
 
