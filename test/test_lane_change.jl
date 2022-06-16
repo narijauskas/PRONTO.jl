@@ -4,15 +4,28 @@ using LinearAlgebra
 using BenchmarkTools
 using JET
 
-const model = MStruct()
-model.ts = 0:0.001:10
-model.NX = NX = 6
-model.NU = NU = 2
-model.x0 = [-5.0;zeros(model.NX-1)]
-# model.x0 = zeros(NX)
-model.x_eq = zeros(NX)
-model.u_eq = zeros(NU)
-model.maxiters = 10
+# model = MStruct()
+# model.ts = 0:0.001:10
+# model.NX = NX = 6
+# model.NU = NU = 2
+# model.x0 = [-5.0;zeros(model.NX-1)]
+# # model.x0 = zeros(NX)
+# model.x_eq = zeros(NX)
+# model.u_eq = zeros(NU)
+# model.maxiters = 10
+NX = 6
+NU = 2
+model = (
+    ts = 0:0.001:10,
+    NX = NX,
+    NU = NU,
+    x0 = [-5.0;zeros(NX-1)],
+    # model.x0 = zeros(NX),
+    x_eq = zeros(NX),
+    u_eq = zeros(NU),
+    maxiters = 10,
+)
+
 
 # model parameters
 M = 2041    # [kg]     Vehicle mass
@@ -53,33 +66,50 @@ l = (x,u) -> 1/2*collect(x)'*Ql*collect(x) + 1/2*collect(u)'*Rl*collect(u)
 p = (x)-> 1/2*collect(x)'collect(x)
 
 @info "running autodiff"
-autodiff!(model,f,l,p)
+model = autodiff(model,f,l,p)
 @info "autodiff complete"
 
-const X_x = Interpolant(t->model.x0, model.ts, NX)
-const U_u = Interpolant(model.ts, NU)
+model = merge(model, (
+    Qr = Interpolant(t->1.0*diagm([1,0,1,0,0,0]), model.ts, NX, NX),
+    Rr = Interpolant(t->0.1*diagm([1,1]), model.ts, NU, NU),
+))
 
-# X_x(1.3)
-# @benchmark X_x(1.3)
-update!(t->model.x0, X_x)
-# @benchmark update!(t->model.x0, X_x)
+# const X_x = Interpolant(t->model.x0, model.ts, NX)
+# const U_u = Interpolant(model.ts, NU)
+
+# # X_x(1.3)
+# # @benchmark X_x(1.3)
+# update!(t->model.x0, X_x)
+# # @benchmark update!(t->model.x0, X_x)
 
 
-A = Functor(NX,NX) do buf,t
-    model.fx!(buf, X_x(t), U_u(t))
-end
+# A = Functor(NX,NX) do buf,t
+#     model.fx!(buf, X_x(t), U_u(t))
+# end
 
-A(1.3)
-@benchmark A(1.3)
-@profview for ix in 1:1000000
-    A(1.3)
-end
-@code_warntype A(1.3)
-buf = copy(A.buf)
-@code_warntype model.fx!(buf, X_x(1.3), U_u(1.3))
-@report_opt model.fx!(buf, X_x(1.3), U_u(1.3))
-@report_opt A(1.3)
-@code_warntype A(1.3)
+# A(1.3)
+# @benchmark A(1.3)
+# @profview for ix in 1:1000000
+#     A(1.3)
+# end
+# @code_warntype A(1.3)
+# buf = copy(A.buf)
+# @code_warntype model.fx!(buf, X_x(1.3), U_u(1.3))
+# @report_opt model.fx!(buf, X_x(1.3), U_u(1.3))
+# @report_opt A(1.3)
+# @code_warntype A(1.3)
+
+
+# invRr = Interpolant(t->inv(0.1*diagm([1,1])), model.ts, NU, NU)
+
+# Qr = Functor(NX,NX) do buf,t
+#     buf .= 1.0*diagm([1,0,1,0,0,0])
+# end
+
+# Rr = Functor(NU,NU) do buf,t
+#     buf .= 0.1*diagm([1,1])
+# end
+
 
     # # can also make these anonymous functions
 # Qr = Interpolant(t->1.0*diagm([1,0,1,0,0,0]), model.ts)

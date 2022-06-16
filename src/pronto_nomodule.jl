@@ -11,6 +11,10 @@ using DifferentialEquations: init # silences linter
 using MatrixEquations # provides arec
 
 
+
+# ---------------------------- functional components ---------------------------- #
+
+
 include("mstruct.jl")
 export MStruct
 
@@ -34,36 +38,25 @@ export autodiff
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+# ------------------------------ ODE interface ------------------------------ #
 
 
 #include("integration.jl")
-# reinitialize integrator ig from x0, and solve, saving steps to iterator X
-function resolve!(ig,x0,X)
+# reinitialize integrator ig from x0, and re-solve, saving steps to interpolant X
+function resolve!(ig,x0,X::Interpolant)
     reinit!(ig,x0)
-    for (i,(x,t)) in enumerate(TimeChoiceIterator(ig, X.t))
-        X[i] = x
+    for (i,(x,t)) in enumerate(TimeChoiceIterator(ig, X.itp.t))
+        X[i] .= x
+        # map!(v->v, X[i], x)
     end
     return nothing
 end
+
+# to use:
+# 1. make ODEProblem
+# 2. initialize as integrator ig
+# 3. make interpolant
+# 4. resolve as needed, storing to interpolant
 
 
 #FUTURE: for convenience,
@@ -73,18 +66,28 @@ end
 # end
 
 
-function set_params!(model)
-    model.maxiters = 10
-    model.ts = 0:0.01:model.T
-end
 
 
+
+
+
+
+
+
+
+
+# --------------------------------- functions --------------------------------- #
 
 
 # non-capturing functions
-function riccati!(dP, P, (A,B,Q,R), t)
-    K = inv(R(t))*B(t)'*P # instantenously evaluated K
-    dP .= -A(t)'P - P*A(t) + K'*R(t)*K - Q(t)
+function riccati!(dP, P, (Ar,Br,Kr,fx!,fu!,Qr,Rr,X_α,U_μ), t)
+    # update buffers in-place
+    fx!(Ar, X_α(t), U_μ(t))
+    fu!(Br, X_α(t), U_μ(t))
+    mul!(Kr, inv(Rr(t))*Br', P)
+    dP .= -Ar'P - P*Ar + Kr'*Rr(t)*Kr - Qr(t)
+    # K = inv(R(t))*B(t)'*P # instantenously evaluated K
+    # dP .= -A(t)'P - P*A(t) + K'*R(t)*K - Q(t)
 end
 
 function stabilized_dynamics!(dx,x,(f,Kr,α,μ),t)
@@ -93,11 +96,99 @@ function stabilized_dynamics!(dx,x,(f,Kr,α,μ),t)
 end
 
 
+test_Ar(Ar) = Ar(1.3)
+
+
+
+P = copy(PT)
+dP = copy(P)
+riccati!(dP,P,(Ar,Br,Kr,model.fx!,model.fu!,model.Qr,model.Rr,X_α,U_μ),1.3)
+@code_warntype riccati!(dP,P,(Ar,Br,Kr,model.fx!,model.fu!,model.Qr,model.Rr,X_α,U_μ),1.3)
+
 # @def Ar (t->model.fx(x(t),u(t)))
 # (@Ar)(t)
 
+# pronto!(x,u,α,μ,model)
+# pronto!(x,u,model)
 
-# --------------------------- main loop --------------------------- #
+# ----------------------------------- main loop ----------------------------------- #
+function pronto(model)
+    T = last(model.ts); NX = model.NX; NU = model.NU
+
+    # maybe? define arctan guess trajectory from x0 to xeq
+    X_x = Interpolant(model.ts, model.NX)
+    X_x[end] = model.x_eq
+    X_α = Interpolant(model.ts, model.NX)
+    X_z = Interpolant(model.ts, model.NX)
+    U_u = Interpolant(model.ts, model.NU)
+    U_u[end] = model.u_eq
+    U_μ = Interpolant(model.ts, model.NU)
+    U_v = Interpolant(model.ts, model.NU)
+    Pr = Interpolant(model.ts, model.NX, model.NX)
+
+    # buffers
+    Ar = MArray{Tuple{NX,NX},Float64}(undef) #FIX: generalize T beyond F64?
+    # model.fx!(Ar, X_α(t), U_μ(t))
+    Br = MArray{Tuple{NX,NU},Float64}(undef)
+    Kr = MArray{Tuple{NU,NX},Float64}(undef)
+    # mul!(buf, inv(Rr(t))*Br(t)', Pr(t))
+    PT = MArray{Tuple{NX,NX},Float64}(undef)
+
+    # update buffers in-place (use x_eq?)
+    model.fx!(Ar, X_α(T), U_μ(T))
+    model.fu!(Br, X_α(T), U_μ(T))
+    P,_ = arec(Ar, Br*inv(model.Rr(T))*Br', model.Qr(T))
+    PT .= P
+    # end
+
+    Pr_ode = init(
+        ODEProblem(riccati!, PT, (T,0.0),(Ar,Br,Kr,model.fx!,model.fu!,model.Qr,model.Rr,X_α,U_μ)),
+        Tsit5()
+    )
+
+    #     # φ->Kr
+    #     # update_Kr!()
+    @info "solving regulator"
+    # update terminal cost
+
+    model.fx!(Ar, X_α(T), U_μ(T))
+    model.fu!(Br, X_α(T), U_μ(T))
+    P,_ = arec(Ar, Br*inv(model.Rr(T))*Br', model.Qr(T))
+    PT .= P
+
+    resolve!(Pr_ode, PT, Pr)
+    # re-solve riccati
+    # reinit!(Pr_ode, PT)
+    # for (i,(x,t)) in enumerate(TimeChoiceIterator(Pr_ode, Pr.itp.t))
+    #     Pr[i] .= x
+    #     # map!(v->v, X[i], x)
+    # end
+    
+    @info "regulator solved"
+    # update Kr via:
+    # mul!(Kr, inv(Rr(t))*Br', P)
+
+    
+    #     # φ,Kr->ξ
+    #     # @info "projection"
+    #     # update_ξ!()
+    
+    #     # ξ,Kr->ζ # search direction
+    
+    #     # ζ->Dh # cost derivatives
+    #     # exit criteria -> return ξ
+    
+    #     # γ # armijo sub-loop
+    #     # ξ,ζ,γ->φ # new estimate
+    #     # φ,Kr->ξ # projection
+    # end
+end
+
+pronto(model)
+@time pronto(model)
+
+# const Pr = Interpolant((t)->PT(T), model.ts, model.NX, model.NX)
+test_resolve!(Pr_ode, PT, Pr) = resolve!(Pr_ode, PT, Pr)
 # @def Ar model.fx(X_α(t),U_μ(t))
 # foo = t->model.fx(X_α(t),U_μ(t))
 # function pronto(model, α0, μ0)
@@ -106,34 +197,63 @@ end
 
     # @pronto_setup
 
+    # X_α always starts at x0 and ends at x_eq
+    # α0 should be arctan guess
+
 # core data storage
-const X_x = Interpolant(t->α0(t), model.ts)
-const X_α = Interpolant(t->α0(t), model.ts)
-const X_z = Interpolant(t->zeros(model.NX), model.ts)
-const U_u = Interpolant(t->μ0(t), model.ts)
-const U_μ = Interpolant(t->μ0(t), model.ts)
-const U_v = Interpolant(t->zeros(model.NU), model.ts)
+# const X_x = Interpolant(t->α0(t), model.ts, model.NX)
+# const X_α = Interpolant(t->α0(t), model.ts, model.NX)
 
-    # core functions
-    A(x,u,t) = model.fx(x(t),u(t))
-    B(x,u,t) = model.fu(x(t),u(t))
 
-    Ar = (t)->A(X_α,U_μ,t) # captures (X_α) and (U_μ)
-    Br = (t)->B(X_α,U_μ,t) # captures (X_α) and (U_μ)
-    # Qr(t) = model.Qr(t)
-    # Rr(t) = model.Rr(t)
-    # invRr(t) = model.invRr(t)
-    
-T = last(model.ts)
-PT,_ = arec(Ar(T), Br(T)*invRr(T)*Br(T)', Qr(T))
-    # PT will always be around x_eq/u_eq
-const ode1 = ODEProblem(riccati!, PT, (T,0.0), (Ar,Br,Qr,Rr))
-const Pr_ode = init(ode1, Tsit5())
-const Pr2 = Interpolant((t)->PT, model.ts, (NX,NX))
+# A!(buf,model,x,u,t) = model.fx!(buf,x(t),u(t))
+
+
+# A = Functor(NX,NX) do 
+#     (buf,t)->model.fx!(buf, X_x(t), U_u(t))
+# end
+
+# B = Functor(NU,NU) do 
+#     (buf,t)->model.fu!(buf, X_x(t), U_u(t))
+# end
+
+    # # core functions
+    # A(x,u,t) = model.fx(x(t),u(t))
+    # B(x,u,t) = model.fu(x(t),u(t))
+
+    # Ar = (t)->A(X_α,U_μ,t) # captures (X_α) and (U_μ)
+    # Br = (t)->B(X_α,U_μ,t) # captures (X_α) and (U_μ)
+
+
+
+# invRr = model.invRr
+
+# PT,_ = arec(Ar(T), Br(T), Rr(T), Qr(T))
+
+# PT will always be around x_eq/u_eq
+
+
+
+# # beautiful:
+# @code_warntype model.fx!(buf, X_α(t), U_μ(t))
+# @code_warntype model.fu!(buf, X_α(t), U_μ(t))
+# @code_warntype Br(t)
+# @benchmark Br(t)
+# @benchmark model.fu!(buf, X_α(t), U_μ(t))
+
+
+@code_native model.fx!(buf, X_α(t), U_μ(t))
+@code_native model.fu!(buf, X_α(t), U_μ(t))
+
+@profview foreach(t->Br(t), model.ts)
+@report_opt Ar(t)
+
+@report_opt resolve!(Pr_ode3, PT(T), Pr)
+
+
 
     # regulator
-const KrT = inv(Rr(T))*Br(T)'*PT
-const Kr = Interpolant((t)->KrT, model.ts)
+# const KrT = inv(Rr(T))*Br(T)'*PT
+# const Kr = Interpolant((t)->KrT, model.ts)
     # Kr = Interpolant(t->zeros(model.NU,model.NX), model.ts)
     # Kr(t) = inv(Rr(t))*B(X_α,U_μ,t)'*Pr(t) # captures Pr, (X_α) and (U_μ)
 

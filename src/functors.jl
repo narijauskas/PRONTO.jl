@@ -18,17 +18,17 @@ end
 #     model.fx!(buf, X_x(t), U_u(t))
 # end
 
-function Functor(fxn!, dims...)
+function Functor(fxn!, dims::Vararg{Int})
     buf = MArray{Tuple{dims...},Float64}(undef) #FIX: generalize T beyond F64?
     T = typeof(buf)
     F = typeof(fxn!)
     Functor{F,T}(fxn!,buf)
 end
 
-
-function (A::Functor{F,T})(args...) where {F,T}
-    A.fxn!(A.buf, args...) # in-place update
-    return A.buf
+function (A::Functor{F,T})(args...) where {F<:Function,T}
+    fxn! = A.fxn!::F
+    fxn!(A.buf, args...) # in-place update
+    return A.buf::T
 end
 
 Base.show(io::IO, ::Functor{F,T}) where {F,T} = print(io, "Functor of $(T)")

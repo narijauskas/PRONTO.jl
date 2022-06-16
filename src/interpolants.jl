@@ -42,7 +42,9 @@ end
 # pre-allocate zeros if no function provided
 Interpolant(ts,dims...;kw...) = Interpolant(t->zeros(dims...), ts, dims...; kw...)
 
-
+Base.firstindex(X::Interpolant) = 1
+Base.lastindex(X::Interpolant) = length(X)
+Base.length(X::Interpolant) = length(X.itp.t)
 Base.getindex(X::Interpolant, inds...) = getindex(X.itp.u,inds...)
 Base.setindex!(X::Interpolant, val, inds...) = setindex!(X.itp.u, val, inds...)
 

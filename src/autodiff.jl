@@ -26,39 +26,58 @@ hessian(dx1, dx2, f, args...; inplace=false) = jacobian(dx2, jacobian(dx1, f, ar
 # struct Model{NX,NU}
 # end
 
+# structs dispatch on name, supertypes
+# NamedTuples dispatch on the value of each field
 
 
 
 
 # function autodiff(f=(x,u)->(x),l=(x,u)->(x),p=(x)->(x); NX=1, NU=1)
-function autodiff(f,l,p; NX,NU)
-    model = MStruct()
-    model.NX = NX
-    model.NU = NU
-    autodiff!(model,f,l,p)
-    return model
-end
+# function autodiff(f,l,p; NX,NU)
+#     # model = MStruct()
+#     # model.NX = NX
+#     # model.NU = NU
+#     model = (NX=NX, NU=NU)
+#     autodiff!(model,f,l,p)
+#     return model
+# end
 
-function autodiff!(model,f,l,p)
+function autodiff(model,f,l,p)
     @variables x[1:model.NX] u[1:model.NU]
 
-    model.f = f
-    model.fx! = jacobian(x,f,x,u; inplace=true)
-    model.fu! = jacobian(u,f,x,u; inplace=true)
-    model.fxx! = hessian(x,x,f,x,u; inplace=true)
-    model.fxu! = hessian(x,u,f,x,u; inplace=true)
-    model.fuu! = hessian(u,u,f,x,u; inplace=true)
-    
-    model.l = l
-    model.lx! = jacobian(x,l,x,u; inplace=true)
-    model.lu! = jacobian(u,l,x,u; inplace=true)
-    model.lxx! = hessian(x,x,l,x,u; inplace=true)
-    model.lxu! = hessian(x,u,l,x,u; inplace=true)
-    model.luu! = hessian(u,u,l,x,u; inplace=true)
+    return merge(model, (
+        f = f,
+        fx! = jacobian(x,f,x,u; inplace=true),
+        fu! = jacobian(u,f,x,u; inplace=true),
+        fxx! = hessian(x,x,f,x,u; inplace=true),
+        fxu! = hessian(x,u,f,x,u; inplace=true),
+        fuu! = hessian(u,u,f,x,u; inplace=true),
+        l = l,
+        lx! = jacobian(x,l,x,u; inplace=true),
+        lu! = jacobian(u,l,x,u; inplace=true),
+        lxx! = hessian(x,x,l,x,u; inplace=true),
+        lxu! = hessian(x,u,l,x,u; inplace=true),
+        luu! = hessian(u,u,l,x,u; inplace=true),
+        p = p,
+        px! = jacobian(x,p,x; inplace=true),
+        pxx! = hessian(x,x,p,x; inplace=true),
+    ))
 
-    model.p = p
-    model.px! = jacobian(x,p,x; inplace=true)
-    model.pxx! = hessian(x,x,p,x; inplace=true)
+    # model.f = f
+    # model.fx! = jacobian(x,f,x,u; inplace=true)
+    # model.fu! = jacobian(u,f,x,u; inplace=true)
+    # model.fxx! = hessian(x,x,f,x,u; inplace=true)
+    # model.fxu! = hessian(x,u,f,x,u; inplace=true)
+    # model.fuu! = hessian(u,u,f,x,u; inplace=true)
+    # model.l = l
+    # model.lx! = jacobian(x,l,x,u; inplace=true)
+    # model.lu! = jacobian(u,l,x,u; inplace=true)
+    # model.lxx! = hessian(x,x,l,x,u; inplace=true)
+    # model.lxu! = hessian(x,u,l,x,u; inplace=true)
+    # model.luu! = hessian(u,u,l,x,u; inplace=true)
+    # model.p = p
+    # model.px! = jacobian(x,p,x; inplace=true)
+    # model.pxx! = hessian(x,x,p,x; inplace=true)
 
-    return model
+    # return model
 end
