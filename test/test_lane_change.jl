@@ -1,13 +1,17 @@
 # using Test
 # using PRONTO
 using LinearAlgebra
+using BenchmarkTools
+using JET
 
-model = MStruct()
+const model = MStruct()
 model.ts = 0:0.001:10
-model.NX = 6
-model.NU = 2
-# model.x0 = [-5.0;zeros(model.NX-1)]
-model.x0 = zeros(model.NX)
+model.NX = NX = 6
+model.NU = NU = 2
+model.x0 = [-5.0;zeros(model.NX-1)]
+# model.x0 = zeros(NX)
+model.x_eq = zeros(NX)
+model.u_eq = zeros(NU)
 model.maxiters = 10
 
 # model parameters
@@ -29,7 +33,7 @@ s = 30      # [m/s]    Vehicle speed
 F(α) = μ*g*M*sin(c*atan(b*α))
 
 # model dynamics
-function fxn(x,u)
+function f(x,u)
     # continuous dynamics
     return [
         s*sin(x[3]) + x[2]*cos(x[3]),
@@ -48,21 +52,47 @@ Rl = I
 l = (x,u) -> 1/2*collect(x)'*Ql*collect(x) + 1/2*collect(u)'*Rl*collect(u)
 p = (x)-> 1/2*collect(x)'collect(x)
 
+@info "running autodiff"
+autodiff!(model,f,l,p)
+@info "autodiff complete"
 
-autodiff!(model,fxn,l,p)
+const X_x = Interpolant(t->model.x0, model.ts, NX)
+const U_u = Interpolant(model.ts, NU)
 
-# can also make these anonymous functions
-Qr = Interpolant(t->1.0*diagm([1,0,1,0,0,0]), model.ts)
-Rr = Interpolant(t->0.1*diagm([1,1]), model.ts)
-invRr = Interpolant(t->inv(Rr(t)), model.ts)
-
-α0 = Interpolant(t->zeros(model.NX),model.ts)
-μ0 = Interpolant(t->zeros(model.NU),model.ts)
+# X_x(1.3)
+# @benchmark X_x(1.3)
+update!(t->model.x0, X_x)
+# @benchmark update!(t->model.x0, X_x)
 
 
-# x,u = pronto(model,x0,u0)
+A = Functor(NX,NX) do buf,t
+    model.fx!(buf, X_x(t), U_u(t))
+end
 
-using JET
+A(1.3)
+@benchmark A(1.3)
+@profview for ix in 1:1000000
+    A(1.3)
+end
+@code_warntype A(1.3)
+buf = copy(A.buf)
+@code_warntype model.fx!(buf, X_x(1.3), U_u(1.3))
+@report_opt model.fx!(buf, X_x(1.3), U_u(1.3))
+@report_opt A(1.3)
+@code_warntype A(1.3)
+
+    # # can also make these anonymous functions
+# Qr = Interpolant(t->1.0*diagm([1,0,1,0,0,0]), model.ts)
+# Rr = Interpolant(t->0.1*diagm([1,1]), model.ts)
+# invRr = Interpolant(t->inv(Rr(t)), model.ts)
+
+# α0 = Interpolant(t->zeros(model.NX),model.ts)
+# μ0 = Interpolant(t->zeros(model.NU),model.ts)
+
+
+# # x,u = pronto(model,x0,u0)
+
+# using JET
 # @time x,u = pronto(model,x0,u0)
 # @report_opt x,u = pronto(model,x0,u0)
 # @profview x,u = pronto(model,x0,u0)

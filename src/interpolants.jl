@@ -26,17 +26,22 @@ Base.eltype(::Interpolant{T}) where {T} = T
 
 Base.show(io::IO, ::Interpolant{T}) where {T} = print(io, "Interpolant of $T")
 
+# make callable as X(t)
 (X::Interpolant{T})(tvals) where {T} = SciMLBase.interpolation(tvals,X.itp,nothing,Val{0},nothing,:left)::T
 (X::Interpolant)(val,tvals) = SciMLBase.interpolation!(val,tvals,X.itp,nothing,Val{0},nothing,:left)
 
 # where f is a function f(t)
-function Interpolant(f,ts,dims...;TT=Float64)
+function Interpolant(f::Function,ts,dims...;TT=Float64)
     S = Tuple{dims...}
     xs = map(t->MArray{S,TT}(f(t)),ts)
     T = eltype(xs)
     itp = LinearInterpolation(collect(ts), xs)
     return Interpolant{T}(itp)
 end
+
+# pre-allocate zeros if no function provided
+Interpolant(ts,dims...;kw...) = Interpolant(t->zeros(dims...), ts, dims...; kw...)
+
 
 Base.getindex(X::Interpolant, inds...) = getindex(X.itp.u,inds...)
 Base.setindex!(X::Interpolant, val, inds...) = setindex!(X.itp.u, val, inds...)

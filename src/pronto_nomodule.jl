@@ -12,16 +12,46 @@ using MatrixEquations # provides arec
 
 
 include("mstruct.jl")
+export MStruct
+
+include("functors.jl")
+export Functor
 
 include("interpolants.jl")
 export Interpolant
 
+#TODO: model type?
 include("autodiff.jl")
 export autodiff
 # export jacobian
 # export hessian
 # model = autodiff(f,l,p;NX,NU)
 # autodiff!(model, f,l,p;NX,NU)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

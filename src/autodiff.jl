@@ -21,11 +21,10 @@ hessian(dx1, dx2, f, args...; inplace=false) = jacobian(dx2, jacobian(dx1, f, ar
 #     jacobian(dx2, Base.invokelatest(jacobian(dx1, f, args...)), args...; inplace)
 
 
+#MAYBE:
 # @kwdef
-
-struct Model{NX,NU}
-
-end
+# struct Model{NX,NU}
+# end
 
 
 
@@ -44,22 +43,22 @@ function autodiff!(model,f,l,p)
     @variables x[1:model.NX] u[1:model.NU]
 
     model.f = f
-    model.fx = jacobian(x,f,x,u)
-    model.fu = jacobian(u,f,x,u)
-    model.fxx = hessian(x,x,f,x,u)
-    model.fxu = hessian(x,u,f,x,u)
-    model.fuu = hessian(u,u,f,x,u)
+    model.fx! = jacobian(x,f,x,u; inplace=true)
+    model.fu! = jacobian(u,f,x,u; inplace=true)
+    model.fxx! = hessian(x,x,f,x,u; inplace=true)
+    model.fxu! = hessian(x,u,f,x,u; inplace=true)
+    model.fuu! = hessian(u,u,f,x,u; inplace=true)
     
     model.l = l
-    model.lx = jacobian(x,l,x,u)
-    model.lu = jacobian(u,l,x,u)
-    model.lxx = hessian(x,x,l,x,u)
-    model.lxu = hessian(x,u,l,x,u)
-    model.luu = hessian(u,u,l,x,u)
+    model.lx! = jacobian(x,l,x,u; inplace=true)
+    model.lu! = jacobian(u,l,x,u; inplace=true)
+    model.lxx! = hessian(x,x,l,x,u; inplace=true)
+    model.lxu! = hessian(x,u,l,x,u; inplace=true)
+    model.luu! = hessian(u,u,l,x,u; inplace=true)
 
     model.p = p
-    model.px = jacobian(x,p,x)
-    model.pxx = hessian(x,x,p,x)
+    model.px! = jacobian(x,p,x; inplace=true)
+    model.pxx! = hessian(x,x,p,x; inplace=true)
 
     return model
 end
