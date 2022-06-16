@@ -14,6 +14,12 @@ end
 # Kr!(src, invRr, Br, Pr) = ... # inplace version!
 # Kr = Functor(Kr!, dims, invRr, Br, Pr)
 
+# specify fxn! as:
+# (t,buf)->fxn!(buf, args...)
+# Functor(fxn!, dims)
+# Functor(2,2) do t,buf
+#     fxn!(buf, args...)
+# end
 
 function Functor1(fxn!, dims, args...)
     buf = MArray{Tuple{dims...},Float64}(undef) #FIX: generalize T beyond F64?
@@ -28,6 +34,19 @@ function(A::Functor1{S})(t) where {S}
     A.fxn(t)
     return SArray(A.buf)::SArray{S,Float64} # enforce type? ::MArray{S,Float64}
 end
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # Functor{T}
 struct Functor3{FT,S1,S2,T}
