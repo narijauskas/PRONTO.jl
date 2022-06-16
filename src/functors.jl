@@ -5,6 +5,30 @@
 
 # Interpolation{S,T} = LinearInterpolation{Vector{SArray{S,T}}, Vector{Float64}}
 
+# S must be Tuple{dims...}
+struct Functor1{FT,S}
+    buf::MArray{S,Float64}
+    fxn::FT
+end
+
+# Kr!(src, invRr, Br, Pr) = ... # inplace version!
+# Kr = Functor(Kr!, dims, invRr, Br, Pr)
+
+
+function Functor1(fxn!, dims, args...)
+    buf = MArray{Tuple{dims...},Float64}(undef) #FIX: generalize T beyond F64?
+    fxn = t->fxn!(buf, (arg(t) for arg in args)...)
+    # Functor1{typeof(fxn), Tuple{dims...}}(buf,fxn)
+    Functor1(buf, fxn)
+end
+
+# update!(A::Functor1, t) = A.fxn(t) # update buffer
+function(A::Functor1{S})(t) where {S}
+    # update!(A,t)
+    A.fxn(t)
+    return SArray(A.buf)::SArray{S,Float64} # enforce type? ::MArray{S,Float64}
+end
+
 # Functor{T}
 struct Functor3{FT,S1,S2,T}
     buf::MMatrix{S1,S2,T}
