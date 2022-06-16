@@ -5,11 +5,34 @@
 
 # Interpolation{S,T} = LinearInterpolation{Vector{SArray{S,T}}, Vector{Float64}}
 
-# S must be Tuple{dims...}
 struct Functor{F,T}
     fxn!::F
     buf::T
 end
+
+
+# specify fxn! of the form:
+# (buf,args...)->()
+# eg.
+# A = Functor(2,2) do buf,t
+#     model.fx!(buf, X_x(t), U_u(t))
+# end
+
+function Functor(fxn!, dims...)
+    buf = MArray{Tuple{dims...},Float64}(undef) #FIX: generalize T beyond F64?
+    T = typeof(buf)
+    F = typeof(fxn!)
+    Functor{F,T}(fxn!,buf)
+end
+
+
+function (A::Functor{F,T})(args...) where {F,T}
+    A.fxn!(A.buf, args...) # in-place update
+    return A.buf
+end
+
+Base.show(io::IO, ::Functor{F,T}) where {F,T} = print(io, "Functor of $(T)")
+
 
 # struct Functor2{FT,S,N}
 #     buf::MArray{S,Float64,N}
@@ -25,16 +48,7 @@ end
 # end
 
 
-# specify fxn! of the form:
-# (buf,args...)->()
-function Functor(fxn!, dims...)
-    buf = MArray{Tuple{dims...},Float64}(undef) #FIX: generalize T beyond F64?
-    T = typeof(buf)
-    F = typeof(fxn!)
-    # fxn = t->fxn!(buf, (arg(t) for arg in args)...)
-    # Functor1{typeof(fxn), Tuple{dims...}}(buf,fxn)
-    Functor{F,T}(fxn!,buf)
-end
+
 
 # A = Functor(2,2) do buf,t
 #     # broadcast!(f, buf, A)
@@ -44,20 +58,38 @@ end
 #     ]
 # end
 
-function (A::Functor{F,T})(args...) where {F,T}
-    A.fxn!(A.buf, args...)
-    return A.buf
-end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 #in-place update
 
-function update!(A::Functor3, t)
-    # in-place update to buf
-    # A.buf .= A.fxn(A.X(t), A.U(t))
-    A.buf .= _update!(A.fxn, A.X(t), A.U(t)) 
-    # map!(t->(), A.buf, 1.0)
-end
+# function update!(A::Functor3, t)
+#     # in-place update to buf
+#     # A.buf .= A.fxn(A.X(t), A.U(t))
+#     A.buf .= _update!(A.fxn, A.X(t), A.U(t)) 
+#     # map!(t->(), A.buf, 1.0)
+# end
 
 
 
@@ -69,7 +101,7 @@ end
 #     # Functor1{typeof(fxn), Tuple{dims...}}(buf,fxn)
 #     Functor1(buf, fxn)
 # end
-
+#=
 # update!(A::Functor1, t) = A.fxn(t) # update buffer
 function(A::Functor1{FT,S})(t) where {FT,S}
     # update!(A,t)
@@ -117,3 +149,5 @@ end
 
 _update!(fxn,x,u) = fxn(x,u)
 # _update!(A.fxn, A.X(t), A.U(t))
+
+=#

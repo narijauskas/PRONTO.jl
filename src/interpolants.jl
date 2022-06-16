@@ -17,82 +17,91 @@ using StaticArrays
 #     new{T}(itp)
 # end    
 
-struct Timeseries{T}
+struct Interpolant{T}
     itp::LinearInterpolation{Vector{Float64}, Vector{T}}
 end
 
-Base.eltype(::Timeseries{T}) where {T} = T
+Base.eltype(::Interpolant{T}) where {T} = T
 # ideally, T is a MMatrix{2,2,F64} or something like that
 
-# function update!(f,X)
-# end
-# Base.size(X::Timeseries{S,T}) where {S,T} = 
-Base.show(io::IO, ::Timeseries{T}) where {T} = println(io, "Timeseries of $T")
-# Timeseries(f,ts,dims...)
-(X::Timeseries{T})(tvals) where {T} = SciMLBase.interpolation(tvals,X.itp,nothing,Val{0},nothing,:left)::T
-(X::Timeseries)(val,tvals) = SciMLBase.interpolation!(val,tvals,X.itp,nothing,Val{0},nothing,:left)
+Base.show(io::IO, ::Interpolant{T}) where {T} = print(io, "Interpolant of $T")
 
+(X::Interpolant{T})(tvals) where {T} = SciMLBase.interpolation(tvals,X.itp,nothing,Val{0},nothing,:left)::T
+(X::Interpolant)(val,tvals) = SciMLBase.interpolation!(val,tvals,X.itp,nothing,Val{0},nothing,:left)
 
-# TI = LinearInterpolation{T1,T2}
-
-# where f is f(t)
-function Timeseries(f,ts,dims...;TT=Float64)
+# where f is a function f(t)
+function Interpolant(f,ts,dims...;TT=Float64)
     S = Tuple{dims...}
     xs = map(t->MArray{S,TT}(f(t)),ts)
     T = eltype(xs)
     itp = LinearInterpolation(collect(ts), xs)
-    return Timeseries{T}(itp)
+    return Interpolant{T}(itp)
 end
 
-#TODO: make iterable?
+Base.getindex(X::Interpolant, inds...) = getindex(X.itp.u,inds...)
+Base.setindex!(X::Interpolant, val, inds...) = setindex!(X.itp.u, val, inds...)
 
-Base.getindex(X::Timeseries, inds...) = getindex(X.itp.u,inds...)
-Base.setindex!(X::Timeseries, val, inds...) = setindex!(X.itp.u, val, inds...)
-
-function update!(f,X::Timeseries{T}) where {T}
+function update!(f,X::Interpolant{T}) where {T}
     for (i,t) in enumerate(X.itp.t)
-        # X[i] = T(f(t))
-        map!(x->0,X[i],X[i])
-        # map!(t->T(f(t)), X[i], Scalar(t))
+        # X[i] = f(t)
+        map!(x->x, X[i], f(t))
     end
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        # X[i] .= f(t)
+        # map!(x->0,X[i],X[i])
+        # map!(t->T(f(t)), X[i], Scalar(t))
 
     # map!(t->f(t), X.itp.u, X.itp.t)
 
-end
 
 
 
 
 
 
-function Interpolant(f,ts)
-    # x0 = f(first(ts))
-    # T = SArray{Tuple{size(x0)...},eltype(x0)}
-    # LinearInterpolation(ts, map(t->zeros(T),ts))
-    # T = eltype(x0)
-    # LinearInterpolation(ts, map(t->ones(T,size(x0)...),ts))
+# function Interpolant(f,ts)
+#     # x0 = f(first(ts))
+#     # T = SArray{Tuple{size(x0)...},eltype(x0)}
+#     # LinearInterpolation(ts, map(t->zeros(T),ts))
+#     # T = eltype(x0)
+#     # LinearInterpolation(ts, map(t->ones(T,size(x0)...),ts))
 
 
-    LinearInterpolation(ts, map(t->f(t),ts))
+#     LinearInterpolation(ts, map(t->f(t),ts))
 
-    # Interpolant{T}(ts)
-    # T = SMatrix{size(x0)...,eltype(x0)}
-    # x0 = @SArray f(first(ts))
-    # get T as StaticArray ...or MMatrix for inplace updates?
-    # Interpolant{typeof(x0)}(ts)
-end
+#     # Interpolant{T}(ts)
+#     # T = SMatrix{size(x0)...,eltype(x0)}
+#     # x0 = @SArray f(first(ts))
+#     # get T as StaticArray ...or MMatrix for inplace updates?
+#     # Interpolant{typeof(x0)}(ts)
+# end
 
-(X::LinearInterpolation)(tvals) = SciMLBase.interpolation(tvals,X,nothing,Val{0},nothing,:left)
-(X::LinearInterpolation)(val,tvals) = SciMLBase.interpolation!(val,tvals,X,nothing,Val{0},nothing,:left)
+# (X::LinearInterpolation)(tvals) = SciMLBase.interpolation(tvals,X,nothing,Val{0},nothing,:left)
+# (X::LinearInterpolation)(val,tvals) = SciMLBase.interpolation!(val,tvals,X,nothing,Val{0},nothing,:left)
 
-Base.setindex!(X::LinearInterpolation, val, inds...) = setindex!(X.u, val, inds...)
+# Base.setindex!(X::LinearInterpolation, val, inds...) = setindex!(X.u, val, inds...)
 
-function update!(f, X)
-    for (i,t) in enumerate(X.t)
-        X[i] = f(t) # setindex!(X, f(t), i)
-        # SMatrix or MMatrix?
-    end
-end
+# function update!(f, X)
+#     for (i,t) in enumerate(X.t)
+#         X[i] = f(t) # setindex!(X, f(t), i)
+#         # SMatrix or MMatrix?
+#     end
+# end
 
 #=
 struct Interpolant{T}
