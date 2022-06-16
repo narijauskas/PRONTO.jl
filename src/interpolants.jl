@@ -5,6 +5,7 @@ to allow more interpolant types in the future:
 or possibly:
     abstract type AbstractInterpolation end
 =#
+import SciMLBase
 import SciMLBase: LinearInterpolation
 using StaticArrays
 
@@ -15,6 +16,54 @@ using StaticArrays
 #     itp = LinearInterpolation(ts, map(t->zeros(T),ts))
 #     new{T}(itp)
 # end    
+
+struct Timeseries{T}
+    itp::LinearInterpolation{Vector{Float64}, Vector{T}}
+end
+
+Base.eltype(::Timeseries{T}) where {T} = T
+# ideally, T is a MMatrix{2,2,F64} or something like that
+
+# function update!(f,X)
+# end
+# Base.size(X::Timeseries{S,T}) where {S,T} = 
+Base.show(io::IO, ::Timeseries{T}) where {T} = println(io, "Timeseries of $T")
+# Timeseries(f,ts,dims...)
+(X::Timeseries{T})(tvals) where {T} = SciMLBase.interpolation(tvals,X.itp,nothing,Val{0},nothing,:left)::T
+(X::Timeseries)(val,tvals) = SciMLBase.interpolation!(val,tvals,X.itp,nothing,Val{0},nothing,:left)
+
+
+# TI = LinearInterpolation{T1,T2}
+
+# where f is f(t)
+function Timeseries(f,ts,dims...;TT=Float64)
+    S = Tuple{dims...}
+    xs = map(t->MArray{S,TT}(f(t)),ts)
+    T = eltype(xs)
+    itp = LinearInterpolation(collect(ts), xs)
+    return Timeseries{T}(itp)
+end
+
+#TODO: make iterable?
+
+Base.getindex(X::Timeseries, inds...) = getindex(X.itp.u,inds...)
+Base.setindex!(X::Timeseries, val, inds...) = setindex!(X.itp.u, val, inds...)
+
+function update!(f,X::Timeseries{T}) where {T}
+    for (i,t) in enumerate(X.itp.t)
+        # X[i] = T(f(t))
+        map!(x->0,X[i],X[i])
+        # map!(t->T(f(t)), X[i], Scalar(t))
+    end
+
+    # map!(t->f(t), X.itp.u, X.itp.t)
+
+end
+
+
+
+
+
 
 function Interpolant(f,ts)
     # x0 = f(first(ts))

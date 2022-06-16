@@ -99,7 +99,7 @@ PT,_ = arec(Ar(T), Br(T)*invRr(T)*Br(T)', Qr(T))
     # PT will always be around x_eq/u_eq
 const ode1 = ODEProblem(riccati!, PT, (T,0.0), (Ar,Br,Qr,Rr))
 const Pr_ode = init(ode1, Tsit5())
-const Pr = Interpolant((t)->PT, model.ts)
+const Pr2 = Interpolant((t)->PT, model.ts, (NX,NX))
 
     # regulator
 const KrT = inv(Rr(T))*Br(T)'*PT

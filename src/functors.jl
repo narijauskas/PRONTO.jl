@@ -6,9 +6,9 @@
 # Interpolation{S,T} = LinearInterpolation{Vector{SArray{S,T}}, Vector{Float64}}
 
 # S must be Tuple{dims...}
-struct Functor1{FT,S}
-    buf::MArray{S,Float64}
-    fxn::FT
+struct Functor{F,T}
+    fxn!::F
+    buf::T
 end
 
 # struct Functor2{FT,S,N}
@@ -18,23 +18,53 @@ end
 # Kr!(src, invRr, Br, Pr) = ... # inplace version!
 # Kr = Functor(Kr!, dims, invRr, Br, Pr)
 
-# specify fxn! as:
-# (t,buf)->fxn!(buf, args...)
+
 # Functor(fxn!, dims)
 # Functor(2,2) do t,buf
 #     fxn!(buf, args...)
 # end
 
 
-function Functor1(fxn, dims)
+# specify fxn! of the form:
+# (buf,args...)->()
+function Functor(fxn!, dims...)
     buf = MArray{Tuple{dims...},Float64}(undef) #FIX: generalize T beyond F64?
+    T = typeof(buf)
+    F = typeof(fxn!)
     # fxn = t->fxn!(buf, (arg(t) for arg in args)...)
     # Functor1{typeof(fxn), Tuple{dims...}}(buf,fxn)
-    Functor1(buf, fxn)
+    Functor{F,T}(fxn!,buf)
 end
 
+# A = Functor(2,2) do buf,t
+#     # broadcast!(f, buf, A)
+#     @. buf = [
+#         sin(t) cos(t);
+#         -cos(t) sin(t);
+#     ]
+# end
+
+function (A::Functor{F,T})(args...) where {F,T}
+    A.fxn!(A.buf, args...)
+    return A.buf
+end
+
+
+#in-place update
+
+function update!(A::Functor3, t)
+    # in-place update to buf
+    # A.buf .= A.fxn(A.X(t), A.U(t))
+    A.buf .= _update!(A.fxn, A.X(t), A.U(t)) 
+    # map!(t->(), A.buf, 1.0)
+end
+
+
+
+
+
 # function Functor1(fxn!, dims, args...)
-#     buf = MArray{Tuple{dims...},Float64}(undef) #FIX: generalize T beyond F64?
+#     buf = MArray{Tuple{dims...},Float64}(undef)
 #     fxn = t->fxn!(buf, (arg(t) for arg in args)...)
 #     # Functor1{typeof(fxn), Tuple{dims...}}(buf,fxn)
 #     Functor1(buf, fxn)
