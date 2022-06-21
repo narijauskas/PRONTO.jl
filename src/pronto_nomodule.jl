@@ -21,12 +21,13 @@ export MStruct
 include("functors.jl")
 export Functor
 
+#MAYBE: interpolant knows element size/type
+#MAYBE: just write simple custom interpolant?
 include("interpolants.jl")
 export Interpolant
 
-#TODO: model type?
 include("autodiff.jl")
-export autodiff
+export autodiff, unpack
 # export jacobian
 # export hessian
 # model = autodiff(f,l,p;NX,NU)
@@ -38,31 +39,87 @@ export autodiff
 
 
 
-# ------------------------------ ODE interface ------------------------------ #
 
 
-#include("integration.jl")
-# reinitialize integrator ig from x0, and re-solve, saving steps to interpolant X
-function resolve!(ig,x0,X::Interpolant)
-    reinit!(ig,x0)
-    for (i,(x,t)) in enumerate(TimeChoiceIterator(ig, X.itp.t))
+
+
+# --------------------------------- ode functions --------------------------------- #
+#FUTURE: @unpack model
+
+# for regulator
+function riccati!(dP, P, (fx!,fu!,Qr,Rr,X_α,U_μ), t)
+    Ar = MArray{Tuple{NX,NX},Float64}(undef)
+    Br = MArray{Tuple{NX,NU},Float64}(undef)
+    iRrBr = MArray{Tuple{NU,NX},Float64}(undef)
+    Kr = MArray{Tuple{NU,NX},Float64}(undef)
+
+    # in-place update of buffers (Ar, Br, Kr) for time t
+    fx!(Ar, X_α(t), U_μ(t)) # Ar = fx(α(t), μ(t))
+    fu!(Br, X_α(t), U_μ(t)) # Br = fu(α(t), μ(t))
+    mul!(iRrBr, iRr(t), Br')
+    mul!(Kr, iRrBr, P) # Kr = inv(Rr(t))*Br'*P
+
+    #TEST: hopefully optimized by compiler?
+    # if not, do each step inplace to local buffers or SVectors
+    dP .= -Ar'P - P*Ar + Kr'*Rr(t)*Kr - Qr(t)
+end
+
+
+
+
+# for projection, provided Kr(t)
+function stabilized_dynamics!(dx, x, (f,fu!,Kr,α,μ), t)
+    #TEST: local buffers
+    u = μ(t) - Kr(t)*(x-α(t))
+    #TEST: u = @SArray μ(t) - Kr(t)*(x-α(t))
+    dx .= f(x,u)
+    # FUTURE: in-place f!(dx,x,u) 
+end
+
+
+
+# function stabilized_dynamics_2!(dx, x, (f,fu!,NX,NU,Rr,Pr,X_α,X_μ), t)
+#    
+#     fu!(Br, X_α(t), U_μ(t))
+#     mul!(Kr, inv(Rr(t))*Br', Pr(t))
+#     u = μ(t) - Kr(t)*(x-α(t))
+#     dx .= f(x,u)
+# end
+
+
+
+
+# ------------------------------ helper functions ------------------------------ #
+
+mapid!(dest, src) = map!(identity, dest, src)
+# same as:
+# mapid!(dest, src) = map!(x->x, dest, src)
+
+
+# update each X(t) by re-solving the ode from x0
+function update!(X::Interpolant, ode, x0)
+    reinit!(ode,x0)
+    for (i,(x,t)) in enumerate(TimeChoiceIterator(ode, X.itp.t))
         X[i] .= x
         # map!(v->v, X[i], x)
     end
+
+    #TEST:
+    # for (Xi, (x,t)) in zip(X,TimeChoiceIterator(ode, X.itp.t))
+    #     map!(v->v, Xi, x)
+    # end
     return nothing
 end
 
-# to use:
-# 1. make ODEProblem
-# 2. initialize as integrator ig
-# 3. make interpolant
-# 4. resolve as needed, storing to interpolant
 
-
-#FUTURE: for convenience,
-# struct Integrator
-#     X::Interpolant
-#     ig # initialized ODE integrator
+#FUTURE: generalize
+# function update!(f::Function, X::Interpolant, ode, x0)
+#     reinit!(ode,x0)
+#     for (i,(x,t)) in enumerate(TimeChoiceIterator(ode, X.itp.t))
+#         X[i] .= x
+#         # map!(v->v, X[i], x)
+#     end
+#     return nothing
 # end
 
 
@@ -70,122 +127,192 @@ end
 
 
 
+#TODO: guess_trajectory!(X_α, U_μ)
 
 
+function update_Kr!(Kr,Pr_ode,fx!,fu!,iRr,Qr,α,μ)
+    Ar = MArray{Tuple{NX,NX},Float64}(undef)
+    Br = MArray{Tuple{NX,NU},Float64}(undef)
+    iRrBr = MArray{Tuple{NU,NX},Float64}(undef)
 
+    fx!(Ar, α(T), μ(T))
+    fu!(Br, α(T), μ(T))
+    PT,_ = arec(Ar, Br*iRr(T)*Br', Qr(T))
+    reinit!(Pr_ode, PT)
 
+    for (Kr_t, (Pr,t)) in zip(Kr, TimeChoiceIterator(Pr_ode, times(Kr)))
+        fu!(Br, α(t), μ(t))
+        mul!(iRrBr, iRr(t), Br') # {NU,NU}*{NU,NX}->{NU,NX}
+        mul!(Kr_t, iRrBr, Pr)
+    end
 
-
-# --------------------------------- functions --------------------------------- #
-
-
-# non-capturing functions
-function riccati!(dP, P, (Ar,Br,Kr,fx!,fu!,Qr,Rr,X_α,U_μ), t)
-    # update buffers in-place
-    fx!(Ar, X_α(t), U_μ(t))
-    fu!(Br, X_α(t), U_μ(t))
-    mul!(Kr, inv(Rr(t))*Br', P)
-    dP .= -Ar'P - P*Ar + Kr'*Rr(t)*Kr - Qr(t)
-    # K = inv(R(t))*B(t)'*P # instantenously evaluated K
-    # dP .= -A(t)'P - P*A(t) + K'*R(t)*K - Q(t)
-end
-
-function stabilized_dynamics!(dx,x,(f,Kr,α,μ),t)
-    u = μ(t) - Kr(t)*(x-α(t))
-    dx .= f(x,u)
 end
 
 
-test_Ar(Ar) = Ar(1.3)
+
+
+function update_ξ!(X,U,X_ode,x0,α,μ,Kr)
+    reinit!(X_ode, x0)
+
+    for (x,u,(xt,t)) in zip(X,U,TimeChoiceIterator(X_ode, times(X)))
+        copy!(x,xt) # copy from ode solution
+        copy!(u, μ(t) - Kr(t)*(x-α(t)))
+    end
+end
 
 
 
-P = copy(PT)
-dP = copy(P)
-riccati!(dP,P,(Ar,Br,Kr,model.fx!,model.fu!,model.Qr,model.Rr,X_α,U_μ),1.3)
-@code_warntype riccati!(dP,P,(Ar,Br,Kr,model.fx!,model.fu!,model.Qr,model.Rr,X_α,U_μ),1.3)
 
-# @def Ar (t->model.fx(x(t),u(t)))
-# (@Ar)(t)
 
-# pronto!(x,u,α,μ,model)
-# pronto!(x,u,model)
 
 # ----------------------------------- main loop ----------------------------------- #
-function pronto(model)
-    T = last(model.ts); NX = model.NX; NU = model.NU
+function pronto(X_x,U_u,model)
+    @info "initializing"
+    ts = model.ts; T = last(ts); NX = model.NX; NU = model.NU
 
-    # maybe? define arctan guess trajectory from x0 to xeq
-    X_x = Interpolant(model.ts, model.NX)
-    X_x[end] = model.x_eq
-    X_α = Interpolant(model.ts, model.NX)
-    X_z = Interpolant(model.ts, model.NX)
-    U_u = Interpolant(model.ts, model.NU)
-    U_u[end] = model.u_eq
-    U_μ = Interpolant(model.ts, model.NU)
-    U_v = Interpolant(model.ts, model.NU)
-    Pr = Interpolant(model.ts, model.NX, model.NX)
+    # X_x = Interpolant(ts, NX)
+    X_α = Interpolant(ts, NX)
+    foreach((x,α)->(α .= x), X_x, X_α)
+    X_z = Interpolant(ts, NX)
+    # U_u = Interpolant(ts, NU)
+    U_μ = Interpolant(ts, NU)
+    foreach((u,μ)->(μ .= u), U_u, U_μ)
+
+    U_v = Interpolant(ts, NU)
+
+    Kr = Interpolant(ts, NU, NX)
 
     # buffers
-    Ar = MArray{Tuple{NX,NX},Float64}(undef) #FIX: generalize T beyond F64?
+    #MAYBE: generalize T beyond F64?
+    Ar = MArray{Tuple{NX,NX},Float64}(undef)
     # model.fx!(Ar, X_α(t), U_μ(t))
     Br = MArray{Tuple{NX,NU},Float64}(undef)
-    Kr = MArray{Tuple{NU,NX},Float64}(undef)
-    # mul!(buf, inv(Rr(t))*Br(t)', Pr(t))
+    # model.fu!(Br, X_α(t), U_μ(t))
+    # Kr = MArray{Tuple{NU,NX},Float64}(undef)
+    # mul!(Kr, iRr(t)*Br', Pr(t))
     PT = MArray{Tuple{NX,NX},Float64}(undef)
 
-    # update buffers in-place (use x_eq?)
-    model.fx!(Ar, X_α(T), U_μ(T))
-    model.fu!(Br, X_α(T), U_μ(T))
-    P,_ = arec(Ar, Br*inv(model.Rr(T))*Br', model.Qr(T))
-    PT .= P
-    # end
 
-    Pr_ode = init(
-        ODEProblem(riccati!, PT, (T,0.0),(Ar,Br,Kr,model.fx!,model.fu!,model.Qr,model.Rr,X_α,U_μ)),
-        Tsit5()
-    )
 
-    #     # φ->Kr
-    #     # update_Kr!()
-    @info "solving regulator"
-    # update terminal cost
+    # ode solver for Pr(t)
+    fx! = model.fx!; fu! = model.fu!
+    Qr = model.Qr; Rr = model.Rr; iRr = model.iRr;
 
-    model.fx!(Ar, X_α(T), U_μ(T))
-    model.fu!(Br, X_α(T), U_μ(T))
-    P,_ = arec(Ar, Br*inv(model.Rr(T))*Br', model.Qr(T))
-    PT .= P
+    fx!(Ar, model.x_eq, model.u_eq)
+    fu!(Br, model.x_eq, model.u_eq)
+    P,_ = arec(Ar, Br*iRr(T)*Br', Qr(T)); PT .= P
+    Pr_ode = init(ODEProblem(riccati!, PT, (T,0.0), (fx!,fu!,Qr,Rr,X_α,U_μ)), Tsit5())
 
-    resolve!(Pr_ode, PT, Pr)
-    # re-solve riccati
-    # reinit!(Pr_ode, PT)
-    # for (i,(x,t)) in enumerate(TimeChoiceIterator(Pr_ode, Pr.itp.t))
-    #     Pr[i] .= x
-    #     # map!(v->v, X[i], x)
-    # end
-    
-    @info "regulator solved"
-    # update Kr via:
-    # mul!(Kr, inv(Rr(t))*Br', P)
 
-    
-    #     # φ,Kr->ξ
-    #     # @info "projection"
-    #     # update_ξ!()
-    
-    #     # ξ,Kr->ζ # search direction
-    
-    #     # ζ->Dh # cost derivatives
-    #     # exit criteria -> return ξ
-    
-    #     # γ # armijo sub-loop
-    #     # ξ,ζ,γ->φ # new estimate
-    #     # φ,Kr->ξ # projection
-    # end
+    # ode solver for x(t) projection
+    X_ode = init(ODEProblem(stabilized_dynamics!, model.x0, (0.0,T), (f,fu!,Kr,X_α,U_μ)), Tsit5())
+
+
+
+    #TODO: define arctan guess trajectory from x0 to xeq
+    #or,
+    # U_u[end] = model.u_eq
+    # X_x[end] = model.x_eq
+
+
+
+        
+    # ξ is guess
+    # (X,U) = ξ
+    for i in 1:model.maxiters
+        @info "iteration: $i"
+        # ξ or φ -> Kr # regulator
+        # Kr = regulator(φ..., model)
+        tx = @elapsed update_Kr!(Kr,Pr_ode,fx!,fu!,iRr,Qr,X_α,U_μ)
+        @info "($i) regulator solved in $tx seconds"
+
+        # φ,Kr -> ξ # projection
+        # φ = projection(ξ..., Kr, model)
+        tx = @elapsed update_ξ!(X_x,U_u,X_ode,model.x0,X_α,U_μ,Kr)
+        @info "($i) projection solved in $tx seconds"
+
+
+        # @info "finding search direction"
+        # # φ,Kr -> ζ,Dh # search direction
+        # ζ,Dh = search_direction(φ..., Kr, model)
+
+        # # check Dh criteria -> return ξ,Kr
+        # @info "Dh is $Dh"
+        # Dh > 0 && (@warn "increased cost - quitting"; return ξ)
+        # -Dh < model.tol && (@info "PRONTO converged"; return ξ)
+        
+        # @info "calculating new trajectory:"
+        # # φ,ζ,Kr -> γ -> ξ # armijo
+        # ξ = armijo_backstep(φ..., Kr, ζ..., Dh, model)
+
+    end
+    # ξ is optimal (or last iteration)
+
+    # @warn "maxiters"
+    return ξ
+
 end
 
 pronto(model)
 @time pronto(model)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # const Pr = Interpolant((t)->PT(T), model.ts, model.NX, model.NX)
 test_resolve!(Pr_ode, PT, Pr) = resolve!(Pr_ode, PT, Pr)

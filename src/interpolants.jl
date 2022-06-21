@@ -21,10 +21,6 @@ struct Interpolant{T}
     itp::LinearInterpolation{Vector{Float64}, Vector{T}}
 end
 
-Base.eltype(::Interpolant{T}) where {T} = T
-# ideally, T is a MMatrix{2,2,F64} or something like that
-
-Base.show(io::IO, ::Interpolant{T}) where {T} = print(io, "Interpolant of $T")
 
 # make callable as X(t)
 (X::Interpolant{T})(tvals) where {T} = SciMLBase.interpolation(tvals,X.itp,nothing,Val{0},nothing,:left)::T
@@ -42,11 +38,26 @@ end
 # pre-allocate zeros if no function provided
 Interpolant(ts,dims...;kw...) = Interpolant(t->zeros(dims...), ts, dims...; kw...)
 
+# indexable
 Base.firstindex(X::Interpolant) = 1
 Base.lastindex(X::Interpolant) = length(X)
 Base.length(X::Interpolant) = length(X.itp.t)
 Base.getindex(X::Interpolant, inds...) = getindex(X.itp.u,inds...)
 Base.setindex!(X::Interpolant, val, inds...) = setindex!(X.itp.u, val, inds...)
+
+# iterable
+Base.iterate(X::Interpolant, i=1) = i > length(X) ? nothing : (X[i], i+1)
+
+
+# other functionality 
+Base.show(io::IO, ::Interpolant{T}) where {T} = print(io, "Interpolant of $T")
+Base.eltype(::Interpolant{T}) where {T} = T
+# ideally, T is a MMatrix{2,2,F64} or something like that
+
+times(X::Interpolant) = X.itp.t
+
+
+
 
 function update!(f,X::Interpolant{T}) where {T}
     for (i,t) in enumerate(X.itp.t)
@@ -57,6 +68,21 @@ end
 
 
 
+
+
+#TODO:
+
+# splitseries(X::Interpolant)
+# returns a vector of 1x1 interpolants
+
+
+
+
+
+
+
+
+# plot!(ax, itp)
 
 
 

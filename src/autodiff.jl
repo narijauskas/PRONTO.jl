@@ -63,7 +63,37 @@ function autodiff(model,f,l,p)
         pxx! = hessian(x,x,p,x; inplace=true),
     ))
 
-    # model.f = f
+    return model
+end
+
+# alternatively? @unpack model NX NU ts fx! fu!
+
+macro unpack(model)
+    return esc(quote
+        NX = $(model).NX
+        NU = $(model).NU
+        ts = $(model).ts
+        f = $(model).f
+        fx! = $(model).fx!
+        fu! = $(model).fu!
+        fxx! = $(model).fxx!
+        fxu! = $(model).fxu!
+        fuu! = $(model).fuu!
+        l = $(model).l
+        lx! = $(model).lx!
+        lu! = $(model).lu!
+        lxx! = $(model).lxx!
+        lxu! = $(model).lxu!
+        luu! = $(model).luu!
+        p = $(model).p
+        px! = $(model).px!
+        pxx! = $(model).pxx!
+    end)
+end
+
+
+
+# model.f = f
     # model.fx! = jacobian(x,f,x,u; inplace=true)
     # model.fu! = jacobian(u,f,x,u; inplace=true)
     # model.fxx! = hessian(x,x,f,x,u; inplace=true)
@@ -80,4 +110,3 @@ function autodiff(model,f,l,p)
     # model.pxx! = hessian(x,x,p,x; inplace=true)
 
     # return model
-end

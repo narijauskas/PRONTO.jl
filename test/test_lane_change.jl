@@ -72,6 +72,7 @@ model = autodiff(model,f,l,p)
 model = merge(model, (
     Qr = Interpolant(t->1.0*diagm([1,0,1,0,0,0]), model.ts, NX, NX),
     Rr = Interpolant(t->0.1*diagm([1,1]), model.ts, NU, NU),
+    iRr = Interpolant(t->inv(0.1*diagm([1,1])), model.ts, NU, NU),
 ))
 
 # const X_x = Interpolant(t->model.x0, model.ts, NX)
