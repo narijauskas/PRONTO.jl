@@ -60,9 +60,44 @@ times(X::Interpolant) = X.itp.t
 
 
 function update!(f,X::Interpolant{T}) where {T}
-    for (i,t) in enumerate(X.itp.t)
-        # X[i] = f(t)
-        map!(x->x, X[i], f(t))
+    for(Xi, t) in zip(X,times(X))
+        copy!(Xi, f(t))
+    end
+    # for (i,t) in enumerate(times(X))
+    #     # X[i] = f(t)
+    #     map!(x->x, X[i], f(t))
+    # end
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+splitseries(X) = SplitSeries(X)
+
+struct SplitSeries
+    X::Interpolant
+end
+
+function Base.iterate(sp::SplitSeries, i=1)
+    i > length(eltype(sp.X)) ? nothing : begin
+        x = collect(sp.X(t)[i] for t in times(sp.X))
+        t = times(sp.X)
+        return ((x,t),i+1)
     end
 end
 
@@ -70,14 +105,15 @@ end
 
 
 
-#TODO:
-
-# splitseries(X::Interpolant)
-# returns a vector of 1x1 interpolants
 
 
 
 
+
+
+
+
+println()
 
 
 

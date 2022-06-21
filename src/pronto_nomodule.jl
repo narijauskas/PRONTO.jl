@@ -47,7 +47,7 @@ export autodiff, unpack
 #FUTURE: @unpack model
 
 # for regulator
-function riccati!(dP, P, (fx!,fu!,Qr,Rr,X_α,U_μ), t)
+function riccati!(dP, P, (fx!,fu!,Qr,Rr,iRr,X_α,U_μ), t)
     Ar = MArray{Tuple{NX,NX},Float64}(undef)
     Br = MArray{Tuple{NX,NU},Float64}(undef)
     iRrBr = MArray{Tuple{NU,NX},Float64}(undef)
@@ -56,8 +56,8 @@ function riccati!(dP, P, (fx!,fu!,Qr,Rr,X_α,U_μ), t)
     # in-place update of buffers (Ar, Br, Kr) for time t
     fx!(Ar, X_α(t), U_μ(t)) # Ar = fx(α(t), μ(t))
     fu!(Br, X_α(t), U_μ(t)) # Br = fu(α(t), μ(t))
-    mul!(iRrBr, iRr(t), Br')
-    mul!(Kr, iRrBr, P) # Kr = inv(Rr(t))*Br'*P
+    mul!(iRrBr, iRr(t), Br') # Kr = inv(Rr(t))*Br'*P
+    mul!(Kr, iRrBr, P)
 
     #TEST: hopefully optimized by compiler?
     # if not, do each step inplace to local buffers or SVectors
@@ -69,7 +69,6 @@ end
 
 # for projection, provided Kr(t)
 function stabilized_dynamics!(dx, x, (f,fu!,Kr,α,μ), t)
-    #TEST: local buffers
     u = μ(t) - Kr(t)*(x-α(t))
     #TEST: u = @SArray μ(t) - Kr(t)*(x-α(t))
     dx .= f(x,u)
@@ -130,7 +129,7 @@ end
 #TODO: guess_trajectory!(X_α, U_μ)
 
 
-function update_Kr!(Kr,Pr_ode,fx!,fu!,iRr,Qr,α,μ)
+function update_Kr!(Kr,Pr,Pr_ode,fx!,fu!,iRr,Qr,α,μ)
     Ar = MArray{Tuple{NX,NX},Float64}(undef)
     Br = MArray{Tuple{NX,NU},Float64}(undef)
     iRrBr = MArray{Tuple{NU,NX},Float64}(undef)
@@ -140,23 +139,44 @@ function update_Kr!(Kr,Pr_ode,fx!,fu!,iRr,Qr,α,μ)
     PT,_ = arec(Ar, Br*iRr(T)*Br', Qr(T))
     reinit!(Pr_ode, PT)
 
-    for (Kr_t, (Pr,t)) in zip(Kr, TimeChoiceIterator(Pr_ode, times(Kr)))
+    for (Kr_t, Pr_t, (Pr_sol,t)) in zip(Kr, Pr, TimeChoiceIterator(Pr_ode, reverse(times(Kr))))
+        copy!(Pr_t, Pr_sol)
         fu!(Br, α(t), μ(t))
         mul!(iRrBr, iRr(t), Br') # {NU,NU}*{NU,NX}->{NU,NX}
-        mul!(Kr_t, iRrBr, Pr)
+        mul!(Kr_t, iRrBr, Pr_t)
     end
 
 end
 
 
 
+function update_Kr!(Kr,fx!,fu!,Qr,Rr,iRr,X_α,U_μ)
 
-function update_ξ!(X,U,X_ode,x0,α,μ,Kr)
-    reinit!(X_ode, x0)
+    Ar = MArray{Tuple{NX,NX},Float64}(undef)
+    Br = MArray{Tuple{NX,NU},Float64}(undef)
+    iRrBr = MArray{Tuple{NU,NX},Float64}(undef)
 
-    for (x,u,(xt,t)) in zip(X,U,TimeChoiceIterator(X_ode, times(X)))
-        copy!(x,xt) # copy from ode solution
-        copy!(u, μ(t) - Kr(t)*(x-α(t)))
+    fx!(Ar, X_α(T), U_μ(T))
+    fu!(Br, X_α(T), U_μ(T))
+    PT,_ = arec(Ar, Br*iRr(T)*Br', Qr(T))
+
+    Pr = solve(ODEProblem(riccati!, PT, (T,0.0), (fx!,fu!,Qr,Rr,iRr,X_α,U_μ)))
+    
+
+    for (Kr_t, t) in zip(Kr, times(Kr))
+        fu!(Br, X_α(t), U_μ(t))
+        mul!(iRrBr, iRr(t), Br') # {NU,NU}*{NU,NX}->{NU,NX}
+        mul!(Kr_t, iRrBr, Pr(t))
+    end
+    # return Kr, Pr
+end
+
+
+function update_ξ!(X_x,U_u,x0,Kr,X_α,U_μ)
+    X_ode = solve(ODEProblem(stabilized_dynamics!, x0, (0.0,T), (f,fu!,Kr,X_α,U_μ)))
+    for (X, U, t) in zip(X_x, U_u, times(X_x))
+        X .= X_ode(t)
+        U .= U_μ(t) - Kr(t)*(X-X_α(t))
     end
 end
 
@@ -171,15 +191,13 @@ function pronto(X_x,U_u,model)
     ts = model.ts; T = last(ts); NX = model.NX; NU = model.NU
 
     # X_x = Interpolant(ts, NX)
-    X_α = Interpolant(ts, NX)
-    foreach((x,α)->(α .= x), X_x, X_α)
+    X_α = Interpolant(t->X_x(t), ts, NX)
     X_z = Interpolant(ts, NX)
     # U_u = Interpolant(ts, NU)
-    U_μ = Interpolant(ts, NU)
-    foreach((u,μ)->(μ .= u), U_u, U_μ)
-
+    U_μ = Interpolant(t->U_u(t), ts, NU)
     U_v = Interpolant(ts, NU)
 
+    # Pr = Interpolant(ts, NX, NX)
     Kr = Interpolant(ts, NU, NX)
 
     # buffers
@@ -201,11 +219,11 @@ function pronto(X_x,U_u,model)
     fx!(Ar, model.x_eq, model.u_eq)
     fu!(Br, model.x_eq, model.u_eq)
     P,_ = arec(Ar, Br*iRr(T)*Br', Qr(T)); PT .= P
-    Pr_ode = init(ODEProblem(riccati!, PT, (T,0.0), (fx!,fu!,Qr,Rr,X_α,U_μ)), Tsit5())
+    # Pr_ode = init(ODEProblem(riccati!, PT, (T,0.0), (fx!,fu!,Qr,Rr,iRr,X_α,U_μ)), Tsit5(); save_on=false)
 
 
     # ode solver for x(t) projection
-    X_ode = init(ODEProblem(stabilized_dynamics!, model.x0, (0.0,T), (f,fu!,Kr,X_α,U_μ)), Tsit5())
+    # X_ode = init(ODEProblem(stabilized_dynamics!, model.x0, (0.0,T), (f,fu!,Kr,X_α,U_μ)), Tsit5())
 
 
 
@@ -223,12 +241,12 @@ function pronto(X_x,U_u,model)
         @info "iteration: $i"
         # ξ or φ -> Kr # regulator
         # Kr = regulator(φ..., model)
-        tx = @elapsed update_Kr!(Kr,Pr_ode,fx!,fu!,iRr,Qr,X_α,U_μ)
+        tx = @elapsed update_Kr!(Kr,fx!,fu!,Qr,Rr,iRr,X_α,U_μ)
         @info "($i) regulator solved in $tx seconds"
 
         # φ,Kr -> ξ # projection
         # φ = projection(ξ..., Kr, model)
-        tx = @elapsed update_ξ!(X_x,U_u,X_ode,model.x0,X_α,U_μ,Kr)
+        tx = @elapsed update_ξ!(X_x,U_u,model.x0,Kr,X_α,U_μ)
         @info "($i) projection solved in $tx seconds"
 
 
@@ -249,14 +267,9 @@ function pronto(X_x,U_u,model)
     # ξ is optimal (or last iteration)
 
     # @warn "maxiters"
-    return ξ
+    # return ξ
 
 end
-
-pronto(model)
-@time pronto(model)
-
-
 
 
 

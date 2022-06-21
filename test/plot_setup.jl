@@ -33,13 +33,14 @@ set_theme!(
     Theme(
         # resolution = (3000, 2000),
         # resolution = (2100, 1400),
-        resolution = (1800, 1200),
+        # resolution = (1800, 1200),
+        resolution = (1500, 1000),
         # resolution = (1200, 800),
         textcolor = clr_fg,
         linewidth = 2,
         markersize = 21,
         fontsize = 28,
-        # font = "Inter Light",
+        font = "Inter Light",
         color = clr_fg,
         # colormap = cmap,
         palette = (
