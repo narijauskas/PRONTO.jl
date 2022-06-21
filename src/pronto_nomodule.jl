@@ -111,46 +111,12 @@ function update!(X::Interpolant, ode, x0)
 end
 
 
-#FUTURE: generalize
-# function update!(f::Function, X::Interpolant, ode, x0)
-#     reinit!(ode,x0)
-#     for (i,(x,t)) in enumerate(TimeChoiceIterator(ode, X.itp.t))
-#         X[i] .= x
-#         # map!(v->v, X[i], x)
-#     end
-#     return nothing
-# end
+
+update_Kr!(Kr, X_α, U_μ, model) = update_Kr!(Kr, model.fx!, model.fu!, model.Qr, model.Rr, model.iRr, X_α, U_μ, model)
 
 
-
-
-
-
-#TODO: guess_trajectory!(X_α, U_μ)
-
-
-function update_Kr!(Kr,Pr,Pr_ode,fx!,fu!,iRr,Qr,α,μ)
-    Ar = MArray{Tuple{NX,NX},Float64}(undef)
-    Br = MArray{Tuple{NX,NU},Float64}(undef)
-    iRrBr = MArray{Tuple{NU,NX},Float64}(undef)
-
-    fx!(Ar, α(T), μ(T))
-    fu!(Br, α(T), μ(T))
-    PT,_ = arec(Ar, Br*iRr(T)*Br', Qr(T))
-    reinit!(Pr_ode, PT)
-
-    for (Kr_t, Pr_t, (Pr_sol,t)) in zip(Kr, Pr, TimeChoiceIterator(Pr_ode, reverse(times(Kr))))
-        copy!(Pr_t, Pr_sol)
-        fu!(Br, α(t), μ(t))
-        mul!(iRrBr, iRr(t), Br') # {NU,NU}*{NU,NX}->{NU,NX}
-        mul!(Kr_t, iRrBr, Pr_t)
-    end
-
-end
-
-
-
-function update_Kr!(Kr,fx!,fu!,Qr,Rr,iRr,X_α,U_μ)
+function update_Kr!(Kr,fx!,fu!,Qr,Rr,iRr,X_α,U_μ,model)
+    ts = model.ts; T = last(ts); NX = model.NX; NU = model.NU
 
     Ar = MArray{Tuple{NX,NX},Float64}(undef)
     Br = MArray{Tuple{NX,NU},Float64}(undef)
@@ -183,9 +149,19 @@ end
 
 
 
+guess(t, x0, x_eq, T) = @. (x_eq - x0)*(tanh((2π/T)*t - π) + 1)/2 + x0
+
 
 
 # ----------------------------------- main loop ----------------------------------- #
+
+function pronto(model)
+    ts = model.ts; T = last(ts); NX = model.NX; NU = model.NU
+    X_x = Interpolant(t->guess(t, model.x0, model.x_eq, T), ts, NX)
+    U_u = Interpolant(ts, NU)
+    pronto(X_x,U_u,model)
+end
+
 function pronto(X_x,U_u,model)
     @info "initializing"
     ts = model.ts; T = last(ts); NX = model.NX; NU = model.NU
@@ -219,29 +195,16 @@ function pronto(X_x,U_u,model)
     fx!(Ar, model.x_eq, model.u_eq)
     fu!(Br, model.x_eq, model.u_eq)
     P,_ = arec(Ar, Br*iRr(T)*Br', Qr(T)); PT .= P
-    # Pr_ode = init(ODEProblem(riccati!, PT, (T,0.0), (fx!,fu!,Qr,Rr,iRr,X_α,U_μ)), Tsit5(); save_on=false)
-
-
-    # ode solver for x(t) projection
-    # X_ode = init(ODEProblem(stabilized_dynamics!, model.x0, (0.0,T), (f,fu!,Kr,X_α,U_μ)), Tsit5())
 
 
 
-    #TODO: define arctan guess trajectory from x0 to xeq
-    #or,
-    # U_u[end] = model.u_eq
-    # X_x[end] = model.x_eq
-
-
-
-        
     # ξ is guess
     # (X,U) = ξ
     for i in 1:model.maxiters
         @info "iteration: $i"
         # ξ or φ -> Kr # regulator
         # Kr = regulator(φ..., model)
-        tx = @elapsed update_Kr!(Kr,fx!,fu!,Qr,Rr,iRr,X_α,U_μ)
+        tx = @elapsed update_Kr!(Kr, X_α, U_μ, model)
         @info "($i) regulator solved in $tx seconds"
 
         # φ,Kr -> ξ # projection
@@ -249,6 +212,9 @@ function pronto(X_x,U_u,model)
         tx = @elapsed update_ξ!(X_x,U_u,model.x0,Kr,X_α,U_μ)
         @info "($i) projection solved in $tx seconds"
 
+        # temporary:
+        update!(t->X_x(t), X_α)
+        update!(t->U_u(t), U_μ)
 
         # @info "finding search direction"
         # # φ,Kr -> ζ,Dh # search direction

@@ -10,11 +10,6 @@
 
 ts->[-pi,pi]
 
-guess(t, x0, x_eq, T) = @. (x_eq - x0)*(tanh((2π/T)*t - π) + 1)/2 + x0
-
-
-X_x = Interpolant(t->guess(t, model.x0, model.x_eq, T), model.ts, NX)
-U_u = Interpolant(model.ts, NU)
 
 ## ----------------------------- scaling ----------------------------- ##
 
