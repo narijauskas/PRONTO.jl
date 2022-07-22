@@ -14,7 +14,7 @@ end
 # specify fxn! of the form:
 # (buf,args...)->()
 # eg.
-# A = Functor(2,2) do buf,t
+# A = Functor(NX,NX) do buf,t
 #     model.fx!(buf, X_x(t), U_u(t))
 # end
 

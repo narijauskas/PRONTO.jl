@@ -1,5 +1,5 @@
 # using Test
-# using PRONTO
+using PRONTO
 using LinearAlgebra
 using BenchmarkTools
 using JET
@@ -20,7 +20,7 @@ model = (
     NX = NX,
     NU = NU,
     x0 = [-5.0;zeros(NX-1)],
-    # model.x0 = zeros(NX),
+    tol = 1e-3,
     x_eq = zeros(NX),
     u_eq = zeros(NU),
     maxiters = 10,
@@ -74,6 +74,9 @@ model = merge(model, (
     Rr = Interpolant(t->0.1*diagm([1,1]), model.ts, NU, NU),
     iRr = Interpolant(t->inv(0.1*diagm([1,1])), model.ts, NU, NU),
 ))
+
+
+
 
 # const X_x = Interpolant(t->model.x0, model.ts, NX)
 # const U_u = Interpolant(model.ts, NU)
