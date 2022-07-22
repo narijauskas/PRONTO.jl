@@ -46,21 +46,21 @@ function autodiff(model,f,l,p)
     @variables x[1:model.NX] u[1:model.NU]
 
     return merge(model, (
-        f = f,
-        fx! = jacobian(x,f,x,u; inplace=true),
-        fu! = jacobian(u,f,x,u; inplace=true),
-        fxx! = hessian(x,x,f,x,u; inplace=true),
-        fxu! = hessian(x,u,f,x,u; inplace=true),
-        fuu! = hessian(u,u,f,x,u; inplace=true),
-        l = l,
-        lx! = jacobian(x,l,x,u; inplace=true),
-        lu! = jacobian(u,l,x,u; inplace=true),
-        lxx! = hessian(x,x,l,x,u; inplace=true),
-        lxu! = hessian(x,u,l,x,u; inplace=true),
-        luu! = hessian(u,u,l,x,u; inplace=true),
-        p = p,
-        px! = jacobian(x,p,x; inplace=true),
-        pxx! = hessian(x,x,p,x; inplace=true),
+        f = f, # NX
+        fx! = jacobian(x,f,x,u; inplace=true), # NX,NX
+        fu! = jacobian(u,f,x,u; inplace=true), # NX,NU
+        fxx! = hessian(x,x,f,x,u; inplace=true), # NX,NX,NX
+        fxu! = hessian(x,u,f,x,u; inplace=true), # NX,NX,NU
+        fuu! = hessian(u,u,f,x,u; inplace=true), # NX,NU,NU
+        l = l, # 1
+        lx! = jacobian(x,l,x,u; inplace=true), # NX
+        lu! = jacobian(u,l,x,u; inplace=true), # NU
+        lxx! = hessian(x,x,l,x,u; inplace=true), # NX,NX
+        lxu! = hessian(x,u,l,x,u; inplace=true), # NX,NU
+        luu! = hessian(u,u,l,x,u; inplace=true), # NU,NU
+        p = p, # 1
+        px! = jacobian(x,p,x; inplace=true), # NX
+        pxx! = hessian(x,x,p,x; inplace=true), # NX,NX
     ))
 
     return model
@@ -88,6 +88,10 @@ macro unpack(model)
         p = $(model).p
         px! = $(model).px!
         pxx! = $(model).pxx!
+        x0 = $(model).x0
+        Qr = $(model).Qr
+        Rr = $(model).Rr
+        iRr = $(model).iRr
     end)
 end
 

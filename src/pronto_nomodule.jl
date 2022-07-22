@@ -35,6 +35,10 @@ export autodiff, unpack
 
 
 
+#YO: #TODO: model is a global in the module
+# type ProntoModel{NX,NU}, pass buffer dimensions parametrically?
+# otherwise, model holds functions and parameters
+
 
 
 
@@ -70,20 +74,19 @@ end
 # for projection, provided Kr(t)
 function stabilized_dynamics!(dx, x, (f,fu!,Kr,α,μ), t)
     u = μ(t) - Kr(t)*(x-α(t))
-    #TEST: u = @SArray μ(t) - Kr(t)*(x-α(t))
     dx .= f(x,u)
     # FUTURE: in-place f!(dx,x,u) 
 end
 
 
 
-# function stabilized_dynamics_2!(dx, x, (f,fu!,NX,NU,Rr,Pr,X_α,X_μ), t)
-#    
-#     fu!(Br, X_α(t), U_μ(t))
-#     mul!(Kr, inv(Rr(t))*Br', Pr(t))
-#     u = μ(t) - Kr(t)*(x-α(t))
-#     dx .= f(x,u)
-# end
+
+#TODO:
+function optimizer!(dP, P, (A,B,Q,R,S), t)
+    #TODO: buffers Ko, R, S, B, Q, A
+    Ko = R(t)\(S(t)'+B(t)'*P)
+    dP .= -A(t)'*P - P*A(t) + Ko'*R(t)*Ko - Q(t)
+end
 
 
 
@@ -112,11 +115,19 @@ end
 
 
 
-update_Kr!(Kr, X_α, U_μ, model) = update_Kr!(Kr, model.fx!, model.fu!, model.Qr, model.Rr, model.iRr, X_α, U_μ, model)
+# update_Kr!(Kr, X_α, U_μ, model) = update_Kr!(Kr, model.fx!, model.fu!, model.Qr, model.Rr, model.iRr, X_α, U_μ, model)
 
-
-function update_Kr!(Kr,fx!,fu!,Qr,Rr,iRr,X_α,U_μ,model)
-    ts = model.ts; T = last(ts); NX = model.NX; NU = model.NU
+# solve for regulator
+# ξ or φ -> Kr
+# update the values stored in Kr
+#TODO: how this works
+# solve algebraic riccati for P(T)
+# 
+# function update_Kr!(Kr,fx!,fu!,Qr,Rr,iRr,X_α,U_μ,model)
+function update_Kr!(Kr, X_α, U_μ, model)
+    @unpack model
+    T = last(ts)
+    # ts = model.ts; T = last(ts); NX = model.NX; NU = model.NU
 
     Ar = MArray{Tuple{NX,NX},Float64}(undef)
     Br = MArray{Tuple{NX,NU},Float64}(undef)
@@ -124,11 +135,11 @@ function update_Kr!(Kr,fx!,fu!,Qr,Rr,iRr,X_α,U_μ,model)
 
     fx!(Ar, X_α(T), U_μ(T))
     fu!(Br, X_α(T), U_μ(T))
-    PT,_ = arec(Ar, Br*iRr(T)*Br', Qr(T))
 
+    PT,_ = arec(Ar, Br*iRr(T)*Br', Qr(T))
     Pr = solve(ODEProblem(riccati!, PT, (T,0.0), (fx!,fu!,Qr,Rr,iRr,X_α,U_μ)))
     
-
+    # Kr(t) = inv(Rr(t))*Br(t)'*Pr(t)
     for (Kr_t, t) in zip(Kr, times(Kr))
         fu!(Br, X_α(t), U_μ(t))
         mul!(iRrBr, iRr(t), Br') # {NU,NU}*{NU,NX}->{NU,NX}
@@ -138,7 +149,9 @@ function update_Kr!(Kr,fx!,fu!,Qr,Rr,iRr,X_α,U_μ,model)
 end
 
 
-function update_ξ!(X_x,U_u,x0,Kr,X_α,U_μ)
+# φ,Kr -> ξ # projection
+function update_ξ!(X_x,U_u,Kr,X_α,U_μ,model)
+    @unpack model
     X_ode = solve(ODEProblem(stabilized_dynamics!, x0, (0.0,T), (f,fu!,Kr,X_α,U_μ)))
     for (X, U, t) in zip(X_x, U_u, times(X_x))
         X .= X_ode(t)
@@ -150,6 +163,75 @@ end
 
 
 guess(t, x0, x_eq, T) = @. (x_eq - x0)*(tanh((2π/T)*t - π) + 1)/2 + x0
+
+
+
+
+
+
+function search_direction(X_z, U_v, X_x, U_u, model)
+    @unpack model
+    T = last(ts)
+    # ts = model.ts; T = last(ts); NX = model.NX; NU = model.NU
+    # fx! = model.fx!; fu! = model.fu!
+    # lxx! = model.lxx!; luu! = model.luu!; lxu! = model.lxu!;
+    # px! = model.px!; pxx! = model.pxx!
+    
+    # buffers
+    Ko = MArray{Tuple{NU,NX},Float64}(undef)
+    vo = MArray{Tuple{NU},Float64}(undef)
+
+    A = MArray{Tuple{NX,NU},Float64}(undef) # fx!
+    B = MArray{Tuple{NX,NU},Float64}(undef) # fu!
+    Q = MArray{Tuple{NX,NX},Float64}(undef) # lxx!
+    R = MArray{Tuple{NU,NU},Float64}(undef) # luu!
+    S = MArray{Tuple{NX,NU},Float64}(undef) # lxu!
+    
+    #TODO: A,B,Q,R,S or pass equivalent functions
+    fx!(A, X_x(t), U_u(t))  # NX,NU
+    fu!(B, X_x(t), U_u(t))  # NX,NU
+    lxx!(Q, X_x(t), U_u(t)) # NX,NX
+    luu!(R, X_x(t), U_u(t)) # NU,NU
+    lxu!(S, X_x(t), U_u(t)) # NX,NU
+
+    PT = MArray{Tuple{NX,NX},Float64}(undef)
+    pxx!(PT, model.x_eq)
+    # solve optimizer Ko
+    P = Timeseries(solve(ODEProblem(optimizer!, PT, (T,0.0), (A,B,Q,R,S))))
+    for (Ko_t, t) in zip(Ko, times(X_x))
+        # update R,S,B
+        fu!(B, X_x(t), U_u(t))
+        luu!(R, X_x(t), U_u(t))
+        lxu!(S, X_x(t), U_u(t))
+        
+        #NU,NU*NU,NX
+        #TODO: inplace operators?
+        Ko_t .= R\(S'+B'*P(t))
+    end
+
+    # NU,NU * NU,1
+    #
+
+    # solve costate dynamics vo
+
+
+    # forward integration, solve z
+    # update X_z
+    # update U_v
+
+    # ζ is updated
+end
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -205,12 +287,12 @@ function pronto(X_x,U_u,model)
         # ξ or φ -> Kr # regulator
         # Kr = regulator(φ..., model)
         tx = @elapsed update_Kr!(Kr, X_α, U_μ, model)
-        @info "($i) regulator solved in $tx seconds"
+        @info "(itr: $i) regulator solved in $tx seconds"
 
         # φ,Kr -> ξ # projection
         # φ = projection(ξ..., Kr, model)
-        tx = @elapsed update_ξ!(X_x,U_u,model.x0,Kr,X_α,U_μ)
-        @info "($i) projection solved in $tx seconds"
+        tx = @elapsed update_ξ!(X_x,U_u,Kr,X_α,U_μ,model)
+        @info "(itr: $i) projection solved in $tx seconds"
 
         # temporary:
         update!(t->X_x(t), X_α)
@@ -219,6 +301,7 @@ function pronto(X_x,U_u,model)
         # @info "finding search direction"
         # # φ,Kr -> ζ,Dh # search direction
         # ζ,Dh = search_direction(φ..., Kr, model)
+        # @info "(itr: $i) search direction found in $tx seconds"
 
         # # check Dh criteria -> return ξ,Kr
         # @info "Dh is $Dh"
@@ -241,349 +324,3 @@ end
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# const Pr = Interpolant((t)->PT(T), model.ts, model.NX, model.NX)
-test_resolve!(Pr_ode, PT, Pr) = resolve!(Pr_ode, PT, Pr)
-# @def Ar model.fx(X_α(t),U_μ(t))
-# foo = t->model.fx(X_α(t),U_μ(t))
-# function pronto(model, α0, μ0)
-    # φ/ξ0/ξ is initial guess
-    # φ->Kr # regulator
-
-    # @pronto_setup
-
-    # X_α always starts at x0 and ends at x_eq
-    # α0 should be arctan guess
-
-# core data storage
-# const X_x = Interpolant(t->α0(t), model.ts, model.NX)
-# const X_α = Interpolant(t->α0(t), model.ts, model.NX)
-
-
-# A!(buf,model,x,u,t) = model.fx!(buf,x(t),u(t))
-
-
-# A = Functor(NX,NX) do 
-#     (buf,t)->model.fx!(buf, X_x(t), U_u(t))
-# end
-
-# B = Functor(NU,NU) do 
-#     (buf,t)->model.fu!(buf, X_x(t), U_u(t))
-# end
-
-    # # core functions
-    # A(x,u,t) = model.fx(x(t),u(t))
-    # B(x,u,t) = model.fu(x(t),u(t))
-
-    # Ar = (t)->A(X_α,U_μ,t) # captures (X_α) and (U_μ)
-    # Br = (t)->B(X_α,U_μ,t) # captures (X_α) and (U_μ)
-
-
-
-# invRr = model.invRr
-
-# PT,_ = arec(Ar(T), Br(T), Rr(T), Qr(T))
-
-# PT will always be around x_eq/u_eq
-
-
-
-# # beautiful:
-# @code_warntype model.fx!(buf, X_α(t), U_μ(t))
-# @code_warntype model.fu!(buf, X_α(t), U_μ(t))
-# @code_warntype Br(t)
-# @benchmark Br(t)
-# @benchmark model.fu!(buf, X_α(t), U_μ(t))
-
-
-@code_native model.fx!(buf, X_α(t), U_μ(t))
-@code_native model.fu!(buf, X_α(t), U_μ(t))
-
-@profview foreach(t->Br(t), model.ts)
-@report_opt Ar(t)
-
-@report_opt resolve!(Pr_ode3, PT(T), Pr)
-
-
-
-    # regulator
-# const KrT = inv(Rr(T))*Br(T)'*PT
-# const Kr = Interpolant((t)->KrT, model.ts)
-    # Kr = Interpolant(t->zeros(model.NU,model.NX), model.ts)
-    # Kr(t) = inv(Rr(t))*B(X_α,U_μ,t)'*Pr(t) # captures Pr, (X_α) and (U_μ)
-
-    # update the value of Kr (by solving Pr) using X_α,U_μ
-function update_Kr!()
-    reinit!(Pr_ode,PT)
-    for (i,(Pr,t)) in enumerate(TimeChoiceIterator(Pr_ode, Kr.t))
-        Kr[i] = invRr(t)*model.fu(X_α(t),U_μ(t))'*Pr
-    end
-    # map!((Pr,t)->(invRr(t)*model.fu(X_α(t),U_μ(t))'*Pr),Kr.u, TimeChoiceIterator(Pr_ode, Kr.t))
-    # resolve!(Pr_ode, PT, Pr)
-    # update!(t->inv(Rr(t))*Br(t)'*Pr(t), Kr)
-    return nothing
-end 
-
-  
-
-const ode2 = ODEProblem(stabilized_dynamics!, model.x0, (0.0,T), (model.f,Kr,X_α,U_μ))
-const X_x_ode = init(ode2, Tsit5())
-
-# resample and save a new (X_x) and (U_u)
-function update_ξ!()
-    resolve!(X_x_ode, model.x0, X_x)
-    update!(t->(U_μ(t) - Kr(t)*(X_x(t)-X_α(t))), U_u)
-    return nothing
-end
-
-
-
-function pronto_loop()
-for i in 1:model.maxiters
-
-    # φ->Kr
-    # @info "regulator update"
-    update_Kr!()
-
-    # φ,Kr->ξ
-    # @info "projection"
-    update_ξ!()
-
-    # ξ,Kr->ζ # search direction
-
-    # ζ->Dh # cost derivatives
-    # exit criteria -> return ξ
-
-    # γ # armijo sub-loop
-    # ξ,ζ,γ->φ # new estimate
-    # φ,Kr->ξ # projection
-end
-end
-
-
-    # @warn "maxiters"
-    # return (X_x,U_u)
-# end
-
-
-
-
-# --------------------------- core data storage --------------------------- #
-
-
-
-
-# --------------------------- core functions --------------------------- #
-
-# useful functions
-# @inline A(model,ξ,t) = model.fx(ξ.x(t),ξ.u(t))
-# @inline B(model,ξ,t) = model.fu(ξ.x(t),ξ.u(t))
-
-# arbitrary guess trajectory
-# φ = α,μ unstabilized trajectory
-# ξ = x,u stabilized trajectory (depends on ξ)
-
-# @def pronto_setup begin ... end
-
-# solving the regulator
-
-# A(tj) = (t)->A(tj,t) # function which creates a function of t with captured trajectory tj
-# alternatively, Ar(t) = A(φ,t), captures φ
-
-# B(tj) = (t)->B(tj,t) # function which creates a function of t with captured trajectory tj
-
-
-
-# --------------------------- regulator --------------------------- #
-
-
-# --------------------------- projection --------------------------- #
-
-
-
-
-
-# --------------------------- update values --------------------------- #
-
-# map ξ0 -> Kr
-# integrate Pr from PT to 0
-# Kr is a function of Pr
-
-
-# now Kr is up to date
-
-
-
-
-
-
-#option 2: define macros, or functions at global scope
-
-
-
-
-
-
-# @expand model A B
-# # likely need to escape A,B
-# A = model.A
-# B = model.B
-
-# @inline A(model,ξ,t) = model.fx(ξ.x(t),ξ.u(t))
-# @inline B(model,ξ,t) = model.fu(ξ.x(t),ξ.u(t))
-
-# Kr(model,t) = inv(model.Rr(t))*B(model,modelt)'*P
-
-
-
-
-# --------------------------- earlier versions and comments --------------------------- #
-
-
-
-
-
-
-
-# @def Rr model.Rr
-# (@Rr)(t) instead of model.Rr(t)
-# t
-# R,Q (for regulator)
-# x0 (for projection)
-# x_eq (for search direction)
-
-# f,fx,fu
-# fxx,fxu,fuu
-
-# l,lx,lu
-# ...
-
-# p, px, pxx
-
-# solver kw
-
-
-
-#=
-include("regulator.jl")
-include("projection.jl")
-include("cost.jl")
-include("search_direction.jl")
-include("armijo.jl")
-
-
-function pronto(ξ, model)
-
-    # declare interpolant objects
-    # ξ,φ
-    # declare integrators to solve them
-    # declare functions (capturing above)
-
-
-    # pronto loop - update integrators
-
-end
-
-
-
-
-
-@inline A(model,ξ,t) = model.fx(ξ.x(t),ξ.u(t))::model.fxT
-@inline B(model,ξ,t) = model.fu(ξ.x(t),ξ.u(t))::model.fuT
-# A = model.fx(ξ.x(t),ξ.u(t))
-# B = model.fu(ξ.x(t),ξ.u(t))
-
-
-# update_regulator!(Kr, ξ, model)
-# update_projection!(φ, ξ, Kr, model)
-# Dh = update_search_direction!(ζ, φ, Kr, model)
-
-function pronto(ξ, model)
-    
-    # ξ is guess
-    # (X,U) = ξ
-    for i in 1:model.maxiters
-        @info "iteration: $i"
-        # ξ -> Kr # regulator
-        @info "building regulator"
-        Kr = regulator(ξ..., model)
-
-        # ξ,Kr -> φ # projection
-        φ = projection(ξ..., Kr, model)
-
-        @info "finding search direction"
-        # φ,Kr -> ζ,Dh # search direction
-        ζ,Dh = search_direction(φ..., Kr, model)
-
-        # check Dh criteria -> return ξ,Kr
-        @info "Dh is $Dh"
-        Dh > 0 && (@warn "increased cost - quitting"; return ξ)
-        -Dh < model.tol && (@info "PRONTO converged"; return ξ)
-        
-        @info "calculating new trajectory:"
-        # φ,ζ,Kr -> γ -> ξ # armijo
-        ξ = armijo_backstep(φ..., Kr, ζ..., Dh, model)
-
-        @info "resampling solution"
-        ξ = resample(ξ...,model)
-    end
-    # ξ is optimal (or last iteration)
-
-    @warn "maxiters"
-    return ξ
-end
-
-=#
-# export pronto
-# end # module
