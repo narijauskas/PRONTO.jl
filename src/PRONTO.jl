@@ -27,7 +27,7 @@ include("interpolants.jl")
 export Interpolant
 
 include("autodiff.jl")
-export autodiff, unpack
+export autodiff, @unpack
 # export jacobian
 # export hessian
 # model = autodiff(f,l,p;NX,NU)
@@ -90,24 +90,26 @@ end
 
 # solve for regulator
 # ξ or φ -> Kr
-function regulator(X_α, U_μ, model)
-
+function regulator(η, model)
     @unpack model
     T = last(ts)
     # ts = model.ts; T = last(ts); NX = model.NX; NU = model.NU
 
+    (α,μ) = η
+
     Ar = Functor(NX,NX) do buf,t
-        fx!(buf, X_α(t), U_μ(t))
+        fx!(buf, α(t), μ(t))
     end
 
     Br = Functor(NX,NU) do buf,t
-        fu!(buf, X_α(t), U_μ(t))
+        fu!(buf, α(t), μ(t))
     end
 
     iRrBr = Functor(NU,NX) do buf,t
         mul!(buf, iRr(t), Br(t)')
     end
 
+    # Kr = inv(Rr)*Br'*P
     Kr = Functor(NU,NX) do buf,P,t
         mul!(buf, iRrBr(t), P)
     end
@@ -129,14 +131,33 @@ end
 
 
 # for projection, provided Kr(t)
-function stabilized_dynamics!(dx, x, (Kr,α,μ,model), t)
-    @unpack model
+function stabilized_dynamics!(dx, x, (α,μ,Kr,f), t)
     u = μ(t) - Kr(t)*(x-α(t))
     dx .= f(x,u)
     # FUTURE: in-place f!(dx,x,u) 
 end
 
+# η,Kr -> ξ # projection to generate stabilized trajectory
+function projection(η,Kr,model)
+    @unpack model
+    T = last(ts)
+    (α,μ) = η
 
+    x_ode = solve(ODEProblem(stabilized_dynamics!, x0, (0.0,T), (α,μ,Kr,f)))
+
+    #TEST: performance against just returning x_ode
+    x = x_ode
+    # x = Functor(NX) do buf,t
+    #     copy!(buf, x_ode(t))
+    # end
+
+    u = Functor(NU) do buf,t
+        buf .= μ(t) - Kr(t)*(x(t)-α(t))
+    end
+
+    ξ = (x,u)
+    return ξ
+end
 
 
 # φ,Kr -> ξ # projection
@@ -157,36 +178,38 @@ end
 
 
 
-function search_direction(X_z, U_v, X_x, U_u, model)
+function search_direction(ξ, η, model)
     @unpack model
     T = last(ts)
+    (x,u) = ξ
+    (α,μ) = η
 
     A = Functor(NX,NX) do buf,t
-        fx!(buf, X_x(t), U_u(t))
+        fx!(buf, x(t), u(t))
     end
 
     B = Functor(NX,NU) do buf,t
-        fu!(buf, X_x(t), U_u(t))
+        fu!(buf, x(t), u(t))
     end
 
     a = Functor(NX) do buf,t
-        lx!(buf, X_x(t), U_u(t))
+        lx!(buf, x(t), u(t))
     end
 
     b = Functor(NU) do buf,t
-        lu!(buf, X_x(t), U_u(t))
+        lu!(buf, x(t), u(t))
     end
 
     Q = Functor(NX,NX) do buf,t
-        lxx!(buf, X_x(t), U_u(t))
+        lxx!(buf, x(t), u(t))
     end
-
+   
     R = Functor(NU,NU) do buf,t
-        luu!(buf, X_x(t), U_u(t))
+        luu!(buf, x(t), u(t))
     end
 
     S = Functor(NX,NU) do buf,t
-        lxu!(buf, X_x(t), U_u(t))
+        lxu!(buf, x(t), u(t))
     end
 
     Ko = Functor(NU,NX) do buf,P,t
@@ -196,10 +219,11 @@ function search_direction(X_z, U_v, X_x, U_u, model)
     # --------------- solve optimizer Ko --------------- #
 
     PT = MArray{Tuple{NX,NX},Float64}(undef) # pxx!
-    pxx!(PT, model.x_eq)
+    pxx!(PT, α(T)) # around unregulated trajectory
 
     P = solve(ODEProblem(optimizer!, PT, (T,0.0), (Ko,R,Q,A)))
     
+    # Ko = inv(R)\(S'+B'*P)
     Ko = Functor(NU,NX) do buf,t
         mul!(buf, inv(R(t)), (S(t)'+B(t)'*P(t)))
     end
@@ -209,8 +233,9 @@ function search_direction(X_z, U_v, X_x, U_u, model)
 
     # solve costate dynamics vo
     rT = MArray{Tuple{NX},Float64}(undef)
-    px!(rT, model.x_eq)
+    px!(rT, α(T)) # around unregulated trajectory
     r = solve(ODEProblem(costate_dynamics!, rT, (T,0.0), (A,B,a,b,Ko)))
+
 
 
     vo = Functor(NU) do buf,t
@@ -222,19 +247,26 @@ function search_direction(X_z, U_v, X_x, U_u, model)
     # --------------- forward integration for search direction --------------- #
 
     v = Functor(NU) do buf,z,t
-        copy!(buf, (-Ko(t)*z+vo(t)))
+        mul!(buf, Ko(t), z)
+        buf .*= -1
+        buf .+= vo(t)
     end
 
     
     z0 = 0 .* model.x_eq
     z_ode = solve(ODEProblem(update_dynamics!, z0, (0.0,T), (A,B,v)))
     
+    #MAYBE: interpolate? just return the ode?
+    #FUTURE: find a way to return ode interpolations in-place
     z = Functor(NX) do buf,t
         copy!(buf, z_ode(t))
     end
 
+    # v = -Ko(t)*z+vo(t)
     v = Functor(NU) do buf,t
-        copy!(buf, muladd(-Ko(t), z(t), vo(t)))
+        mul!(buf, Ko(t), z(t))
+        buf .*= -1
+        buf .+= vo(t)
     end
 
     ζ = (z,v)
@@ -286,31 +318,47 @@ end
 # armijo_backstep:
 function armijo_backstep(x,u,Kr,z,v,Dh,model)
     γ = 1
-    T = last(model.t)
+    T = last(model.ts)
     
     # compute cost
     J = cost(x,u,model)
-    h = J(T)[1] + model.p(x(T))
-    ξ = 0
+    h = J(T)[1] + model.p(x(T)) # around regulated trajectory
+    # ξ = 0
 
     while γ > model.β^12
         @info "armijo update: γ = $γ"
         
         # generate estimate
-        α = Timeseries(t->(x(t) + γ*z(t)))
-        μ = Timeseries(t->(u(t) + γ*v(t)))
-        ξ = projection(α, μ, Kr, model)
+        # MAYBE: α̂(γ,t)
 
-        J = cost(ξ..., model)
-        g = J(T)[1] + model.p(ξ[1](T))
+        # α̂ = x + γz
+        α̂ = Functor(NX) do buf,t
+            mul!(buf, γ, z(t))
+            buf .+= x(t)
+        end
+
+        # μ̂ = u + γv
+        μ̂ = Functor(NU) do buf,t
+            mul!(buf, γ, v(t))
+            buf .+= u(t)
+        end
+
+        η̂ = (α̂, μ̂)
+        # α = Timeseries(t->(x(t) + γ*z(t)))
+        # μ = Timeseries(t->(u(t) + γ*v(t)))
+        ξ̂ = projection(η̂, Kr, model)
+        (x̂,û) = ξ̂
+
+        J = cost(ξ̂..., model)
+        g = J(T)[1] + model.p(x̂(T))
 
         # check armijo rule
-        h-g >= -model.α*γ*Dh ? (return ξ) : (γ *= model.β)
+        h-g >= -model.α*γ*Dh ? (return ξ̂) : (γ *= model.β)
         # println("γ=$γ, h-g=$(h-g)")
     end
 
     @warn "maxiters"
-    return ξ
+    return ξ̂
 end
 
 
@@ -331,56 +379,54 @@ end
 
 function pronto(model)
     ts = model.ts; T = last(ts); NX = model.NX; NU = model.NU
-    X_x = Interpolant(t->guess(t, model.x0, model.x_eq, T), ts, NX)
-    U_u = Interpolant(ts, NU)
-    pronto(X_x,U_u,model)
+    α = Interpolant(t->guess(t, model.x0, model.x_eq, T), ts, NX)
+    μ = Interpolant(ts, NU)
+    η = (α,μ)
+    pronto(η,model)
 end
 
-function pronto(X_x,U_u,model)
+
+function pronto(η,model)
     @info "initializing"
     ts = model.ts; T = last(ts); NX = model.NX; NU = model.NU
 
-    X_α = Interpolant(t->X_x(t), ts, NX)
-    X_z = Interpolant(ts, NX)
-
-    U_μ = Interpolant(t->U_u(t), ts, NU)
-    U_v = Interpolant(ts, NU)
-
-
-
-    # ξ is guess
-    # (X,U) = ξ
     for i in 1:model.maxiters
         @info "iteration: $i"
-        # ξ or φ -> Kr # regulator
+        # η -> Kr # regulator
         tx = @elapsed begin
-            Kr = regulator(X_α, U_μ, model)
+            Kr = regulator(η, model)
         end
         @info "(itr: $i) regulator solved in $tx seconds"
 
-        # φ,Kr -> ξ # projection
-        # φ = projection(ξ..., Kr, model)
-        tx = @elapsed update_ξ!(X_x,U_u,Kr,X_α,U_μ,model)
+        # η,Kr -> ξ # projection
+        tx = @elapsed begin
+            ξ = projection(η, Kr, model)
+        end
+        # tx = @elapsed update_ξ!(X_x,U_u,Kr,X_α,U_μ,model)
         @info "(itr: $i) projection solved in $tx seconds"
-
-        # temporary:
-        update!(t->X_x(t), X_α)
-        update!(t->U_u(t), U_μ)
 
         # φ,Kr -> ζ # search direction
         tx = @elapsed begin
-            ζ,Dh = search_direction(X_z, U_v, X_x, U_u, model)
+            ζ,Dh = search_direction(ξ, η, model)
         end
         @info "(itr: $i) search direction found in $tx seconds"
 
-        # check Dh criteria -> return ξ,Kr
+        # # check Dh criteria -> return ξ,Kr
         @info "Dh is $Dh"
         Dh > 0 && (@warn "increased cost - quitting"; return ξ)
         -Dh < model.tol && (@info "PRONTO converged"; return ξ)
         
         # @info "calculating new trajectory:"
         # # φ,ζ,Kr -> γ -> ξ # armijo
-        # ξ = armijo_backstep(φ..., Kr, ζ..., Dh, model)
+        tx = @elapsed begin
+            ξ̂ = armijo_backstep(ξ...,Kr,ζ...,Dh,model)
+        end
+        @info "(itr: $i) trajectory update found in $tx seconds"
+
+        (x̂,û) = ξ̂
+        update!(t->x̂(t), α)
+        update!(t->û(t), μ)
+        η = (α,μ)
 
     end
     # ξ is optimal (or last iteration)

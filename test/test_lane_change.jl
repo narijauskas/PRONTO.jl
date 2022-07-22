@@ -2,17 +2,9 @@
 using PRONTO
 using LinearAlgebra
 using BenchmarkTools
-using JET
+# using JET
 
-# model = MStruct()
-# model.ts = 0:0.001:10
-# model.NX = NX = 6
-# model.NU = NU = 2
-# model.x0 = [-5.0;zeros(model.NX-1)]
-# # model.x0 = zeros(NX)
-# model.x_eq = zeros(NX)
-# model.u_eq = zeros(NU)
-# model.maxiters = 10
+
 NX = 6
 NU = 2
 model = (
@@ -76,6 +68,7 @@ model = merge(model, (
 ))
 
 
+# pronto(model)
 
 
 # const X_x = Interpolant(t->model.x0, model.ts, NX)
@@ -130,3 +123,5 @@ model = merge(model, (
 # @time x,u = pronto(model,x0,u0)
 # @report_opt x,u = pronto(model,x0,u0)
 # @profview x,u = pronto(model,x0,u0)
+
+
