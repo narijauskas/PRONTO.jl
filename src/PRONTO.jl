@@ -413,8 +413,8 @@ function pronto(η,model)
 
         # # check Dh criteria -> return ξ,Kr
         @info "Dh is $Dh"
-        Dh > 0 && (@warn "increased cost - quitting"; return ξ)
-        -Dh < model.tol && (@info "PRONTO converged"; return ξ)
+        Dh > 0 && (@warn "increased cost - quitting"; return η)
+        -Dh < model.tol && (@info "PRONTO converged"; return η)
         
         # @info "calculating new trajectory:"
         # # φ,ζ,Kr -> γ -> ξ # armijo
@@ -429,10 +429,10 @@ function pronto(η,model)
         η = (α,μ)
 
     end
-    # ξ is optimal (or last iteration)
+    # η is optimal (or last iteration)
 
-    # @warn "maxiters"
-    # return ξ
+    @warn "maxiters"
+    return η
 
 end
 
