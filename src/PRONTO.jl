@@ -90,12 +90,10 @@ end
 
 # solve for regulator
 # ξ or φ -> Kr
-function regulator(η, model)
+function regulator(α,μ,model)
     @unpack model
     T = last(ts)
     # ts = model.ts; T = last(ts); NX = model.NX; NU = model.NU
-
-    (α,μ) = η
 
     Ar = Functor(NX,NX) do buf,t
         fx!(buf, α(t), μ(t))
@@ -140,38 +138,36 @@ function stabilized_dynamics!(dx, x, (α,μ,Kr,f), t)
 end
 
 # η,Kr -> ξ # projection to generate stabilized trajectory
-function projection(η,Kr,model)
+function projection(α,μ,Kr,model)
     @unpack model
     T = last(ts)
-    (α,μ) = η
 
     x_ode = solve(ODEProblem(stabilized_dynamics!, x0, (0.0,T), (α,μ,Kr,f)))
 
     #TEST: performance against just returning x_ode
-    x = x_ode
-    # x = Functor(NX) do buf,t
-    #     copy!(buf, x_ode(t))
-    # end
+    # x = x_ode
+    x = Functor(NX) do buf,t
+        copy!(buf, x_ode(t))
+    end
 
     u = Functor(NU) do buf,t
         buf .= μ(t) - Kr(t)*(x(t)-α(t))
     end
 
-    ξ = (x,u)
-    return ξ
+    return (x,u)
 end
 
 
 # φ,Kr -> ξ # projection
-function update_ξ!(X_x,U_u,Kr,X_α,U_μ,model)
-    @unpack model
-    T = last(ts)
-    X_ode = solve(ODEProblem(stabilized_dynamics!, x0, (0.0,T), (Kr,X_α,U_μ,model)))
-    for (X, U, t) in zip(X_x, U_u, times(X_x))
-        X .= X_ode(t)
-        U .= U_μ(t) - Kr(t)*(X-X_α(t))
-    end
-end
+# function update_ξ!(X_x,U_u,Kr,X_α,U_μ,model)
+#     @unpack model
+#     T = last(ts)
+#     X_ode = solve(ODEProblem(stabilized_dynamics!, x0, (0.0,T), (Kr,X_α,U_μ,model)))
+#     for (X, U, t) in zip(X_x, U_u, times(X_x))
+#         X .= X_ode(t)
+#         U .= U_μ(t) - Kr(t)*(X-X_α(t))
+#     end
+# end
 
 
 
@@ -180,11 +176,9 @@ end
 
 
 
-function search_direction(ξ, η, model)
+function search_direction(x, u, α, model)
     @unpack model
     T = last(ts)
-    (x,u) = ξ
-    (α,μ) = η
 
     A = Functor(NX,NX) do buf,t
         fx!(buf, x(t), u(t))
@@ -219,7 +213,7 @@ function search_direction(ξ, η, model)
     end
 
     # --------------- solve optimizer Ko --------------- #
-
+    @info "solving optimizer"
     PT = MArray{Tuple{NX,NX},Float64}(undef) # pxx!
     pxx!(PT, α(T)) # around unregulated trajectory
 
@@ -232,6 +226,7 @@ function search_direction(ξ, η, model)
 
 
     # --------------- solve costate dynamics vo --------------- #
+    @info "solving costate dynamics"
 
     # solve costate dynamics vo
     rT = MArray{Tuple{NX},Float64}(undef)
@@ -247,7 +242,7 @@ function search_direction(ξ, η, model)
 
 
     # --------------- forward integration for search direction --------------- #
-
+    @info "forward integration"
     v = Functor(NU) do buf,z,t
         mul!(buf, Ko(t), z)
         buf .*= -1
@@ -274,6 +269,7 @@ function search_direction(ξ, η, model)
     ζ = (z,v)
 
     # --------------- cost derivatives --------------- #
+    @info "cost derivatives"
     #FUTURE: break out to separate function
     y0 = [0;0]
     y = solve(ODEProblem(cost_derivatives!, y0, (0.0,T), (z,v,a,b,Q,S,R)))
@@ -319,6 +315,7 @@ end
 
 # armijo_backstep:
 function armijo_backstep(x,u,Kr,z,v,Dh,model)
+    @unpack model
     γ = 1
     T = last(model.ts)
     
@@ -345,10 +342,9 @@ function armijo_backstep(x,u,Kr,z,v,Dh,model)
             buf .+= u(t)
         end
 
-        η̂ = (α̂, μ̂)
         # α = Timeseries(t->(x(t) + γ*z(t)))
         # μ = Timeseries(t->(u(t) + γ*v(t)))
-        ξ̂ = projection(η̂, Kr, model)
+        ξ̂ = projection(α̂, μ̂, Kr, model)
         (x̂,û) = ξ̂
 
         J = cost(ξ̂..., model)
@@ -370,7 +366,7 @@ function stage_cost!(dh, h, (l,x,u), t)
 end
 
 function cost(x,u,model)
-    T = last(model.t)
+    T = last(model.ts)
     h = solve(ODEProblem(stage_cost!, [0], (0.0,T), (model.l,x,u)))
     return h
 end
@@ -383,33 +379,44 @@ function pronto(model)
     ts = model.ts; T = last(ts); NX = model.NX; NU = model.NU
     α = Interpolant(t->guess(t, model.x0, model.x_eq, T), ts, NX)
     μ = Interpolant(ts, NU)
-    η = (α,μ)
-    pronto(η,model)
+    pronto(α,μ,model)
 end
 
 
-function pronto(η,model)
+function pronto(α,μ,model)
     @info "initializing"
     ts = model.ts; T = last(ts); NX = model.NX; NU = model.NU
+    η = (α,μ)
+
+    x = Interpolant(ts, NX)
+    u = Interpolant(ts, NU)
+    z = Interpolant(ts, NX)
+    v = Interpolant(ts, NU)
 
     for i in 1:model.maxiters
         @info "iteration: $i"
         # η -> Kr # regulator
         tx = @elapsed begin
-            Kr = regulator(η, model)
+            Kr = regulator(α, μ, model)
         end
         @info "(itr: $i) regulator solved in $tx seconds"
 
         # η,Kr -> ξ # projection
         tx = @elapsed begin
-            ξ = projection(η, Kr, model)
+            ξ = projection(α, μ, Kr, model)
+            update!(t->ξ[1](t), x)
+            update!(t->ξ[2](t), u)
+            ξ = (x,u)
         end
         # tx = @elapsed update_ξ!(X_x,U_u,Kr,X_α,U_μ,model)
         @info "(itr: $i) projection solved in $tx seconds"
 
         # φ,Kr -> ζ # search direction
         tx = @elapsed begin
-            ζ,Dh = search_direction(ξ, η, model)
+            ζ,Dh = search_direction(ξ..., α, model)
+            update!(t->ζ[1](t), z)
+            update!(t->ζ[2](t), v)
+            ζ = (z,v)
         end
         @info "(itr: $i) search direction found in $tx seconds"
 

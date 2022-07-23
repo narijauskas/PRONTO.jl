@@ -16,6 +16,8 @@ model = (
     x_eq = zeros(NX),
     u_eq = zeros(NU),
     maxiters = 10,
+    α = 0.4,
+    β = 0.7,
 )
 
 
