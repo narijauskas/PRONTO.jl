@@ -19,7 +19,7 @@ clearln() = print("\e[2K","\e[1G")
 
 info(str) = println(as_tag(crayon"magenta","PRONTO"), str)
 info(i, str) = println(as_tag(crayon"magenta","PRONTO[$i]"), str)
-tinfo(i, str, tx) = println(as_tag(crayon"magenta","PRONTO[$i]"), str, " in $(tx*1000) ms")
+tinfo(i, str, tx) = println(as_tag(crayon"magenta","PRONTO[$i]"), str, " in $(round(tx*1000; digits=2)) ms")
 # ---------------------------- functional components ---------------------------- #
 
 
