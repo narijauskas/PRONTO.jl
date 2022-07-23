@@ -10,8 +10,16 @@ using DifferentialEquations: init # silences linter
 # using ControlSystems # provides lqr
 using MatrixEquations # provides arec
 
+using Crayons
+as_tag(str) = as_tag(crayon"default", str)
+as_tag(c::Crayon, str) = as_color(c, as_bold("[$str: "))
+as_color(c::Crayon, str) = "$c" * str * "$(crayon"default")"
+as_bold(str) = "$(crayon"bold")" * str * "$(crayon"!bold")"
+clearln() = print("\e[2K","\e[1G")
 
-
+info(str) = println(as_tag(crayon"magenta","PRONTO"), str)
+info(i, str) = println(as_tag(crayon"magenta","PRONTO[$i]"), str)
+tinfo(i, str, tx) = println(as_tag(crayon"magenta","PRONTO[$i]"), str, " in $(tx*1000) ms")
 # ---------------------------- functional components ---------------------------- #
 
 
@@ -21,38 +29,25 @@ export MStruct
 include("functors.jl")
 export Functor
 
-#MAYBE: interpolant knows element size/type
-#MAYBE: just write simple custom interpolant?
 include("interpolants.jl")
 export Interpolant
 
 include("autodiff.jl")
+export jacobian, hessian
 export autodiff, @unpack
-# export jacobian
-# export hessian
-# model = autodiff(f,l,p;NX,NU)
-# autodiff!(model, f,l,p;NX,NU)
 
 
 
-#YO: #TODO: model is a global in the module
-# type ProntoModel{NX,NU}, pass buffer dimensions parametrically?
-# otherwise, model holds functions and parameters
+
 
 
 export guess, pronto
 
 
 
-using Crayons
-info(i,str) = print("\e[2K","\e[1G", as_tag(crayon"magenta","PRONTO[$i]"), str)
-infoln(str) = info(str*"\n")
-info(str) = print("\e[2K","\e[1G", as_tag(crayon"magenta","PRONTO"), str)
-as_tag(str) = as_tag(crayon"default", str)
-as_tag(c::Crayon, str) = as_color(c, as_bold("[$str: "))
-as_color(c::Crayon, str) = "$c" * str * "$(crayon"default")"
-as_bold(str) = "$(crayon"bold")" * str * "$(crayon"!bold")"
-
+#MAYBE:model is a global in the module
+# type ProntoModel{NX,NU}, pass buffer dimensions parametrically?
+# otherwise, model holds functions and parameters
 
 
 
@@ -60,28 +55,9 @@ as_bold(str) = "$(crayon"bold")" * str * "$(crayon"!bold")"
 
 
 mapid!(dest, src) = map!(identity, dest, src)
-# same as:
-# mapid!(dest, src) = map!(x->x, dest, src)
+# same as: mapid!(dest, src) = map!(x->x, dest, src)
 
-
-# update each X(t) by re-solving the ode from x0
-function update!(X::Interpolant, ode, x0)
-    reinit!(ode,x0)
-    for (i,(x,t)) in enumerate(TimeChoiceIterator(ode, X.itp.t))
-        X[i] .= x
-        # map!(v->v, X[i], x)
-    end
-
-    #TEST:
-    # for (Xi, (x,t)) in zip(X,TimeChoiceIterator(ode, X.itp.t))
-    #     map!(v->v, Xi, x)
-    # end
-    return nothing
-end
-
-
-
-
+# generate a guess curve between the initial state and equilibrium
 guess(t, x0, x_eq, T) = @. (x_eq - x0)*(tanh((2π/T)*t - π) + 1)/2 + x0
 
 
@@ -184,7 +160,7 @@ end
 
 
 
-function search_direction(x, u, α, model)
+function search_direction(x, u, α, model, i)
     @unpack model
     T = last(ts)
 
@@ -221,69 +197,65 @@ function search_direction(x, u, α, model)
     end
 
     # --------------- solve optimizer Ko --------------- #
-    info("solving optimizer")
-    PT = MArray{Tuple{NX,NX},Float64}(undef) # pxx!
-    pxx!(PT, α(T)) # around unregulated trajectory
+    tx = @elapsed begin
+        PT = MArray{Tuple{NX,NX},Float64}(undef) # pxx!
+        pxx!(PT, α(T)) # around unregulated trajectory
 
-    P = solve(ODEProblem(optimizer!, PT, (T,0.0), (Ko,R,Q,A)))
-    
-    # Ko = inv(R)\(S'+B'*P)
-    Ko = Functor(NU,NX) do buf,t
-        mul!(buf, inv(R(t)), (S(t)'+B(t)'*P(t)))
+        P = solve(ODEProblem(optimizer!, PT, (T,0.0), (Ko,R,Q,A)))
+        
+        # Ko = inv(R)\(S'+B'*P)
+        Ko = Functor(NU,NX) do buf,t
+            mul!(buf, inv(R(t)), (S(t)'+B(t)'*P(t)))
+        end
     end
+    tinfo(i, "optimizer solved", tx)
 
 
     # --------------- solve costate dynamics vo --------------- #
-    info("solving costate dynamics")
+    tx = @elapsed begin
+        # solve costate dynamics vo
+        rT = MArray{Tuple{NX},Float64}(undef)
+        px!(rT, α(T)) # around unregulated trajectory
+        r = solve(ODEProblem(costate_dynamics!, rT, (T,0.0), (A,B,a,b,Ko)))
 
-    # solve costate dynamics vo
-    rT = MArray{Tuple{NX},Float64}(undef)
-    px!(rT, α(T)) # around unregulated trajectory
-    r = solve(ODEProblem(costate_dynamics!, rT, (T,0.0), (A,B,a,b,Ko)))
-
-
-
-    vo = Functor(NU) do buf,t
-        mul!(buf, -inv(R(t)), (B(t)'*r(t)+b(t)))
+        vo = Functor(NU) do buf,t
+            mul!(buf, -inv(R(t)), (B(t)'*r(t)+b(t)))
+        end
     end
-
+    tinfo(i, "costate dynamics solved", tx)
 
 
     # --------------- forward integration for search direction --------------- #
-    info("forward integration")
-    v = Functor(NU) do buf,z,t
-        mul!(buf, Ko(t), z)
-        buf .*= -1
-        buf .+= vo(t)
-    end
+    tx = @elapsed begin
+        v = Functor(NU) do buf,z,t
+            mul!(buf, Ko(t), z)
+            buf .*= -1
+            buf .+= vo(t)
+        end
 
-    
-    z0 = 0 .* model.x_eq
-    z_ode = solve(ODEProblem(update_dynamics!, z0, (0.0,T), (A,B,v)))
-    
-    #MAYBE: interpolate? just return the ode?
-    #FUTURE: find a way to return ode interpolations in-place
-    z = Functor(NX) do buf,t
-        copy!(buf, z_ode(t))
-    end
+        z0 = 0 .* model.x_eq
+        z = solve(ODEProblem(update_dynamics!, z0, (0.0,T), (A,B,v)))
+        
+        # v = -Ko(t)*z+vo(t)
+        v = Functor(NU) do buf,t
+            mul!(buf, Ko(t), z(t))
+            buf .*= -1
+            buf .+= vo(t)
+        end
 
-    # v = -Ko(t)*z+vo(t)
-    v = Functor(NU) do buf,t
-        mul!(buf, Ko(t), z(t))
-        buf .*= -1
-        buf .+= vo(t)
+        ζ = (z,v)
     end
-
-    ζ = (z,v)
+    tinfo(i, "search direction found", tx)
 
     # --------------- cost derivatives --------------- #
-    info("cost derivatives")
-    #FUTURE: break out to separate function
-    y0 = [0;0]
-    y = solve(ODEProblem(cost_derivatives!, y0, (0.0,T), (z,v,a,b,Q,S,R)))
-    Dh = y(T)[1] + rT'*z(T)
-    D2g = y(T)[2] + z(T)'*PT*z(T)
-
+    tx = @elapsed begin
+        #FUTURE: break out to separate function
+        y0 = [0;0]
+        y = solve(ODEProblem(cost_derivatives!, y0, (0.0,T), (z,v,a,b,Q,S,R)))
+        Dh = y(T)[1] + rT'*z(T)
+        D2g = y(T)[2] + z(T)'*PT*z(T)
+    end
+    tinfo(i, "cost derivatives calculated", tx)
     return ζ,Dh
 end
 
@@ -322,7 +294,7 @@ end
 # ----------------------------------- armijo ----------------------------------- #
 
 # armijo_backstep:
-function armijo_backstep(x,u,Kr,z,v,Dh,model)
+function armijo_backstep(x,u,Kr,z,v,Dh,model,i)
     @unpack model
     γ = 1
     T = last(model.ts)
@@ -333,7 +305,7 @@ function armijo_backstep(x,u,Kr,z,v,Dh,model)
     # ξ = 0
 
     while γ > model.β^12
-        info("  armijo: γ = $γ")
+        info(i, "armijo: γ = $γ")
         
         # generate estimate
         # MAYBE: α̂(γ,t) & move up a level
@@ -359,10 +331,9 @@ function armijo_backstep(x,u,Kr,z,v,Dh,model)
         g = J(T)[1] + model.p(x̂(T))
 
         # check armijo rule
-        h-g >= -model.α*γ*Dh ? (println(); return ξ̂) : (γ *= model.β)
+        h-g >= -model.α*γ*Dh ? (return ξ̂) : (γ *= model.β)
         # println("γ=$γ, h-g=$(h-g)")
     end
-    println()
     @warn "armijo maxiters"
     return (x,u)
 end
@@ -392,7 +363,7 @@ end
 
 
 function pronto(α,μ,model)
-    infoln("initializing")
+    info("initializing")
     ts = model.ts; T = last(ts); NX = model.NX; NU = model.NU
     η = (α,μ)
 
@@ -402,12 +373,12 @@ function pronto(α,μ,model)
     v = Interpolant(ts, NU)
 
     for i in 1:model.maxiters
-        infoln("iteration: $i")
+        # info("iteration: $i")
         # η -> Kr # regulator
         tx = @elapsed begin
             Kr = regulator(α, μ, model)
         end
-        infoln("  regulator solved in $tx seconds")
+        tinfo(i, "regulator solved", tx)
 
         # η,Kr -> ξ # projection
         tx = @elapsed begin
@@ -417,28 +388,37 @@ function pronto(α,μ,model)
             ξ = (x,u)
         end
         # tx = @elapsed update_ξ!(X_x,U_u,Kr,X_α,U_μ,model)
-        infoln("  projection solved in $tx seconds")
+        tinfo(i, "projection solved", tx)
 
         # φ,Kr -> ζ # search direction
         tx = @elapsed begin
-            ζ,Dh = search_direction(ξ..., α, model)
-            update!(t->ζ[1](t), z)
-            update!(t->ζ[2](t), v)
-            ζ = (z,v)
+            ζ,Dh = search_direction(ξ..., α, model, i)
         end
-        infoln("  search direction found in $tx seconds")
+        tinfo(i, "search direction found", tx)
+
+        tx = @elapsed begin
+            update!(t->ζ[1](t), z)
+        end
+        tinfo(i, "search direction update z", tx)
+        
+        tx = @elapsed begin
+            update!(t->ζ[2](t), v)
+        end
+        tinfo(i, "search direction update v", tx)
+        
+        ζ = (z,v)
 
         # # check Dh criteria -> return ξ,Kr
-        infoln("  Dh is $Dh")
+        info(i, "Dh is $Dh")
         Dh > 0 && (@warn "increased cost - quitting"; return η)
-        -Dh < model.tol && (infoln(as_bold("PRONTO converged")); return η)
+        -Dh < model.tol && (info(as_bold("PRONTO converged")); return η)
         
-        # infoln("calculating new trajectory:")
+        # info("calculating new trajectory:")
         # # φ,ζ,Kr -> γ -> ξ # armijo
         tx = @elapsed begin
-            ξ̂ = armijo_backstep(ξ...,Kr,ζ...,Dh,model)
+            ξ̂ = armijo_backstep(ξ...,Kr,ζ...,Dh,model,i)
         end
-        infoln("  trajectory update found in $tx seconds")
+        tinfo(i, "trajectory update found", tx)
 
         (x̂,û) = ξ̂
         update!(t->x̂(t), α)
