@@ -114,7 +114,9 @@ function regulator(η, model)
         mul!(buf, iRrBr(t), P)
     end
 
-    PT,_ = arec(Ar(T), Br(T)*iRr(T)*Br(T)', Qr(T))
+    # PT,_ = arec(Ar(T), Br(T)*iRr(T)*Br(T)', Qr(T))
+    PT = collect(I(NX))
+    @show PT
     Pr = solve(ODEProblem(riccati!, PT, (T,0.0), (Ar,Br,Rr,Qr,Kr)))
 
     Kr = Functor(NU,NX) do buf,t
