@@ -126,13 +126,12 @@ function projection(α,μ,Kr,model)
     @unpack model
     T = last(ts)
 
-    x_ode = solve(ODEProblem(stabilized_dynamics!, x0, (0.0,T), (α,μ,Kr,f)))
+    x = solve(ODEProblem(stabilized_dynamics!, x0, (0.0,T), (α,μ,Kr,f)))
 
-    #TEST: performance against just returning x_ode
-    # x = x_ode
-    x = Functor(NX) do buf,t
-        copy!(buf, x_ode(t))
-    end
+    #TEST: performance against just returning x_ode as x
+    # x = Functor(NX) do buf,t
+    #     copy!(buf, x_ode(t))
+    # end
 
     u = Functor(NU) do buf,t
         buf .= μ(t) - Kr(t)*(x(t)-α(t))
@@ -142,23 +141,12 @@ function projection(α,μ,Kr,model)
 end
 
 
-# φ,Kr -> ξ # projection
-# function update_ξ!(X_x,U_u,Kr,X_α,U_μ,model)
-#     @unpack model
-#     T = last(ts)
-#     X_ode = solve(ODEProblem(stabilized_dynamics!, x0, (0.0,T), (Kr,X_α,U_μ,model)))
-#     for (X, U, t) in zip(X_x, U_u, times(X_x))
-#         X .= X_ode(t)
-#         U .= U_μ(t) - Kr(t)*(X-X_α(t))
-#     end
-# end
-
-
 
 # --------------------------------- search direction --------------------------------- #
 
 
 
+#FUTURE: break apart to separate functions
 
 function search_direction(x, u, α, model, i)
     @unpack model
@@ -250,7 +238,6 @@ function search_direction(x, u, α, model, i)
 
     # --------------- cost derivatives --------------- #
     tx = @elapsed begin
-        #FUTURE: break out to separate function
         y0 = [0;0]
         y = solve(ODEProblem(cost_derivatives!, y0, (0.0,T), (z,v,a,b,Q,S,R)))
         Dh = y(T)[1] + rT'*z(T)
@@ -272,18 +259,6 @@ end
 function update_dynamics!(dz, z, (A,B,v), t)
     dz .= A(t)*z + B(t)*v(z,t)
 end
-
-
-# ----------------------------------- cost derivatives ----------------------------------- #
-
-
-# function cost_derivatives()
-#     y0 = [0;0]
-#     y = solve(ODEProblem(cost_derivatives!, y0, (0.0,T), (z,v,a,b,Qo,So,Ro)))
-#     Dh = y(T)[1] + rT'*z(T)
-#     D2g = y(T)[2] + z(T)'*PT*z(T)
-# end
-
 
 
 function cost_derivatives!(dy, y, (z,v,a,b,Qo,So,Ro), t)
@@ -392,37 +367,27 @@ function pronto(α,μ,model)
         # φ,Kr -> ζ # search direction
         tx = @elapsed begin
             ζ,Dh = search_direction(ξ..., α, model, i)
+            update!(t->ζ[1](t), z)
+            update!(t->ζ[2](t), v) #TODO: optimize this
+            ζ = (z,v)
         end
         tinfo(i, "search direction found", tx)
-
-        tx = @elapsed begin
-            update!(t->ζ[1](t), z)
-        end
-        tinfo(i, "search direction update z", tx)
         
-        tx = @elapsed begin
-            update!(t->ζ[2](t), v)
-        end
-        tinfo(i, "search direction update v", tx)
-        
-        ζ = (z,v)
-
-        # # check Dh criteria -> return ξ,Kr
+    
+        # check Dh criteria -> return η
         info(i, "Dh is $Dh")
         Dh > 0 && (@warn "increased cost - quitting"; return η)
         -Dh < model.tol && (info(as_bold("PRONTO converged")); return η)
         
-        # info("calculating new trajectory:")
-        # # φ,ζ,Kr -> γ -> ξ # armijo
+        # # φ,ζ,Kr -> γ -> ξ̂ # armijo
         tx = @elapsed begin
             ξ̂ = armijo_backstep(ξ...,Kr,ζ...,Dh,model,i)
+            (x̂,û) = ξ̂
+            update!(t->x̂(t), α)
+            update!(t->û(t), μ)
+            η = (α,μ)
         end
         tinfo(i, "trajectory update found", tx)
-
-        (x̂,û) = ξ̂
-        update!(t->x̂(t), α)
-        update!(t->û(t), μ)
-        η = (α,μ)
 
     end
     # η is optimal (or last iteration)
@@ -431,8 +396,6 @@ function pronto(α,μ,model)
     return η
 
 end
-
-
 
 
 
