@@ -356,7 +356,7 @@ function armijo_backstep(x,u,Kr,z,v,Dh,model)
     end
 
     @warn "maxiters"
-    return ξ̂
+    return (x,u)
 end
 
 
