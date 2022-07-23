@@ -168,6 +168,7 @@ function search_direction(x, u, α, model, i)
         fx!(buf, x(t), u(t))
     end
 
+    # B = Functor((buf,t)->fu!(buf, x(t), u(t)), NX, NU)
     B = Functor(NX,NU) do buf,t
         fu!(buf, x(t), u(t))
     end
@@ -322,8 +323,6 @@ function armijo_backstep(x,u,Kr,z,v,Dh,model,i)
             buf .+= u(t)
         end
 
-        # α = Timeseries(t->(x(t) + γ*z(t)))
-        # μ = Timeseries(t->(u(t) + γ*v(t)))
         ξ̂ = projection(α̂, μ̂, Kr, model)
         (x̂,û) = ξ̂
 
