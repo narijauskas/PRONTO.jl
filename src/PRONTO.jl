@@ -44,6 +44,14 @@ export guess, pronto
 
 
 
+using Crayons
+info(i,str) = print("\e[2K","\e[1G", as_tag(crayon"magenta","PRONTO[$i]"), str)
+infoln(str) = info(str*"\n")
+info(str) = print("\e[2K","\e[1G", as_tag(crayon"magenta","PRONTO"), str)
+as_tag(str) = as_tag(crayon"default", str)
+as_tag(c::Crayon, str) = as_color(c, as_bold("[$str: "))
+as_color(c::Crayon, str) = "$c" * str * "$(crayon"default")"
+as_bold(str) = "$(crayon"bold")" * str * "$(crayon"!bold")"
 
 
 
@@ -213,7 +221,7 @@ function search_direction(x, u, α, model)
     end
 
     # --------------- solve optimizer Ko --------------- #
-    @info "solving optimizer"
+    info("solving optimizer")
     PT = MArray{Tuple{NX,NX},Float64}(undef) # pxx!
     pxx!(PT, α(T)) # around unregulated trajectory
 
@@ -226,7 +234,7 @@ function search_direction(x, u, α, model)
 
 
     # --------------- solve costate dynamics vo --------------- #
-    @info "solving costate dynamics"
+    info("solving costate dynamics")
 
     # solve costate dynamics vo
     rT = MArray{Tuple{NX},Float64}(undef)
@@ -242,7 +250,7 @@ function search_direction(x, u, α, model)
 
 
     # --------------- forward integration for search direction --------------- #
-    @info "forward integration"
+    info("forward integration")
     v = Functor(NU) do buf,z,t
         mul!(buf, Ko(t), z)
         buf .*= -1
@@ -269,7 +277,7 @@ function search_direction(x, u, α, model)
     ζ = (z,v)
 
     # --------------- cost derivatives --------------- #
-    @info "cost derivatives"
+    info("cost derivatives")
     #FUTURE: break out to separate function
     y0 = [0;0]
     y = solve(ODEProblem(cost_derivatives!, y0, (0.0,T), (z,v,a,b,Q,S,R)))
@@ -325,10 +333,10 @@ function armijo_backstep(x,u,Kr,z,v,Dh,model)
     # ξ = 0
 
     while γ > model.β^12
-        @info "armijo update: γ = $γ"
+        info("  armijo: γ = $γ")
         
         # generate estimate
-        # MAYBE: α̂(γ,t)
+        # MAYBE: α̂(γ,t) & move up a level
 
         # α̂ = x + γz
         α̂ = Functor(NX) do buf,t
@@ -351,11 +359,11 @@ function armijo_backstep(x,u,Kr,z,v,Dh,model)
         g = J(T)[1] + model.p(x̂(T))
 
         # check armijo rule
-        h-g >= -model.α*γ*Dh ? (return ξ̂) : (γ *= model.β)
+        h-g >= -model.α*γ*Dh ? (println(); return ξ̂) : (γ *= model.β)
         # println("γ=$γ, h-g=$(h-g)")
     end
-
-    @warn "maxiters"
+    println()
+    @warn "armijo maxiters"
     return (x,u)
 end
 
@@ -384,7 +392,7 @@ end
 
 
 function pronto(α,μ,model)
-    @info "initializing"
+    infoln("initializing")
     ts = model.ts; T = last(ts); NX = model.NX; NU = model.NU
     η = (α,μ)
 
@@ -394,12 +402,12 @@ function pronto(α,μ,model)
     v = Interpolant(ts, NU)
 
     for i in 1:model.maxiters
-        @info "iteration: $i"
+        infoln("iteration: $i")
         # η -> Kr # regulator
         tx = @elapsed begin
             Kr = regulator(α, μ, model)
         end
-        @info "(itr: $i) regulator solved in $tx seconds"
+        infoln("  regulator solved in $tx seconds")
 
         # η,Kr -> ξ # projection
         tx = @elapsed begin
@@ -409,7 +417,7 @@ function pronto(α,μ,model)
             ξ = (x,u)
         end
         # tx = @elapsed update_ξ!(X_x,U_u,Kr,X_α,U_μ,model)
-        @info "(itr: $i) projection solved in $tx seconds"
+        infoln("  projection solved in $tx seconds")
 
         # φ,Kr -> ζ # search direction
         tx = @elapsed begin
@@ -418,19 +426,19 @@ function pronto(α,μ,model)
             update!(t->ζ[2](t), v)
             ζ = (z,v)
         end
-        @info "(itr: $i) search direction found in $tx seconds"
+        infoln("  search direction found in $tx seconds")
 
         # # check Dh criteria -> return ξ,Kr
-        @info "Dh is $Dh"
+        infoln("  Dh is $Dh")
         Dh > 0 && (@warn "increased cost - quitting"; return η)
-        -Dh < model.tol && (@info "PRONTO converged"; return η)
+        -Dh < model.tol && (infoln(as_bold("PRONTO converged")); return η)
         
-        # @info "calculating new trajectory:"
+        # infoln("calculating new trajectory:")
         # # φ,ζ,Kr -> γ -> ξ # armijo
         tx = @elapsed begin
             ξ̂ = armijo_backstep(ξ...,Kr,ζ...,Dh,model)
         end
-        @info "(itr: $i) trajectory update found in $tx seconds"
+        infoln("  trajectory update found in $tx seconds")
 
         (x̂,û) = ξ̂
         update!(t->x̂(t), α)

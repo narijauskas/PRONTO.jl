@@ -25,7 +25,7 @@ function armijo_backstep(x,u,Kr,z,v,Dh,model)
         h-g >= -model.α*γ*Dh ? (return ξ) : (γ *= model.β)
         # println("γ=$γ, h-g=$(h-g)")
     end
-
+    println()
     @warn "maxiters"
     return ξ
 end

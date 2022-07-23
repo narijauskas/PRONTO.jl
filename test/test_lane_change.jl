@@ -70,72 +70,21 @@ model = merge(model, (
 ))
 
 
-(α,μ) = pronto(model)
+η = pronto(model)
 ts = model.ts
 
-fig = Figure()
-ax = Axis(fig[1,1])
-for i in 1:NX
-    lines!(ax, ts, map(t->α(t)[i], ts))
-end
-ax = Axis(fig[2,1])
-for i in 1:NU
-    lines!(ax, ts, map(t->μ(t)[i], ts))
-end
-display(fig)
 
-
-# const X_x = Interpolant(t->model.x0, model.ts, NX)
-# const U_u = Interpolant(model.ts, NU)
-
-# # X_x(1.3)
-# # @benchmark X_x(1.3)
-# update!(t->model.x0, X_x)
-# # @benchmark update!(t->model.x0, X_x)
-
-
-# A = Functor(NX,NX) do buf,t
-#     model.fx!(buf, X_x(t), U_u(t))
-# end
-
-# A(1.3)
-# @benchmark A(1.3)
-# @profview for ix in 1:1000000
-#     A(1.3)
-# end
-# @code_warntype A(1.3)
-# buf = copy(A.buf)
-# @code_warntype model.fx!(buf, X_x(1.3), U_u(1.3))
-# @report_opt model.fx!(buf, X_x(1.3), U_u(1.3))
-# @report_opt A(1.3)
-# @code_warntype A(1.3)
-
-
-# invRr = Interpolant(t->inv(0.1*diagm([1,1])), model.ts, NU, NU)
-
-# Qr = Functor(NX,NX) do buf,t
-#     buf .= 1.0*diagm([1,0,1,0,0,0])
-# end
-
-# Rr = Functor(NU,NU) do buf,t
-#     buf .= 0.1*diagm([1,1])
-# end
-
-
-    # # can also make these anonymous functions
-# Qr = Interpolant(t->1.0*diagm([1,0,1,0,0,0]), model.ts)
-# Rr = Interpolant(t->0.1*diagm([1,1]), model.ts)
-# invRr = Interpolant(t->inv(Rr(t)), model.ts)
-
-# α0 = Interpolant(t->zeros(model.NX),model.ts)
-# μ0 = Interpolant(t->zeros(model.NU),model.ts)
-
-
-# # x,u = pronto(model,x0,u0)
-
-# using JET
-# @time x,u = pronto(model,x0,u0)
-# @report_opt x,u = pronto(model,x0,u0)
-# @profview x,u = pronto(model,x0,u0)
-
+#= plot result
+    using GLMakie
+    fig = Figure()
+    ax = Axis(fig[1,1])
+    for i in 1:NX
+        lines!(ax, ts, map(t->α(t)[i], ts))
+    end
+    ax = Axis(fig[2,1])
+    for i in 1:NU
+        lines!(ax, ts, map(t->μ(t)[i], ts))
+    end
+    display(fig)
+=#
 
