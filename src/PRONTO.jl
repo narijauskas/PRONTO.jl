@@ -313,6 +313,7 @@ end
 
 # armijo_backstep:
 function armijo_backstep(x,u,Kr,z,v,Dh,model)
+    @unpack model
     γ = 1
     T = last(model.ts)
     
@@ -363,7 +364,7 @@ function stage_cost!(dh, h, (l,x,u), t)
 end
 
 function cost(x,u,model)
-    T = last(model.t)
+    T = last(model.ts)
     h = solve(ODEProblem(stage_cost!, [0], (0.0,T), (model.l,x,u)))
     return h
 end
@@ -387,6 +388,8 @@ function pronto(α,μ,model)
 
     x = Interpolant(ts, NX)
     u = Interpolant(ts, NU)
+    z = Interpolant(ts, NX)
+    v = Interpolant(ts, NU)
 
     for i in 1:model.maxiters
         @info "iteration: $i"
@@ -409,6 +412,9 @@ function pronto(α,μ,model)
         # φ,Kr -> ζ # search direction
         tx = @elapsed begin
             ζ,Dh = search_direction(ξ..., α, model)
+            update!(t->ζ[1](t), z)
+            update!(t->ζ[2](t), v)
+            ζ = (z,v)
         end
         @info "(itr: $i) search direction found in $tx seconds"
 
