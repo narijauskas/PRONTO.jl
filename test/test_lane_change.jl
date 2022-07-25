@@ -12,7 +12,7 @@ model = (
     NX = NX,
     NU = NU,
     x0 = [-5.0;zeros(NX-1)],
-    tol = 1e-3,
+    tol = 1e-4,
     x_eq = zeros(NX),
     u_eq = zeros(NU),
     maxiters = 20,
@@ -81,11 +81,11 @@ ts = model.ts
     fig = Figure()
     ax = Axis(fig[1,1])
     for i in 1:NX
-        lines!(ax, ts, map(t->α(t)[i], ts))
+        lines!(ax, ts, map(t->η[1](t)[i], ts))
     end
     ax = Axis(fig[2,1])
     for i in 1:NU
-        lines!(ax, ts, map(t->μ(t)[i], ts))
+        lines!(ax, ts, map(t->η[2](t)[i], ts))
     end
     display(fig)
 =#

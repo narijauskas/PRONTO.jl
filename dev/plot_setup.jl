@@ -1,11 +1,4 @@
 
-
-# high-quality, static plots
-# CairoMakie.activate!(type="png")
-
-
-
-
 ## --------------------------------------- colors & themes ----------------------------------------- ##
 
 clr_0 = parse(RGBAf, "#00000000") # transparent
@@ -28,7 +21,8 @@ clr = [
     parse(RGBAf, "#009E73FF"), # teal
 ]
 
-#FUTURE: use update_theme!(), separate for resolutions & colors
+
+#FUTURE: use update_theme!(), separate eg. resolution/scale & color
 set_theme!(
     Theme(
         # resolution = (3000, 2000),
@@ -39,7 +33,7 @@ set_theme!(
         textcolor = clr_fg,
         linewidth = 2,
         markersize = 21,
-        fontsize = 28,
+        fontsize = 22,
         font = "Inter Light",
         color = clr_fg,
         # colormap = cmap,
@@ -61,38 +55,6 @@ set_theme!(
             bottomspinecolor = clr_mg,
             xtickcolor = clr_mg,
             ytickcolor = clr_mg,
-        ),
-        Axis3 = (
-            backgroundcolor = :transparent,
-            xspinecolor_1 = clr_mg,
-            xspinecolor_2 = clr_mg,
-            xspinecolor_3 = clr_mg,
-            xspinewidth = 2,
-
-            xgridcolor = clr_mg,
-            xtickcolor = clr_mg,
-            xgridwidth = 1,
-            xtickwidth = 1,
-
-            yspinecolor_1 = clr_mg,
-            yspinecolor_2 = clr_mg,
-            yspinecolor_3 = clr_mg,
-            yspinewidth = 2,
-
-            ygridcolor = clr_mg,
-            ytickcolor = clr_mg,
-            ygridwidth = 1,
-            ytickwidth = 1,
-
-            zspinecolor_1 = clr_mg,
-            zspinecolor_2 = clr_mg,
-            zspinecolor_3 = clr_mg,
-            zspinewidth = 2,
-
-            zgridcolor = clr_mg,
-            ztickcolor = clr_mg,
-            zgridwidth = 1,
-            ztickwidth = 1,
         ),
         Slider = (
             color_active = clr_fg,
