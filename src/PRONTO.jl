@@ -326,6 +326,17 @@ function pronto(model)
     pronto(α,μ,model)
 end
 
+function ol_dynamics!(dx, x, (f,u), t)
+    dx .= f(x,u(t))
+end
+
+function pronto(μ, model)
+    ts = model.ts; T = last(ts); NX = model.NX; NU = model.NU
+    α_ode = solve(ODEProblem(ol_dynamics!, model.x0, (0,T), (model.f, μ)))
+    α = Interpolant((t->α_ode(t)), ts, NX)
+    pronto(α,μ,model)
+end
+
 
 function pronto(α,μ,model)
     info("initializing")
