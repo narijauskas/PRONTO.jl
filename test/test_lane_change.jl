@@ -20,7 +20,7 @@ model = (
     β = 0.7,
 )
 
-
+#TEST: move inside f(x,u)
 # model parameters
 M = 2041    # [kg]     Vehicle mass
 J = 4964    # [kg m^2] Vehicle inertia (yaw)
@@ -39,9 +39,8 @@ s = 30      # [m/s]    Vehicle speed
 # tire force
 F(α) = μ*g*M*sin(c*atan(b*α))
 
-# model dynamics
+# define model dynamics
 function f(x,u)
-    # continuous dynamics
     return [
         s*sin(x[3]) + x[2]*cos(x[3]),
         -s*x[4] + ( F(αf(x))*cos(x[5]) + F(αr(x))*cos(x[6]) )/M,
@@ -52,12 +51,15 @@ function f(x,u)
     ]
 end
 
-# stage cost
+# define stage cost
 Ql = I
 Rl = I
 
+#NOTE: need to collect() vector variables
 l = (x,u) -> 1/2*collect(x)'*Ql*collect(x) + 1/2*collect(u)'*Rl*collect(u)
-p = (x)-> 1/2*collect(x)'collect(x)
+
+# define terminal cost
+p = (x) -> 1/2*collect(x)'collect(x)
 
 @info "running autodiff"
 model = autodiff(model,f,l,p)

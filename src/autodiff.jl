@@ -1,5 +1,3 @@
-
-
 # fx = jacobian(x, f, x, u)
 function jacobian(dx, f, args...; inplace = false)
     f_sym = Base.invokelatest(f, args...)

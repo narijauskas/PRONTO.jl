@@ -1,5 +1,5 @@
 # a quick and dirty linear matrix interpolant by way of wrapping SciMLBase
-#TODO: write simple n-dim ArrayInterpolation/Timeseries object, which interpolates elementwise
+#TODO: replace this with a simple n-dim ArrayInterpolation/Timeseries object, which interpolates elementwise
 # this is valid for state vectors/arrays, not for arbitrary matrices
 
 import SciMLBase
@@ -37,7 +37,6 @@ Base.setindex!(X::Interpolant, val, inds...) = setindex!(X.itp.u, val, inds...)
 
 # iterable
 Base.iterate(X::Interpolant, i=1) = i > length(X) ? nothing : (X[i], i+1)
-
 
 # other functionality 
 Base.show(io::IO, ::Interpolant{T}) where {T} = print(io, "Interpolant of $T")

@@ -10,6 +10,7 @@ using DifferentialEquations: init # silences linter
 # using ControlSystems # provides lqr
 using MatrixEquations # provides arec
 
+# ---------------------------- for runtime feedback ---------------------------- #
 using Crayons
 as_tag(str) = as_tag(crayon"default", str)
 as_tag(c::Crayon, str) = as_color(c, as_bold("[$str: "))
@@ -20,8 +21,11 @@ clearln() = print("\e[2K","\e[1G")
 info(str) = println(as_tag(crayon"magenta","PRONTO"), str)
 info(i, str) = println(as_tag(crayon"magenta","PRONTO[$i]"), str)
 tinfo(i, str, tx) = println(as_tag(crayon"magenta","PRONTO[$i]"), str, " in $(round(tx*1000; digits=2)) ms")
-# ---------------------------- functional components ---------------------------- #
 
+
+
+
+# ---------------------------- functional components ---------------------------- #
 
 include("mstruct.jl")
 export MStruct
@@ -37,12 +41,7 @@ export jacobian, hessian
 export autodiff, @unpack
 
 
-
-
-
-
 export guess, pronto
-
 
 
 #MAYBE:model is a global in the module
@@ -50,16 +49,9 @@ export guess, pronto
 # otherwise, model holds functions and parameters
 
 
-
 # --------------------------------- helper functions --------------------------------- #
-
-
 mapid!(dest, src) = map!(identity, dest, src)
 # same as: mapid!(dest, src) = map!(x->x, dest, src)
-
-# generate a guess curve between the initial state and equilibrium
-guess(t, x0, x_eq, T) = @. (x_eq - x0)*(tanh((2π/T)*t - π) + 1)/2 + x0
-
 
 
 # --------------------------------- regulator --------------------------------- #
@@ -278,7 +270,6 @@ function armijo_backstep(x,u,Kr,z,v,Dh,model,i)
     # compute cost
     J = cost(x,u,model)
     h = J(T)[1] + model.p(x(T)) # around regulated trajectory
-    # ξ = 0
 
     while γ > model.β^12
         info(i, "armijo: γ = $γ")
@@ -298,8 +289,7 @@ function armijo_backstep(x,u,Kr,z,v,Dh,model,i)
             buf .+= u(t)
         end
 
-        ξ̂ = projection(α̂, μ̂, Kr, model)
-        (x̂,û) = ξ̂
+        ξ̂ = (x̂,û) = projection(α̂, μ̂, Kr, model)
 
         J = cost(ξ̂..., model)
         g = J(T)[1] + model.p(x̂(T))
@@ -311,7 +301,6 @@ function armijo_backstep(x,u,Kr,z,v,Dh,model,i)
     @warn "armijo maxiters"
     return (x,u)
 end
-
 
 
 function stage_cost!(dh, h, (l,x,u), t)
@@ -327,6 +316,9 @@ end
 
 
 # ----------------------------------- main loop ----------------------------------- #
+
+# generate a guess curve between the initial state and equilibrium
+guess(t, x0, x_eq, T) = @. (x_eq - x0)*(tanh((2π/T)*t - π) + 1)/2 + x0
 
 function pronto(model)
     ts = model.ts; T = last(ts); NX = model.NX; NU = model.NU
@@ -347,7 +339,6 @@ function pronto(α,μ,model)
     v = Interpolant(ts, NU)
 
     for i in 1:model.maxiters
-        # info("iteration: $i")
         # η -> Kr # regulator
         tx = @elapsed begin
             Kr = regulator(α, μ, model)
@@ -361,10 +352,9 @@ function pronto(α,μ,model)
             update!(t->ξ[2](t), u)
             ξ = (x,u)
         end
-        # tx = @elapsed update_ξ!(X_x,U_u,Kr,X_α,U_μ,model)
         tinfo(i, "projection solved", tx)
 
-        # φ,Kr -> ζ # search direction
+        # ξ,Kr -> ζ # search direction
         tx = @elapsed begin
             ζ,Dh = search_direction(ξ..., α, model, i)
             update!(t->ζ[1](t), z)
@@ -373,13 +363,12 @@ function pronto(α,μ,model)
         end
         tinfo(i, "search direction found", tx)
         
-    
         # check Dh criteria -> return η
         info(i, "Dh is $Dh")
         Dh > 0 && (@warn "increased cost - quitting"; return η)
         -Dh < model.tol && (info(as_bold("PRONTO converged")); return η)
         
-        # # φ,ζ,Kr -> γ -> ξ̂ # armijo
+        # ξ,ζ,Kr -> γ -> ξ̂ # armijo
         tx = @elapsed begin
             ξ̂ = armijo_backstep(ξ...,Kr,ζ...,Dh,model,i)
             (x̂,û) = ξ̂
@@ -388,13 +377,9 @@ function pronto(α,μ,model)
             η = (α,μ)
         end
         tinfo(i, "trajectory update found", tx)
-
     end
-    # η is optimal (or last iteration)
-
     @warn "maxiters"
     return η
-
 end
 
 
