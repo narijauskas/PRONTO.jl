@@ -326,6 +326,25 @@ function pronto(model)
     pronto(α,μ,model)
 end
 
+u_guess(t) = zeros(NU)
+
+function u_guess(t)
+    u = zeros(NU)
+    if t>t1
+        u[1] = 5*blackman(601)
+    end
+    if t>t2
+        u[3] = 5*blackman(601)
+    end
+    return u
+end
+μ = Interpolant(t->u_guess(t), ts, NU)
+
+
+function pronto(μ, model)
+
+end
+
 
 function pronto(α,μ,model)
     info("initializing")
