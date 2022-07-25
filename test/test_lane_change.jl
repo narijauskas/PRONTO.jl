@@ -70,21 +70,13 @@ model = merge(model, (
     iRr = Interpolant(t->inv(0.1*diagm([1,1])), model.ts, NU, NU),
 ))
 
+η = pronto(model)
 
 tx = map(1:10) do i
     @elapsed begin
         η = pronto(model)
     end
 end
-
-
-for i in 1:10
-    tx = @elapsed begin
-        η = pronto(model)
-    end
-    println("solve time: $tx seconds")
-end
-# ts = model.ts
 
 
 #= plot result
