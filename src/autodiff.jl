@@ -1,6 +1,7 @@
 # fx = jacobian(x, f, x, u)
 function jacobian(dx, f, args...; inplace = false)
-    f_sym = Base.invokelatest(f, args...)
+    # f_sym = Base.invokelatest(f, args...)
+    f_sym = @eval $f($args...)
     fx_sym = cat(map(1:length(dx)) do i
         map(f_sym) do f
             derivative(f, dx[i])

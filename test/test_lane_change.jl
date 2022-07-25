@@ -71,8 +71,20 @@ model = merge(model, (
 ))
 
 
-η = pronto(model)
-ts = model.ts
+tx = map(1:10) do i
+    @elapsed begin
+        η = pronto(model)
+    end
+end
+
+
+for i in 1:10
+    tx = @elapsed begin
+        η = pronto(model)
+    end
+    println("solve time: $tx seconds")
+end
+# ts = model.ts
 
 
 #= plot result
