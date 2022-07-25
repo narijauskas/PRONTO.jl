@@ -7,7 +7,7 @@ function optimizer!(dP, P, (A,B,Q,R,S), t)
 end
 
 function costate_dynamics!(dx, x, (A,B,a,b,K), t)
-    dx .= -(A(t)-B(t)*K(t))'*x - a(t) + collect(K(t)'*b(t))
+    dx .= -(A(t)-B(t)*K(t))'*x - a(t) + K(t)'*b(t)
 end
 
 
@@ -23,19 +23,32 @@ function cost_derivatives!(dy, y, (z,v,a,b,Qo,So,Ro), t)
 end
 
     
+
+# 1. create integrator (with model? at package level? at model construction?)
+
+# 2. re-init integrator at [x0]
+# 3. for each t in ξ.t
+    # 3.1 solve integrator to t 
+    # 3.2 update value of interpolant (which is NOT used to solve #3)
+
+# 4. use value for next solution
+
+#MAYBE: create solver object, containing the "internal" solutions
+# eg, trajectories like ξ/ζ, and internal solutions like Kr,P,r,q
+
 function search_direction(x,u,Kr,model)
     #MAYBE: split this into parts?
 
     # --------------- define tangent space --------------- #
     #MAYBE: condense this into a separate function?
 
-    A = Timeseries(t->model.fx(x(t), u(t)), model.t)
-    B = Timeseries(t->model.fu(x(t), u(t)), model.t)
-    a = Timeseries(t->model.lx(x(t), u(t)), model.t)
-    b = Timeseries(t->model.lu(x(t), u(t)), model.t)
-    Q = Timeseries(t->model.lxx(x(t), u(t)), model.t)
-    R = Timeseries(t->model.luu(x(t), u(t)), model.t)
-    S = Timeseries(t->model.lxu(x(t), u(t)), model.t)
+    A = Timeseries(t->model.fx(x(t), u(t)))
+    B = Timeseries(t->model.fu(x(t), u(t)))
+    a = Timeseries(t->model.lx(x(t), u(t)))
+    b = Timeseries(t->model.lu(x(t), u(t)))
+    Q = Timeseries(t->model.lxx(x(t), u(t)))
+    R = Timeseries(t->model.luu(x(t), u(t)))
+    S = Timeseries(t->model.lxu(x(t), u(t)))
 
 
     # --------------- backward integration --------------- #
@@ -44,24 +57,26 @@ function search_direction(x,u,Kr,model)
     PT = model.pxx(model.x_eq) # use x_eq
     rT = model.px(model.x_eq)
 
-    P = solve(ODEProblem(optimizer!, PT, (T,0.0), (A,B,Q,R,S)), dt=1e-3)
-    Ko = Timeseries(t->R(t)\(S(t)'+B(t)'*P(t)), model.t)
+    P = Timeseries(solve(ODEProblem(optimizer!, PT, (T,0.0), (A,B,Q,R,S))))
+    Ko = Timeseries(t->R(t)\(S(t)'+B(t)'*P(t)))
 
-    r = solve(ODEProblem(costate_dynamics!, rT, (T,0.0), (A,B,a,b,Ko)), Rosenbrock23(), dt=0.001)
-    vo = Timeseries(t->(-R(t)\(B(t)'*r(t)+b(t))), model.t)
-
+    #YO: fails with Rosenbrock23()
+    r = Timeseries(solve(ODEProblem(costate_dynamics!, rT, (T,0.0), (A,B,a,b,Ko))))
+    vo = Timeseries(t->(-R(t)\(B(t)'*r(t)+b(t))))
+    
+    
     qT = rT # use x_eq
-    q = solve(ODEProblem(costate_dynamics!, qT, (T,0.0), (A,B,a,b,Kr)), dt=0.001)
-    q = Timeseries(t->q(t), model.t)
+    q = Timeseries(solve(ODEProblem(costate_dynamics!, qT, (T,0.0), (A,B,a,b,Kr))))
+    q = Timeseries(t->q(t))
 
 
 
     # --------------- forward integration --------------- #
 
     z0 = 0 .* model.x_eq
-    z = solve(ODEProblem(update_dynamics!, z0, (0.0,T), (A,B,Ko,vo)))
-    z = Timeseries(t->z(t), model.t)
-    v = Timeseries(t -> -Ko(t)*z(t)+vo(t), model.t)
+    z = Timeseries(solve(ODEProblem(update_dynamics!, z0, (0.0,T), (A,B,Ko,vo))))
+    # z = Timeseries(t->z(t))
+    v = Timeseries(t->(-Ko(t)*z(t)+vo(t)))
     ζ = (z,v)
 
     # --------------- step type --------------- #
@@ -75,7 +90,7 @@ function search_direction(x,u,Kr,model)
 
     # --------------- cost derivatives --------------- #
     y0 = [0;0]
-    y = solve(ODEProblem(cost_derivatives!, y0, (0.0,T), (z,v,a,b,Qo,So,Ro)))
+    y = Timeseries(solve(ODEProblem(cost_derivatives!, y0, (0.0,T), (z,v,a,b,Qo,So,Ro))))
     Dh = y(T)[1] + rT'*z(T)
     D2g = y(T)[2] + z(T)'*PT*z(T)
     # Dh  = update.y1.Data(end)+rT'*update.z.Data(end,:)';

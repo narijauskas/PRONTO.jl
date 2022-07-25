@@ -11,19 +11,28 @@ function armijo_backstep(x,u,Kr,z,v,Dh,model)
     ξ = 0
 
     while γ > model.β^12
+        @info "armijo update: γ = $γ"
+        
         # generate estimate
-        α = Timeseries(t->(x(t) + γ*z(t)), model.t)
-        μ = Timeseries(t->(u(t) + γ*v(t)), model.t)
+        α = Timeseries(t->(x(t) + γ*z(t)))
+        μ = Timeseries(t->(u(t) + γ*v(t)))
         ξ = projection(α, μ, Kr, model)
 
         J = cost(ξ..., model)
         g = J(T)[1] + model.p(ξ[1](T))
 
         # check armijo rule
-        @info "armijo update: γ = $γ"
         h-g >= -model.α*γ*Dh ? (return ξ) : (γ *= model.β)
         # println("γ=$γ, h-g=$(h-g)")
     end
-
+    println()
+    @warn "maxiters"
     return ξ
+end
+
+
+function resample(x,u,model)
+    x = Timeseries(t->x(t), model.t)
+    u = Timeseries(t->u(t), model.t)
+    return (x,u)
 end

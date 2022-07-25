@@ -4,19 +4,21 @@ authors = ["mantas <mantas@case.edu>", "jay"]
 version = "0.1.0"
 
 [deps]
-CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 ColorSchemes = "35d6a980-a343-548e-a6ea-1d62b119f2f4"
 Colors = "5ae59095-9a9b-59fe-a467-6f913c188581"
-DataInterpolations = "82cc6244-b520-54b8-b5a6-8a565e85f1d0"
+Crayons = "a8cc5b0e-0ffa-5ad4-8c14-923d3ee1735f"
 DifferentialEquations = "0c46a032-eb83-5123-abaf-570d42b7fbaa"
-GLMakie = "e9467ef8-e4e7-5192-8a1a-b1aee30e663a"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 MatrixEquations = "99c1a7ee-ab34-5fd5-8076-27c950a045f4"
 QuadGK = "1fd47b50-473d-5c70-9696-f719f8f3bcdc"
+SciMLBase = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
 
 [compat]
-DataInterpolations = "3.9.0" #FIX: very rigid, change eventually
+DifferentialEquations = "7.1.0"
+SciMLBase = "1.38.3"
+Symbolics = "4.6.0"
 
 [extras]
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
