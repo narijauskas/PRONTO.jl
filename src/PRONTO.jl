@@ -114,7 +114,7 @@ function regulator(α,μ,model)
 
     # PT,_ = arec(Ar(T), Br(T)*iRr(T)*Br(T)', Qr(T))
     PT = collect(I(NX))
-    @show PT
+    # @show PT
     Pr = solve(ODEProblem(riccati!, PT, (T,0.0), (Ar,Br,Rr,Qr,Kr)))
 
     Kr = Functor(NU,NX) do buf,t
@@ -356,7 +356,7 @@ function armijo_backstep(x,u,Kr,z,v,Dh,model)
     end
 
     @warn "maxiters"
-    return ξ̂
+    return (x,u)
 end
 
 

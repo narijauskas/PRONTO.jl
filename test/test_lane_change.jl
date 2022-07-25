@@ -15,7 +15,7 @@ model = (
     tol = 1e-3,
     x_eq = zeros(NX),
     u_eq = zeros(NU),
-    maxiters = 10,
+    maxiters = 20,
     α = 0.4,
     β = 0.7,
 )
@@ -70,7 +70,19 @@ model = merge(model, (
 ))
 
 
-# pronto(model)
+(α,μ) = pronto(model)
+ts = model.ts
+
+fig = Figure()
+ax = Axis(fig[1,1])
+for i in 1:NX
+    lines!(ax, ts, map(t->α(t)[i], ts))
+end
+ax = Axis(fig[2,1])
+for i in 1:NU
+    lines!(ax, ts, map(t->μ(t)[i], ts))
+end
+display(fig)
 
 
 # const X_x = Interpolant(t->model.x0, model.ts, NX)
