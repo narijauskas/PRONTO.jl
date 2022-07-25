@@ -26,19 +26,6 @@ model = (
 
 # initial input
 
-# function u_guess(t)
-#     u = zeros(NU)
-#     if t>2
-#         u[1] = 5*blackman(601)
-#     end
-#     if t<3
-#         u[3] = 5*blackman(601)
-#     end
-#     return u
-# end
-
-# μ = Interpolant(t->u_guess(t), ts, NU)
-
 uguess = zeros(NU, length(ts))
 uguess[1, 2001:end] = 5*blackman(3001)
 uguess[3, 1:3001] = 5*blackman(3001)
@@ -79,9 +66,6 @@ model = merge(model, (
     iRr = Interpolant(t->inv(1.0*diagm([1,1,1,1])), model.ts, NU, NU),
 ))
 
-ts = model.ts; T = last(ts); NX = model.NX; NU = model.NU
-α_ode = solve(ODEProblem(PRONTO.ol_dynamics!, model.x0, (0,T), (model.f, μ)))
-α = Interpolant(t->α_ode(t), ts, NX)
 
 ##
 (α,μ) = pronto(μ, model)
