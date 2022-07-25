@@ -3,12 +3,15 @@ using Revise
 using PRONTO
 using LinearAlgebra
 using BenchmarkTools
-
+# using WindowFunctions # blackman
+using DSP.Windows: blackman
+# https://docs.juliadsp.org/stable/windows/
 
 NX = 6
 NU = 4
+ts = 0:0.001:5
 model = (
-    ts = 0:0.001:10,
+    ts = ts,
     NX = NX,
     NU = NU,
     x0 = [1.0;0.0;0.0;0.0;0.0;0.0],
@@ -21,6 +24,26 @@ model = (
     β = 0.7,
 )
 
+# initial input
+
+# function u_guess(t)
+#     u = zeros(NU)
+#     if t>2
+#         u[1] = 5*blackman(601)
+#     end
+#     if t<3
+#         u[3] = 5*blackman(601)
+#     end
+#     return u
+# end
+
+# μ = Interpolant(t->u_guess(t), ts, NU)
+
+uguess = zeros(NU, length(ts))
+uguess[1, 2001:end] = 5*blackman(3001)
+uguess[3, 1:3001] = 5*blackman(3001)
+
+μ = Interpolant(uguess, ts, NU)
 
 # model parameters
 H0 = [0 0 0 -0.5 0 0;0 0 0 0 0 0;0 0 0 0 0 -0.5;0.5 0 0 0 0 0;0 0 0 0 0 0;0 0 0.5 0 0 0]
@@ -56,20 +79,28 @@ model = merge(model, (
     iRr = Interpolant(t->inv(1.0*diagm([1,1,1,1])), model.ts, NU, NU),
 ))
 
-(α,μ) = pronto(model)
+ts = model.ts; T = last(ts); NX = model.NX; NU = model.NU
+α_ode = solve(ODEProblem(PRONTO.ol_dynamics!, model.x0, (0,T), (model.f, μ)))
+α = Interpolant(t->α_ode(t), ts, NX)
+
+##
+(α,μ) = pronto(μ, model)
 # NS = NX/2
-I2 = collect([I(3) I(3)])
+I2 = collect([I(Int(NX/2)) I(Int(NX/2))])
 pop(t) = I2*α(t).^2
 
 using GLMakie
 
-ts = model.ts
 fig = Figure()
 ax = Axis(fig[1,1])
-for i in 1:3
+for i in 1:Int(NX/2)
     lines!(ax, ts, map(t->pop(t)[i], ts))
 end
 ax = Axis(fig[2,1])
+for i in 1:NX
+    lines!(ax, ts, map(t->α_ode(t)[i], ts))
+end
+ax = Axis(fig[3,1])
 for i in 1:NU
     lines!(ax, ts, map(t->μ(t)[i], ts))
 end

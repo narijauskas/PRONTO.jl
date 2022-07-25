@@ -326,23 +326,15 @@ function pronto(model)
     pronto(α,μ,model)
 end
 
-u_guess(t) = zeros(NU)
-
-function u_guess(t)
-    u = zeros(NU)
-    if t>t1
-        u[1] = 5*blackman(601)
-    end
-    if t>t2
-        u[3] = 5*blackman(601)
-    end
-    return u
+function ol_dynamics!(dx, x, (f,u), t)
+    dx .= f(x,u(t))
 end
-μ = Interpolant(t->u_guess(t), ts, NU)
-
 
 function pronto(μ, model)
-
+    ts = model.ts; T = last(ts); NX = model.NX; NU = model.NU
+    α_ode = solve(ODEProblem(ol_dynamics!, model.x0, (0,T), (model.f, μ)))
+    α = Interpolant((t->α_ode(t)), ts, NX)
+    pronto(α,μ,model)
 end
 
 

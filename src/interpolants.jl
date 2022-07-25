@@ -17,7 +17,7 @@ end
 (X::Interpolant)(val,tvals) = SciMLBase.interpolation!(val,tvals,X.itp,nothing,Val{0},nothing,:left)
 
 # where f is a function f(t)
-function Interpolant(f::Function,ts,dims...;TT=Float64)
+function Interpolant(f::Function,ts::AbstractVector,dims...;TT=Float64)
     S = Tuple{dims...}
     xs = map(t->MArray{S,TT}(f(t)),ts)
     T = eltype(xs)
@@ -25,8 +25,21 @@ function Interpolant(f::Function,ts,dims...;TT=Float64)
     return Interpolant{T}(itp)
 end
 
+# where x is an array
+function Interpolant(x::AbstractArray,ts::AbstractVector,dims...; TT=Float64)
+    @assert size(x) == (dims..., length(ts)) "check dimensions of input"
+    S = Tuple{dims...}
+
+    xs = map(eachcol(x)) do col
+        MArray{S,TT}(col)
+    end
+    T = eltype(xs)
+    itp = LinearInterpolation(collect(ts), xs)
+    return Interpolant{T}(itp)
+end
+
 # pre-allocate zeros if no function provided
-Interpolant(ts,dims...;kw...) = Interpolant(t->zeros(dims...), ts, dims...; kw...)
+Interpolant(ts::AbstractVector,dims...;kw...) = Interpolant((t->zeros(dims...)), ts, dims...; kw...)
 
 # indexable
 Base.firstindex(X::Interpolant) = 1
