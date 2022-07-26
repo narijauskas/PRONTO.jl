@@ -21,6 +21,7 @@ function autodiff(model,f,l,p)
 
     return merge(model, (
         f = f, # NX
+        fx = jacobian(x,f,x,u; inplace=false), # NX,NX #NOTE: for testing
         fx! = jacobian(x,f,x,u; inplace=true), # NX,NX
         fu! = jacobian(u,f,x,u; inplace=true), # NX,NU
         fxx! = hessian(x,x,f,x,u; inplace=true), # NX,NX,NX

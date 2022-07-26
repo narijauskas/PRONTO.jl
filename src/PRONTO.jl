@@ -67,6 +67,7 @@ function riccati!(dP, P, (Ar,Br,Rr,Qr,Kr), t)
 end
 
 
+
 # solve for regulator
 # ξ or φ -> Kr
 function regulator(α,μ,model)
