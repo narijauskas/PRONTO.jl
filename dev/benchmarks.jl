@@ -79,7 +79,27 @@ fx_pass4! = (buf,x,u,model)->begin
     fx! = model.fx!
     fx_pass!(buf,x,u,fx!)
 end
+fx_pass5! = (buf,x,u,model)->begin
+    fx!(buf,x,u) = model.fx!(buf,x,u)
+    fx!(buf,x,u)
+end
 
+fx_test! = (buf,α,μ,t,model)->begin
+    fx!(buf,x,u) = model.fx!(buf,x,u)
+    fx!(buf,α(t),μ(t))
+end
+
+fx_test2! = (buf,α,μ,t,model)->begin
+    fx! = copy(model.fx!)
+    fx!(buf,α(t),μ(t))
+end
+fx_test3! = (buf,α,μ,t,fx!)->begin
+    fx!(buf,α(t),μ(t))
+end
+
+fx_test4! = (buf,α,μ,t;fx!)->begin
+    fx!(buf,α(t),μ(t))
+end
 ## -------------------------------------- benchmarks -------------------------------------- ##
 # FX buffer
 isdefined(Main, :FX) || const FX = MMatrix{NX,NX,Float64}(undef)
@@ -102,6 +122,8 @@ isdefined(Main, :FX) || const FX = MMatrix{NX,NX,Float64}(undef)
 @benchmark fx_pass2!(FX,x0,u0,model) # 38 ns, zero allocs
 @benchmark fx_pass3!(FX,x0,u0,model) # 42 ns, zero allocs
 @benchmark fx_pass4!(FX,x0,u0,model) # 64 ns, zero allocs
+@benchmark fx_pass5!(FX,x0,u0,model) # 38 ns, zero allocs
+@report_opt fx_pass5!(FX,x0,u0,model) # clean
 
 @benchmark fx_functor(x0,u0) # 369 ns
 @benchmark fx_functor2(x0,u0) # 475 ns
@@ -149,3 +171,21 @@ t = 3.5
 @code_warntype fx_auto!(FX, α(t), μ(t)) # type stable
 @report_opt fx_auto!(FX, α(t), μ(t)) # no issues
 @allocated fx_auto!(FX, α(t), μ(t)) # 96
+
+@benchmark fx_test!(FX,α,μ,t,model) # 273 ns
+@code_warntype fx_test!(FX,α,μ,t,model) # type stable
+@report_opt fx_test!(FX,α,μ,t,model) # clean
+@allocated fx_test!(FX,α,μ,t,model) # 96
+
+@benchmark fx_test3!(FX,α,μ,t,fx_auto!) # 256 ns
+@code_warntype fx_test3!(FX,α,μ,t,fx_auto!) # type stable
+
+@benchmark fx_test3!(FX,α,μ,t,model.fx!) # 804 ns
+@code_warntype fx_test3!(FX,α,μ,t,model.fx!) # type stable
+
+@benchmark fx_test4!(FX,α,μ,t; fx! = fx_auto!) # 547 ns
+@benchmark fx_test4!(FX,α,μ,t; fx! = model.fx!) # 668 ns
+
+
+#TODO: make zero-allocating interpolant
+#TODO: pass separate functions instead of combined PRONTO model
