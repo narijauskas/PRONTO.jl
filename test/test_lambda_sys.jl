@@ -68,7 +68,12 @@ model = merge(model, (
 
 
 ##
-(α,μ) = pronto(μ, model)
+μ = Interpolant(uguess, ts, NU)
+tx = @elapsed begin
+    η = pronto(μ, model)
+end
+
+##
 # NS = NX/2
 I2 = collect([I(Int(NX/2)) I(Int(NX/2))])
 pop(t) = I2*α(t).^2

@@ -53,6 +53,9 @@ export guess, pronto
 mapid!(dest, src) = map!(identity, dest, src)
 # same as: mapid!(dest, src) = map!(x->x, dest, src)
 
+inv!(A) = LinearAlgebra.inv!(lu!(A)) # general
+
+# LinearAlgebra.inv!(choelsky!(A)) # if SPD
 
 # --------------------------------- regulator --------------------------------- #
 
@@ -173,7 +176,9 @@ function search_direction(x, u, α, model, i)
     end
 
     Ko = Functor(NU,NX) do buf,P,t
-        mul!(buf, inv(R(t)), (S(t)'+B(t)'*P))
+        # copy!(R(t), buf)
+        # inv!()
+        copy!(buf, R(t)\(S(t)'+B(t)'*P))
     end
 
     # --------------- solve optimizer Ko --------------- #
@@ -185,7 +190,7 @@ function search_direction(x, u, α, model, i)
         
         # Ko = inv(R)\(S'+B'*P)
         Ko = Functor(NU,NX) do buf,t
-            mul!(buf, inv(R(t)), (S(t)'+B(t)'*P(t)))
+            copy!(buf, R(t)\(S(t)'+B(t)'*P(t)))
         end
     end
     tinfo(i, "optimizer solved", tx)
@@ -199,7 +204,7 @@ function search_direction(x, u, α, model, i)
         r = solve(ODEProblem(costate_dynamics!, rT, (T,0.0), (A,B,a,b,Ko)))
 
         vo = Functor(NU) do buf,t
-            mul!(buf, -inv(R(t)), (B(t)'*r(t)+b(t)))
+            copy!(buf, -R(t)\(B(t)'*r(t)+b(t)))
         end
     end
     tinfo(i, "costate dynamics solved", tx)
