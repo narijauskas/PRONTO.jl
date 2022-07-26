@@ -61,6 +61,14 @@ fx_auto! = model.fx!
 fx_model = (x,u)->(model.fx(x,u))
 fx_model! = (buf,x,u)->(model.fx!(buf,x,u))
 
+fx_functor = Functor(NX,NX) do buf,x,u
+    fx_auto!(buf,x,u)
+end
+
+fx_functor2 = Functor(NX,NX) do buf,x,u
+    model.fx!(buf,x,u)
+end
+
 fx_pass! = (buf,x,u,fx!)->(fx!(buf,x,u))
 fx_pass2! = (buf,x,u,model)->(model.fx!(buf,x,u))
 fx_pass3! = (buf,x,u,model)->begin
@@ -74,7 +82,7 @@ end
 
 ## -------------------------------------- benchmarks -------------------------------------- ##
 # FX buffer
-isdefined(Main, :FX) && const FX = MMatrix{NX,NX,Float64}(undef)
+isdefined(Main, :FX) || const FX = MMatrix{NX,NX,Float64}(undef)
 
 
 # baseline
@@ -95,8 +103,49 @@ isdefined(Main, :FX) && const FX = MMatrix{NX,NX,Float64}(undef)
 @benchmark fx_pass3!(FX,x0,u0,model) # 42 ns, zero allocs
 @benchmark fx_pass4!(FX,x0,u0,model) # 64 ns, zero allocs
 
+@benchmark fx_functor(x0,u0) # 369 ns
+@benchmark fx_functor2(x0,u0) # 475 ns
 
 # conclusions
 # ~10x speedup from in-place autodiff
 # ~10x speedup when zero allocs
 # zero allocs occur if implemented by pulling fx! from model (bizzare)
+# functors don't seem to solve the problem
+
+## -------------------------------------- interpolants -------------------------------------- ##
+# X buffer
+isdefined(Main, :X) || const X = MVector{NX,Float64}(undef)
+isdefined(Main, :X2) || const X2 = MVector{NX,Float64}(undef)
+
+
+α = Interpolant(ts, NX)
+μ = Interpolant(ts, NU)
+
+t = 3.5
+@benchmark α(t) # 161 ns
+@benchmark μ(t) # 121 ns
+
+@benchmark fill!(X, 0) # 2.7 ns
+@benchmark fill!(X, rand()) # 6.8 ns
+@benchmark copy!(X2, X) # 2.5 ns
+
+@benchmark copy!(X, α(t)) # 188 ns
+@benchmark X.=α(t) # 1.7 μs
+
+@benchmark fx_model!(FX, α(t), μ(t)) # 468 ns
+@benchmark fx_auto!(FX, α(t), μ(t)) # 298 ns
+
+## -------------------------------------- type stability -------------------------------------- ##
+
+@code_warntype α(t) # type stable
+@report_opt α(t) # no issues
+
+@btime fx_auto!(FX,x0,u0) # 28 ns
+@code_warntype fx_auto!(FX,x0,u0) # type stable
+@report_opt fx_auto!(FX,x0,u0) # no issues
+@allocated fx_auto!(FX,x0,u0) # 0
+
+@btime fx_auto!(FX, α(t), μ(t)) # 301 ns
+@code_warntype fx_auto!(FX, α(t), μ(t)) # type stable
+@report_opt fx_auto!(FX, α(t), μ(t)) # no issues
+@allocated fx_auto!(FX, α(t), μ(t)) # 96
