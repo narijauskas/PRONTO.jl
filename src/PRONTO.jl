@@ -60,40 +60,14 @@ inv!(A) = LinearAlgebra.inv!(lu!(A)) # general
 Buffer(dims::Vararg{Int}) = MArray{Tuple{dims...},Float64}(undef)
 
 include("regulator.jl")
-# --------------------------------- projection --------------------------------- #
+include("projection.jl")
 
-
-
-# for projection, provided Kr(t)
-function stabilized_dynamics!(dx, x, (α,μ,Kr,f), t)
-    u = μ(t) - Kr(t)*(x-α(t))
-    dx .= f(x,u)
-    # FUTURE: in-place f!(dx,x,u) 
-end
-
-# η,Kr -> ξ # projection to generate stabilized trajectory
-function projection(α,μ,Kr,model)
-    @unpack model
-    T = last(ts)
-
-    x = solve(ODEProblem(stabilized_dynamics!, x0, (0.0,T), (α,μ,Kr,f)))
-
-    #TEST: performance against just returning x_ode as x
-    # x = Functor(NX) do buf,t
-    #     copy!(buf, x_ode(t))
-    # end
-
-    u = Functor(NU) do buf,t
-        buf .= μ(t) - Kr(t)*(x(t)-α(t))
-    end
-
-    return (x,u)
-end
 
 
 
 # --------------------------------- search direction --------------------------------- #
 
+Ko = optimizer()
 
 
 #FUTURE: break apart to separate functions
@@ -320,7 +294,7 @@ function pronto(α,μ,model)
         
         # η,Kr -> ξ # projection
         tx = @elapsed begin
-            ξ = projection(α, μ, Kr, model)
+            ξ = projection(NX,NU,T,α,μ,Kr,model.f,model.x0)
         end
         tinfo(i, "projection solved", tx)
 
