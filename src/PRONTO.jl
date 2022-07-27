@@ -313,7 +313,7 @@ function pronto(α,μ,model)
     for i in 1:model.maxiters
         # η -> Kr # regulator
         tx = @elapsed begin
-            Kr = regulator(α, μ, model)
+            Kr = regulator(NX,NU,T,α,μ,model.fx!,model.fu!,model.Rr,model.Qr)
         end
         tinfo(i, "regulator solved", tx)
         # info("allocated: $al")
@@ -321,12 +321,17 @@ function pronto(α,μ,model)
         # η,Kr -> ξ # projection
         tx = @elapsed begin
             ξ = projection(α, μ, Kr, model)
+        end
+        tinfo(i, "projection solved", tx)
+
+        tx = @elapsed begin
             update!(x, ξ[1])
             update!(u, ξ[2])
             ξ = (x,u)
         end
-        tinfo(i, "projection solved", tx)
+        tinfo(i, "(x,u) updated", tx)
         
+        #=
         # ξ,Kr -> ζ # search direction
         tx = @elapsed begin
             ζ,Dh = search_direction(ξ..., α, model, i)
@@ -352,7 +357,7 @@ function pronto(α,μ,model)
             η = (α,μ)
         end
         tinfo(i, "trajectory update found", tx)
-        
+        =#
     end
     @warn "maxiters"
     return nothing
