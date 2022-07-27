@@ -45,9 +45,15 @@ model = autodiff(model,f,l,p)
 
 
 model = merge(model, (
-    Qr = (t)->1.0*diagm([1,1,1,1]), # can Qr be a function of α?
-    Rr = (t)->1.0*diagm([1]),
-    iRr = (t)->inv(1.0*diagm([1])),
+    Qr = let M = Diagonal(1.0*diagm([1,1,1,1]))
+        (t)->M
+    end, # can Qr be a function of α?
+    Rr = let M = Diagonal(1.0*diagm([1]))
+        (t)->M
+    end,
+    iRr = let M = inv(Diagonal(1.0*diagm([1])))
+        (t)->M
+    end
 ))
 
 #before: 16s
