@@ -57,7 +57,7 @@ model = merge(model, (
 ))
 
 #before: 16s
-# tx = @elapsed η = pronto(model)
+tx = @elapsed η = pronto(model)
 
 # ts = model.ts
 
