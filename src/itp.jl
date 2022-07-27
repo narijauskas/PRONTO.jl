@@ -1,28 +1,43 @@
-# adapted from SciMLBase
+# adapted from SciMLBase (some parts copied directly)
 # simplified, non-allocating
+# long term goal: integrate, use non-linear interpolants, variable time step everywhere
 
+# should be well suited for representing smooth, dense, continuous things like states, costates, and inputs
 using StaticArrays
 
-struct LinearInterpolation{S,T,TT}
-    x::Vector{MVector{S,T}}
-    t::TT
-    buf::MVector{S,T}
+struct Interpolant{S,A,T}
+    x::Vector{MVector{S,A}}
+    t::T
+    buf::MVector{S,A}
 end
 
 # where f is a function f(t)
-function LinearInterpolation(f::Function,ts::TT;T=Float64) where {TT}
+function Interpolant(f::Function,ts::T; A=Float64) where {T}
     S = length(f(first(ts)))
-    xs = map(t->MVector{S,T}(f(t)), ts)
-    buf = MVector{S,T}(undef)
-    LinearInterpolation{S,T,TT}(xs,ts,buf)
+    xs = map(t->MVector{S,A}(f(t)), ts)
+    buf = MVector{S,A}(undef)
+    Interpolant{S,A,T}(xs,ts,buf)
+end
+
+# where x is a matrix of size NX x length(ts)
+# in other words, column vectors of x
+function Interpolant(x::AbstractMatrix, ts::T,dims...; A=Float64) where {T}
+    S,l = size(x)
+    @assert l = length(ts) "time dimension mismatch"
+    xs = map(col->MVector{S,A}(col), eachcol(x))
+    buf = MVector{S,A}(undef)
+    Interpolant{S,A,T}(xs,ts,buf)
 end
 
 
-function (X::LinearInterpolation{S,T,TT})(τ)::MVector{S,T} where {S,T,TT}
-    t = X.t
-    x = X.x
-    buf = X.buf
+function (X::Interpolant{S,A,T})(τ)::MVector{S,A} where {S,A,T}
+    interpolate!(X.buf, τ, X.x, X.t)
+end
 
+# Interpolant(t -> sin(t), ts)
+
+# set buf to be x(τ) from set x and t
+function interpolate!(buf,τ,x,t)
     tdir = sign(t[end] - t[1])
     tdir * τ > tdir * t[end] && error("Solution interpolation cannot extrapolate past the final timepoint.")
     tdir * τ < tdir * t[1] && error("Solution interpolation cannot extrapolate before the first timepoint.")
@@ -40,9 +55,26 @@ function (X::LinearInterpolation{S,T,TT})(τ)::MVector{S,T} where {S,T,TT}
     return buf
 end
 
-# LinearInterpolation(t -> sin(t), ts)
+
+# pure update, 29 μs, zero allocations
+# evals push into ms range, MiB of allocations
+function update!(X::Interpolant, src)
+    for (t,x) in zip(X.t,X.x)
+        x .= src(t)
+        # src!(x, t) in-place version?
+    end
+end
+
+Base.length(X::Interpolant) = length(X.t)
+Base.show(io::IO, ::Interpolant{S,<:Any,<:Any}) where {S} = print(io, "$S - element Interpolant")
+
+# times(X::Interpolant) = X.t
+# Base.eltype(::Interpolant{T}) where {T} = T
 
 
 
-ts = 0:0.001:10
-itp = LinearInterpolation(t->([1,2,3,4]*sin(t)), ts)
+
+# ts = 0:0.001:10
+# ts = collect(ts)
+# itp = Interpolant(t->([1,2,3,4]*sin(t)), ts)
+

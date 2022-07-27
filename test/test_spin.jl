@@ -41,14 +41,19 @@ p = (x)-> 1/2*collect(x)'*Pl*collect(x)
 model = autodiff(model,f,l,p)
 @info "autodiff complete"
 
+
+
+
 model = merge(model, (
-    Qr = Interpolant(t->1.0*diagm([1,1,1,1]), model.ts, NX, NX), #TODO: can Qr be a function of α?
-    Rr = Interpolant(t->1.0*diagm([1]), model.ts, NU, NU),
-    iRr = Interpolant(t->inv(1.0*diagm([1])), model.ts, NU, NU),
+    Qr = (t)->1.0*diagm([1,1,1,1]), # can Qr be a function of α?
+    Rr = (t)->1.0*diagm([1]),
+    iRr = (t)->inv(1.0*diagm([1])),
 ))
 
-η = pronto(model)
-ts = model.ts
+#before: 16s
+tx = @elapsed η = pronto(model)
+
+# ts = model.ts
 
 
 
