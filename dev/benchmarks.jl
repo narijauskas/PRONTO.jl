@@ -138,6 +138,7 @@ isdefined(Main, :FX) || const FX = MMatrix{NX,NX,Float64}(undef)
 # X buffer
 isdefined(Main, :X) || const X = MVector{NX,Float64}(undef)
 isdefined(Main, :X2) || const X2 = MVector{NX,Float64}(undef)
+isdefined(Main, :U) || const U = MVector{NU,Float64}(undef)
 
 
 α = Interpolant(ts, NX)
@@ -146,6 +147,8 @@ isdefined(Main, :X2) || const X2 = MVector{NX,Float64}(undef)
 t = 3.5
 @benchmark α(t) # 161 ns
 @benchmark μ(t) # 121 ns
+
+@benchmark α(X,t)
 
 @benchmark fill!(X, 0) # 2.7 ns
 @benchmark fill!(X, rand()) # 6.8 ns
@@ -189,3 +192,5 @@ t = 3.5
 
 #TODO: make zero-allocating interpolant
 #TODO: pass separate functions instead of combined PRONTO model
+
+

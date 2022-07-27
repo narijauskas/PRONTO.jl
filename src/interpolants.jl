@@ -14,7 +14,8 @@ end
 
 # make callable as X(t)
 (X::Interpolant{T})(tvals) where {T} = SciMLBase.interpolation(tvals,X.itp,nothing,Val{0},nothing,:left)::T
-(X::Interpolant)(val,tvals) = SciMLBase.interpolation!(val,tvals,X.itp,nothing,Val{0},nothing,:left)
+(X::Interpolant{T})(buf,tvals) where {T} = SciMLBase.interpolation!(buf,tvals,X.itp,nothing,Val{0},nothing,:left)
+
 
 # where f is a function f(t)
 function Interpolant(f::Function,ts::AbstractVector,dims...;TT=Float64)
