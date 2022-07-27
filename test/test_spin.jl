@@ -24,10 +24,8 @@ H1 = [0 -1 0 0;1 0 0 0;0 0 0 -1;0 0 1 0]
 
 
 # model dynamics
-function f(x,u)
-    f = collect((H0 + u[1]*H1)*x)
-    return f
-end
+f = (x,u)->collect((H0 + u[1]*H1)*x)
+
 
 # stage cost
 Ql = zeros(NX,NX)
