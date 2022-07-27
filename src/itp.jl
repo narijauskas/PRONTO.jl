@@ -33,7 +33,7 @@ function (X::LinearInterpolation{S,T,TT})(τ)::MVector{S,T} where {S,T,TT}
         copy!(buf, x[i-1])
     else
         dt = t[i] - t[i-1]
-        Θ = (tval - t[i-1]) / dt
+        Θ = (τ - t[i-1]) / dt
         Θm1 = (1 - Θ)
         @. buf = Θm1 * x[i-1] + Θ * x[i]
     end

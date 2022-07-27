@@ -100,9 +100,17 @@ end
 fx_test4! = (buf,α,μ,t;fx!)->begin
     fx!(buf,α(t),μ(t))
 end
-## -------------------------------------- benchmarks -------------------------------------- ##
+
+
 # FX buffer
 isdefined(Main, :FX) || const FX = MMatrix{NX,NX,Float64}(undef)
+# X buffer
+isdefined(Main, :X) || const X = MVector{NX,Float64}(undef)
+isdefined(Main, :X2) || const X2 = MVector{NX,Float64}(undef)
+isdefined(Main, :U) || const U = MVector{NU,Float64}(undef)
+
+
+## -------------------------------------- benchmarks -------------------------------------- ##
 
 
 # baseline
@@ -135,11 +143,9 @@ isdefined(Main, :FX) || const FX = MMatrix{NX,NX,Float64}(undef)
 # functors don't seem to solve the problem
 
 ## -------------------------------------- interpolants -------------------------------------- ##
-# X buffer
-isdefined(Main, :X) || const X = MVector{NX,Float64}(undef)
-isdefined(Main, :X2) || const X2 = MVector{NX,Float64}(undef)
-isdefined(Main, :U) || const U = MVector{NU,Float64}(undef)
 
+α = LinearInterpolation(t->zeros(NX), ts)
+μ = LinearInterpolation(t->zeros(NU), ts)
 
 α = Interpolant(ts, NX)
 μ = Interpolant(ts, NU)
@@ -170,7 +176,7 @@ t = 3.5
 @report_opt fx_auto!(FX,x0,u0) # no issues
 @allocated fx_auto!(FX,x0,u0) # 0
 
-@btime fx_auto!(FX, α(t), μ(t)) # 301 ns
+@btime fx_auto!(FX, α(t), μ(t)) # 301 ns # 1.5x speedup with new interpolant: 177 ns
 @code_warntype fx_auto!(FX, α(t), μ(t)) # type stable
 @report_opt fx_auto!(FX, α(t), μ(t)) # no issues
 @allocated fx_auto!(FX, α(t), μ(t)) # 96
@@ -180,10 +186,10 @@ t = 3.5
 @report_opt fx_test!(FX,α,μ,t,model) # clean
 @allocated fx_test!(FX,α,μ,t,model) # 96
 
-@benchmark fx_test3!(FX,α,μ,t,fx_auto!) # 256 ns
+@benchmark fx_test3!(FX,α,μ,t,fx_auto!) # 256 ns # 1.5x speedup with new interpolant -> 178 ns
 @code_warntype fx_test3!(FX,α,μ,t,fx_auto!) # type stable
 
-@benchmark fx_test3!(FX,α,μ,t,model.fx!) # 804 ns
+@benchmark fx_test3!(FX,α,μ,t,model.fx!) # 804 ns # 2.5x speedup with new interpolant -> 293 ns
 @code_warntype fx_test3!(FX,α,μ,t,model.fx!) # type stable
 
 @benchmark fx_test4!(FX,α,μ,t; fx! = fx_auto!) # 547 ns
