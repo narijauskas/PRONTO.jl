@@ -61,8 +61,10 @@ fx_auto! = model.fx!
 fx_model = (x,u)->(model.fx(x,u))
 fx_model! = (buf,x,u)->(model.fx!(buf,x,u))
 
-fx_functor = Functor(NX,NX) do buf,x,u
-    fx_auto!(buf,x,u)
+fx_functor = let fx! = fx_auto!
+    Functor(NX,NX) do buf,x,u
+        fx!(buf,x,u)
+    end
 end
 
 fx_functor2 = Functor(NX,NX) do buf,x,u
