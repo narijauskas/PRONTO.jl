@@ -25,9 +25,8 @@ function Functor(fxn!, dims::Vararg{Int})
     Functor{F,T}(fxn!,buf)
 end
 
-function (A::Functor{F,T})(args...) where {F<:Function,T}
-    fxn! = A.fxn!::F
-    fxn!(A.buf, args...) # in-place update
+function (A::Functor{F,T})(args...) where {F,T}
+    A.fxn!(A.buf, args...) # in-place update
     return A.buf::T
 end
 

@@ -33,7 +33,8 @@ export MStruct
 include("functors.jl")
 export Functor
 
-include("interpolants.jl")
+# include("interpolants.jl")
+include("itp.jl")
 export Interpolant
 
 include("autodiff.jl")
@@ -53,6 +54,9 @@ export guess, pronto
 mapid!(dest, src) = map!(identity, dest, src)
 # same as: mapid!(dest, src) = map!(x->x, dest, src)
 
+inv!(A) = LinearAlgebra.inv!(lu!(A)) # general
+
+# LinearAlgebra.inv!(choelsky!(A)) # if SPD
 
 # --------------------------------- regulator --------------------------------- #
 
@@ -62,6 +66,7 @@ function riccati!(dP, P, (Ar,Br,Rr,Qr,Kr), t)
     # if not, do each step inplace to local buffers or SVectors
     dP .= -Ar(t)'P - P*Ar(t) + Kr(P,t)'*Rr(t)*Kr(P,t) - Qr(t)
 end
+
 
 
 # solve for regulator
@@ -173,7 +178,9 @@ function search_direction(x, u, α, model, i)
     end
 
     Ko = Functor(NU,NX) do buf,P,t
-        mul!(buf, inv(R(t)), (S(t)'+B(t)'*P))
+        # copy!(R(t), buf)
+        # inv!()
+        copy!(buf, R(t)\(S(t)'+B(t)'*P))
     end
 
     # --------------- solve optimizer Ko --------------- #
@@ -185,7 +192,7 @@ function search_direction(x, u, α, model, i)
         
         # Ko = inv(R)\(S'+B'*P)
         Ko = Functor(NU,NX) do buf,t
-            mul!(buf, inv(R(t)), (S(t)'+B(t)'*P(t)))
+            copy!(buf, R(t)\(S(t)'+B(t)'*P(t)))
         end
     end
     tinfo(i, "optimizer solved", tx)
@@ -199,7 +206,7 @@ function search_direction(x, u, α, model, i)
         r = solve(ODEProblem(costate_dynamics!, rT, (T,0.0), (A,B,a,b,Ko)))
 
         vo = Functor(NU) do buf,t
-            mul!(buf, -inv(R(t)), (B(t)'*r(t)+b(t)))
+            copy!(buf, -R(t)\(B(t)'*r(t)+b(t)))
         end
     end
     tinfo(i, "costate dynamics solved", tx)
@@ -321,8 +328,8 @@ guess(t, x0, x_eq, T) = @. (x_eq - x0)*(tanh((2π/T)*t - π) + 1)/2 + x0
 
 function pronto(model)
     ts = model.ts; T = last(ts); NX = model.NX; NU = model.NU
-    α = Interpolant(t->guess(t, model.x0, model.x_eq, T), ts, NX)
-    μ = Interpolant(ts, NU)
+    α = Interpolant(t->guess(t, model.x0, model.x_eq, T), ts)
+    μ = Interpolant(t->zeros(NU), ts)
     pronto(α,μ,model)
 end
 
@@ -333,7 +340,7 @@ end
 function pronto(μ, model)
     ts = model.ts; T = last(ts); NX = model.NX; NU = model.NU
     α_ode = solve(ODEProblem(ol_dynamics!, model.x0, (0,T), (model.f, μ)))
-    α = Interpolant((t->α_ode(t)), ts, NX)
+    α = Interpolant((t->α_ode(t)), ts)
     pronto(α,μ,model)
 end
 
@@ -343,10 +350,11 @@ function pronto(α,μ,model)
     ts = model.ts; T = last(ts); NX = model.NX; NU = model.NU
     η = (α,μ)
 
-    x = Interpolant(ts, NX)
-    u = Interpolant(ts, NU)
-    z = Interpolant(ts, NX)
-    v = Interpolant(ts, NU)
+    x = Interpolant(t->zeros(NX), ts)
+    u = Interpolant(t->zeros(NU), ts)
+
+    z = Interpolant(t->zeros(NX), ts)
+    v = Interpolant(t->zeros(NU), ts)
 
     for i in 1:model.maxiters
         # η -> Kr # regulator
@@ -358,8 +366,8 @@ function pronto(α,μ,model)
         # η,Kr -> ξ # projection
         tx = @elapsed begin
             ξ = projection(α, μ, Kr, model)
-            update!(t->ξ[1](t), x)
-            update!(t->ξ[2](t), u)
+            update!(x, ξ[1])
+            update!(u, ξ[2])
             ξ = (x,u)
         end
         tinfo(i, "projection solved", tx)
@@ -367,8 +375,10 @@ function pronto(α,μ,model)
         # ξ,Kr -> ζ # search direction
         tx = @elapsed begin
             ζ,Dh = search_direction(ξ..., α, model, i)
-            update!(t->ζ[1](t), z)
-            update!(t->ζ[2](t), v) #TODO: optimize this
+            update!(z, ζ[1])
+            update!(v, ζ[2])
+            # update!(t->ζ[1](t), z)
+            # update!(t->ζ[2](t), v) #TODO: optimize this
             ζ = (z,v)
         end
         tinfo(i, "search direction found", tx)
@@ -382,8 +392,8 @@ function pronto(α,μ,model)
         tx = @elapsed begin
             ξ̂ = armijo_backstep(ξ...,Kr,ζ...,Dh,model,i)
             (x̂,û) = ξ̂
-            update!(t->x̂(t), α)
-            update!(t->û(t), μ)
+            update!(α, x̂)
+            update!(μ, û)
             η = (α,μ)
         end
         tinfo(i, "trajectory update found", tx)
