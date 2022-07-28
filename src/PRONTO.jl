@@ -272,6 +272,7 @@ function pronto(μ, model)
 end
 
 
+
 function pronto(α,μ,model)
     info("initializing")
     ts = model.ts; T = last(ts); NX = model.NX; NU = model.NU
@@ -283,14 +284,12 @@ function pronto(α,μ,model)
     v = Interpolant(t->zeros(NU), ts)
 
     for i in 1:model.maxiters
+        
         # η -> Kr # regulator
         tx = @elapsed begin
             Kr = regulator(NX,NU,T,α,μ,model.fx!,model.fu!,model.iRr,model.Rr,model.Qr)
         end
-        tinfo(i, "regulator solved", tx)
-        # info("allocated: $al")
-        
-
+        tinfo(i, "regulator solved", tx)        
 
         # η,Kr -> ξ # projection
         tx = @elapsed begin

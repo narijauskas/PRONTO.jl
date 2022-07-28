@@ -5,11 +5,13 @@
 # should be well suited for representing smooth, dense, continuous things like states, costates, and inputs
 using StaticArrays
 
+
 struct Interpolant{S,A,T}
     x::Vector{MVector{S,A}}
     t::T
     buf::MVector{S,A}
 end
+
 
 # where f is a function f(t)
 function Interpolant(f::Function,ts::T; A=Float64) where {T}
@@ -36,23 +38,29 @@ end
 
 # Interpolant(t -> sin(t), ts)
 
-# set buf to be x(τ) from set x and t
-function interpolate!(buf,τ,x,t)
+function findindex(t,τ)
     tdir = sign(t[end] - t[1])
     tdir * τ > tdir * t[end] && error("Solution interpolation cannot extrapolate past the final timepoint.")
     tdir * τ < tdir * t[1] && error("Solution interpolation cannot extrapolate before the first timepoint.")
     @inbounds i = searchsortedfirst(t, τ, rev=tdir < 0) # It's in the interval t[i-1] to t[i]
+    return i
+end
+
+# set X to be x(τ) from set x and t
+function interpolate!(X,τ,x,t)
+    i = findindex(t,τ)
+
     @inbounds if t[i] == τ
-        copy!(buf, x[i])
+        copy!(X, x[i])
     elseif t[i-1] == τ # Can happen if it's the first value!
-        copy!(buf, x[i-1])
+        copy!(X, x[i-1])
     else
         dt = t[i] - t[i-1]
         Θ = (τ - t[i-1]) / dt
         Θm1 = (1 - Θ)
-        @. buf = Θm1 * x[i-1] + Θ * x[i]
+        @. X = Θm1 * x[i-1] + Θ * x[i]
     end
-    return buf
+    return X
 end
 
 
@@ -65,7 +73,18 @@ function update!(X::Interpolant, f)
     end
 end
 
+
+# indexable
+Base.firstindex(X::Interpolant) = 1
+Base.lastindex(X::Interpolant) = length(X)
 Base.length(X::Interpolant) = length(X.t)
+Base.getindex(X::Interpolant, inds...) = getindex(X.x,inds...)
+Base.setindex!(X::Interpolant, val, inds...) = setindex!(X.x, val, inds...)
+
+# iterable
+Base.iterate(X::Interpolant, i=1) = i > length(X) ? nothing : (X[i], i+1)
+
+# show
 Base.show(io::IO, ::Interpolant{S,<:Any,<:Any}) where {S} = print(io, "$S - element Interpolant")
 
 # times(X::Interpolant) = X.t
@@ -74,7 +93,40 @@ Base.show(io::IO, ::Interpolant{S,<:Any,<:Any}) where {S} = print(io, "$S - elem
 
 
 
-# ts = 0:0.001:10
-# ts = collect(ts)
-# itp = Interpolant(t->([1,2,3,4]*sin(t)), ts)
+# ----------------------------------- Trajectories ----------------------------------- #
+
+
+struct Trajectory{SX,SU,A,T}
+    x::Vector{MVector{S,A}}
+    u::Vector{MVector{S,A}}
+    t::T
+    X::MVector{SX,A}
+    U::MVector{SU,A}
+end
+
+(Ξ::Trajectory)(τ) = interpolate!(Ξ.X, Ξ.U, τ, Ξ.x, Ξ.u, Ξ.t)
+
+function Trajectory(X::Interpolant, U::Interpolant, t)
+    @assert X.t == U.t == t "unequal timesteps"
+    Trajectory(X.x, X.u, t, X.X, U.X)
+end
+
+function interpolate!(X,U,τ,x,u,t)
+    i = find_index(t,τ)
+
+    @inbounds if t[i] == τ
+        copy!(X, x[i])
+        copy!(U, u[i])
+    elseif t[i-1] == τ # Can happen if it's the first value!
+        copy!(X, x[i-1])
+        copy!(U, u[i-1])
+    else
+        dt = t[i] - t[i-1]
+        Θ = (τ - t[i-1]) / dt
+        Θm1 = (1 - Θ)
+        @. X = Θm1 * x[i-1] + Θ * x[i]
+        @. U = Θm1 * u[i-1] + Θ * u[i]
+    end
+    return (X,U)
+end
 
