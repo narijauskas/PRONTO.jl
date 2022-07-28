@@ -1,14 +1,6 @@
 # --------------------------------- optimizer Ko --------------------------------- #
 
-function optimizer(NX,NU,T,x,u,α,fx!,fu!,lxx!,luu!,lxu!,pxx!)
-    A = functor((A,t) -> fx!(A,x(t),u(t)), buffer(NX,NX))
-    B = functor((B,t) -> fu!(B,x(t),u(t)), buffer(NX,NU))
-    Q = functor((Q,t) -> lxx!(Q,x(t),u(t)), buffer(NX,NX))
-    R = functor((R,t) -> luu!(R,x(t),u(t)), buffer(NU,NU))
-    S = functor((S,t) -> lxu!(S,x(t),u(t)), buffer(NX,NU))
-
-    PT = buffer(NX,NX); pxx!(PT, α(T)) # P(T) around unregulated trajectory
-    #TODO: # PT = functor((PT)->(pxx!(PT, α(T))), buffer(NX,NX))
+function optimizer(A,B,Q,R,S,PT,NX,NU,T)
     P! = solve(ODEProblem(optimizer!, PT, (T,0.0), (A,B,Q,R,S)))
     P = functor((P,t)->P!(P,t), buffer(NX,NX))
 

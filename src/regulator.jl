@@ -1,14 +1,12 @@
 
 # --------------------------------- regulator --------------------------------- #
 
-function regulator(NX,NU,T,α,μ,fx!,fu!,iRr,Rr,Qr)
-    Ar = functor((Ar,t) -> fx!(Ar,α(t),μ(t)), buffer(NX,NX))
-    Br = functor((Br,t) -> fu!(Br,α(t),μ(t)), buffer(NX,NU))
-
+function regulator(Ar,Br,iRr,Rr,Qr,NX,NU,T)
+    
     Kr = buffer(NU,NX)
 
     PT = collect(I(NX))
-    Pr! = solve(ODEProblem(riccati!, PT, (T,0.0), (α,μ,Ar,Br,Rr,Qr,Kr)))
+    Pr! = solve(ODEProblem(riccati!, PT, (T,0.0), (Ar,Br,Rr,Qr,Kr)))
     Pr = functor((Pr,t) -> Pr!(Pr, t), buffer(NX,NX))
 
     iRrBr = buffer(NU,NX)
@@ -20,7 +18,7 @@ function regulator(NX,NU,T,α,μ,fx!,fu!,iRr,Rr,Qr)
     return _Kr
 end
 
-function riccati!(dP, P, (α,μ,Ar,Br,Rr,Qr,Kr), t)
+function riccati!(dP, P, (Ar,Br,Rr,Qr,Kr), t)
     mul!(Kr, Rr(t)\Br(t)', P)
     dP .= -Ar(t)'P - P*Ar(t) + Kr'*Rr(t)*Kr - Qr(t)
     # dP .= -Ar(t)'P - P*Ar(t) + Kr'*Br'*P - Qr(t)

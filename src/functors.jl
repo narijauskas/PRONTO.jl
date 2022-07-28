@@ -7,9 +7,15 @@
 # should be zero-allocating & type stable
 
 buffer(dims...) = MArray{Tuple{dims...},Float64}(undef)
+
+macro buffer(dims...)
+    S = Tuple{dims...}
+    :(MArray{$S,Float64}(undef))
+end
+
 functor(f!,X) = (F(args...) = (f!(X, args...); return X); return F)
 
-export buffer, functor
+export buffer, @buffer, functor
 # function functor(f!,dims...)
 #     X = MArray{Tuple{dims...},Float64}(undef)
 #     function F(args...)

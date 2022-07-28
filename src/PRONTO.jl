@@ -9,6 +9,7 @@ using DifferentialEquations
 using DifferentialEquations: init # silences linter
 # using ControlSystems # provides lqr
 using MatrixEquations # provides arec
+using FastClosures
 
 # ---------------------------- for runtime feedback ---------------------------- #
 using Crayons
@@ -62,190 +63,10 @@ include("regulator.jl")
 include("projection.jl")
 include("optimizer.jl")
 include("costate.jl")
+include("search_direction.jl")
+include("cost_derivatives.jl")
 
 
-# --------------------------------- search direction --------------------------------- #
-
-# Ko = optimizer()
-
-
-#FUTURE: break apart to separate functions
-
-function search_direction(x, u, α, model, i)
-    @unpack model
-    T = last(ts)
-
-    A = Functor(NX,NX) do buf,t
-        fx!(buf, x(t), u(t))
-    end
-
-    # B = Functor((buf,t)->fu!(buf, x(t), u(t)), NX, NU)
-    B = Functor(NX,NU) do buf,t
-        fu!(buf, x(t), u(t))
-    end
-
-    a = Functor(NX) do buf,t
-        lx!(buf, x(t), u(t))
-    end
-
-    b = Functor(NU) do buf,t
-        lu!(buf, x(t), u(t))
-    end
-
-    Q = Functor(NX,NX) do buf,t
-        lxx!(buf, x(t), u(t))
-    end
-   
-    R = Functor(NU,NU) do buf,t
-        luu!(buf, x(t), u(t))
-    end
-
-    S = Functor(NX,NU) do buf,t
-        lxu!(buf, x(t), u(t))
-    end
-
-    Ko = Functor(NU,NX) do buf,P,t
-        # copy!(R(t), buf)
-        # inv!()
-        copy!(buf, R(t)\(S(t)'+B(t)'*P))
-    end
-
-    # --------------- solve optimizer Ko --------------- #
-    tx = @elapsed begin
-        PT = MArray{Tuple{NX,NX},Float64}(undef) # pxx!
-        pxx!(PT, α(T)) # around unregulated trajectory
-
-        P = solve(ODEProblem(optimizer!, PT, (T,0.0), (Ko,R,Q,A)))
-        
-        # Ko = inv(R)\(S'+B'*P)
-        Ko = Functor(NU,NX) do buf,t
-            copy!(buf, R(t)\(S(t)'+B(t)'*P(t)))
-        end
-    end
-    tinfo(i, "optimizer solved", tx)
-
-
-    # --------------- solve costate dynamics vo --------------- #
-    tx = @elapsed begin
-        # solve costate dynamics vo
-        rT = MArray{Tuple{NX},Float64}(undef)
-        px!(rT, α(T)) # around unregulated trajectory
-        r = solve(ODEProblem(costate_dynamics!, rT, (T,0.0), (A,B,a,b,Ko)))
-
-        vo = Functor(NU) do buf,t
-            copy!(buf, -R(t)\(B(t)'*r(t)+b(t)))
-        end
-    end
-    tinfo(i, "costate dynamics solved", tx)
-
-
-    # --------------- forward integration for search direction --------------- #
-    tx = @elapsed begin
-        v = Functor(NU) do buf,z,t
-            mul!(buf, Ko(t), z)
-            buf .*= -1
-            buf .+= vo(t)
-        end
-
-        z0 = 0 .* model.x_eq
-        z = solve(ODEProblem(update_dynamics!, z0, (0.0,T), (A,B,v)))
-        
-        # v = -Ko(t)*z+vo(t)
-        v = Functor(NU) do buf,t
-            mul!(buf, Ko(t), z(t))
-            buf .*= -1
-            buf .+= vo(t)
-        end
-
-        ζ = (z,v)
-    end
-    tinfo(i, "search direction found", tx)
-
-    # --------------- cost derivatives --------------- #
-    tx = @elapsed begin
-        y0 = [0;0]
-        y = solve(ODEProblem(cost_derivatives!, y0, (0.0,T), (z,v,a,b,Q,S,R)))
-        Dh = y(T)[1] + rT'*z(T)
-        D2g = y(T)[2] + z(T)'*PT*z(T)
-    end
-    tinfo(i, "cost derivatives calculated", tx)
-    return ζ,Dh
-end
-
-
-# function optimizer!(dP, P, (Ko,R,Q,A), t)
-#     dP .= -A(t)'*P - P*A(t) + Ko(P,t)'*R(t)*Ko(P,t) - Q(t)
-# end
-
-# function costate_dynamics!(dx, x, (A,B,a,b,K), t)
-#     dx .= -(A(t)-B(t)*K(t))'*x - a(t) + K(t)'*b(t)
-# end
-
-function update_dynamics!(dz, z, (A,B,v), t)
-    dz .= A(t)*z + B(t)*v(z,t)
-end
-
-
-function cost_derivatives!(dy, y, (z,v,a,b,Qo,So,Ro), t)
-    dy[1] = a(t)'*z(t) + b(t)'*v(t)
-    dy[2] = z(t)'*Qo(t)*z(t) + 2*z(t)'*So(t)*v(t) + v(t)'*Ro(t)*v(t)
-end
-
-
-# ----------------------------------- armijo ----------------------------------- #
-
-# armijo_backstep:
-function armijo_backstep(x,u,Kr,z,v,Dh,model,i)
-    @unpack model
-    γ = 1
-    T = last(model.ts)
-    
-    # compute cost
-    J = cost(x,u,model)
-    h = J(T)[1] + model.p(x(T)) # around regulated trajectory
-
-    while γ > model.β^12
-        info(i, "armijo: γ = $γ")
-        
-        # generate estimate
-        # MAYBE: α̂(γ,t) & move up a level
-
-        # α̂ = x + γz
-        α̂ = Functor(NX) do buf,t
-            mul!(buf, γ, z(t))
-            buf .+= x(t)
-        end
-
-        # μ̂ = u + γv
-        μ̂ = Functor(NU) do buf,t
-            mul!(buf, γ, v(t))
-            buf .+= u(t)
-        end
-
-        ξ̂ = (x̂,û) = projection(α̂, μ̂, Kr, model)
-
-        J = cost(ξ̂..., model)
-        g = J(T)[1] + model.p(x̂(T))
-
-        # check armijo rule
-        h-g >= -model.α*γ*Dh ? (return ξ̂) : (γ *= model.β)
-        # println("γ=$γ, h-g=$(h-g)")
-    end
-    @warn "armijo maxiters"
-    return (x,u)
-end
-
-
-function stage_cost!(dh, h, (l,x,u), t)
-    dh .= l(x(t), u(t))
-end
-
-function cost(x,u,model)
-    T = last(model.ts)
-    h = solve(ODEProblem(stage_cost!, [0], (0.0,T), (model.l,x,u)))
-    return h
-end
- 
 
 
 # ----------------------------------- main loop ----------------------------------- #
@@ -271,11 +92,20 @@ function pronto(μ, model)
     pronto(α,μ,model)
 end
 
+# before 0.55
 
+# function pronto(α,μ,model)
+#     pronto(α,μ,model.f,model.l,model.p,model.fx!,model.fu!,model.lx!,model.lu!,model.lxx!,model.luu!,model.lxu!,model.px!,model.pxx!,model)
+# end
 
+#TODO: @functor
 function pronto(α,μ,model)
-    info("initializing")
-    ts = model.ts; T = last(ts); NX = model.NX; NU = model.NU
+    NX = model.NX; NU = model.NU; ts = model.ts; T = last(ts); 
+    Qr = model.Qr; Rr = model.Rr; iRr = model.iRr;
+    fx! = model.fx!; fu! = model.fu!;
+    lx! = model.lx!; lu! = model.lu!;
+    lxx! = model.lxx!; luu! = model.luu!; lxu! = model.lxu!;
+    px! = model.px!; pxx! = model.pxx!;
 
     x = Interpolant(t->zeros(NX), ts)
     u = Interpolant(t->zeros(NU), ts)
@@ -283,64 +113,144 @@ function pronto(α,μ,model)
     z = Interpolant(t->zeros(NX), ts)
     v = Interpolant(t->zeros(NU), ts)
 
-    for i in 1:model.maxiters
+    Ar = functor((Ar,t) -> fx!(Ar,α(t),μ(t)), buffer(NX,NX))
+    Br = functor((Br,t) -> fu!(Br,α(t),μ(t)), buffer(NX,NU))
+
+    A = functor((A,t) -> fx!(A,x(t),u(t)), buffer(NX,NX))
+    B = functor((B,t) -> fu!(B,x(t),u(t)), buffer(NX,NU))
+    a = functor((a,t) -> lx!(a,x(t),u(t)), buffer(NX))
+    b = functor((b,t) -> lu!(b,x(t),u(t)), buffer(NU))
+    Q = functor((Q,t) -> lxx!(Q,x(t),u(t)), buffer(NX,NX))
+    R = functor((R,t) -> luu!(R,x(t),u(t)), buffer(NU,NU))
+    S = functor((S,t) -> lxu!(S,x(t),u(t)), buffer(NX,NU))
+
+    # PT = buffer(NX,NX); pxx!(PT, α(T)) # P(T) around unregulated trajectory
+    PT = functor((PT) -> pxx!(PT, α(T)), buffer(NX,NX))
+
+    # rT = buffer(NX); px!(rT, α(T)) # around unregulated trajectory
+    rT = functor((rT) -> px!(rT, α(T)), buffer(NX))
+
+    pronto(α,μ,x,u,z,v,Ar,Br,iRr,Rr,Qr,A,B,a,b,Q,R,S,PT,rT,NX,NU,T,model.f,model.l,model.p,model.x0,model.maxiters,model.tol)
+end
+
+# function pronto(α,μ,f,l,p,fx!,fu!,lx!,lu!,lxx!,luu!,lxu!,px!,pxx!,model)
+function pronto(α,μ,x,u,z,v,Ar,Br,iRr,Rr,Qr,A,B,a,b,Q,R,S,PT,rT,NX,NU,T,f,l,p,x0,maxiters,tol)
+
+    info("initializing")
+    # @unpack model
+
+    for i in 1:maxiters
         
         # η -> Kr # regulator
         tx = @elapsed begin
-            Kr = regulator(NX,NU,T,α,μ,model.fx!,model.fu!,model.iRr,model.Rr,model.Qr)
+            Kr = regulator(Ar,Br,iRr,Rr,Qr,NX,NU,T)
         end
-        tinfo(i, "regulator solved", tx)        
+        tinfo(i, "regulator solved", tx)
 
-        # η,Kr -> ξ # projection
+
+        # # η,Kr -> ξ # projection
         tx = @elapsed begin
-            _x = projection_x(NX,T,α,μ,Kr,model.f,model.x0)
+            _x = projection_x(NX,T,α,μ,Kr,f,x0)
             update!(x, _x)
             _u = projection_u(NX,NU,α,μ,Kr,x)
             update!(u, _u)
         end
         tinfo(i, "projection solved", tx)
-
+        
         tx = @elapsed begin
-            Ko = optimizer(NX,NU,T,x,u,α,model.fx!,model.fu!,model.lxx!,model.luu!,model.lxu!,model.pxx!)
+            Ko = optimizer(A,B,Q,R,S,PT(),NX,NU,T)
         end
         tinfo(i, "optimizer found", tx)
         
         tx = @elapsed begin
-           vo = costate_dynamics(NX,NU,T,x,u,α,Ko,model.fx!,model.fu!,model.lx!,model.lu!,model.luu!,model.px!)
+            vo = costate_dynamics(Ko,A,B,a,b,R,rT(),NX,NU,T)
         end
         tinfo(i, "costate dynamics solved", tx)
-        #=
-        # ξ,Kr -> ζ # search direction
+        
         tx = @elapsed begin
-            ζ,Dh = search_direction(ξ..., α, model, i)
-            update!(z, ζ[1])
-            update!(v, ζ[2])
-            # update!(t->ζ[1](t), z)
-            # update!(t->ζ[2](t), v) #TODO: optimize this
-            ζ = (z,v)
+            _z = search_z(NX,T,Ko,vo,A,B)
+            update!(z, _z)
+            _v = search_v(NU,z,Ko,vo)
+            update!(v, _v)
         end
         tinfo(i, "search direction found", tx)
-        
+
         # check Dh criteria -> return η
+        (Dh,D2g) = cost_derivatives(z,v,a,b,Q,S,R,rT(),PT(),T)
         info(i, "Dh is $Dh")
-        Dh > 0 && (@warn "increased cost - quitting"; return η)
-        -Dh < model.tol && (info(as_bold("PRONTO converged")); return η)
+        Dh > 0 && (@warn "increased cost - quitting"; return (α,μ))
+        -Dh < tol && (info(as_bold("PRONTO converged")); return (α,μ))
+        
         
         # ξ,ζ,Kr -> γ -> ξ̂ # armijo
         tx = @elapsed begin
-            ξ̂ = armijo_backstep(ξ...,Kr,ζ...,Dh,model,i)
-            (x̂,û) = ξ̂
+            (x̂,û) = armijo_backstep(x,u,Kr,z,v,Dh,i,f,l,p,x0,NX,NU,T)
             update!(α, x̂)
             update!(μ, û)
-            η = (α,μ)
+            # η = (α,μ)
         end
         tinfo(i, "trajectory update found", tx)
-        =#
+        
     end
-    @warn "maxiters"
+    # @warn "maxiters"
     return nothing
 end
 
+
+
+
+# ----------------------------------- armijo ----------------------------------- #
+
+# armijo_backstep:
+function armijo_backstep(x,u,Kr,z,v,Dh,i,f,l,p,x0,NX,NU,T; aα=0.4, aβ=0.7)
+    γ = 1
+    
+    # compute cost
+    J = cost(x,u,l,T)
+    h = J(T)[1] + p(x(T)) # around regulated trajectory
+
+    while γ > aβ^12
+        info(i, "armijo: γ = $γ")
+        
+        # generate estimate
+        # MAYBE: α̂(γ,t) & move up a level
+
+        # α̂ = x + γz
+        α̂ = functor(buffer(NX)) do X,t
+            mul!(X, γ, z(t))
+            X .+= x(t)
+        end
+
+        # μ̂ = u + γv
+        μ̂ = functor(buffer(NU)) do U,t
+            mul!(U, γ, v(t))
+            U .+= u(t)
+        end
+        
+        x̂ = projection_x(NX,T,α̂,μ̂,Kr,f,x0)
+        û = projection_u(NX,NU,α̂,μ̂,Kr,x̂)
+
+        J = cost(x̂,û,l,T)
+        g = J(T)[1] + p(x̂(T))
+
+        # check armijo rule
+        h-g >= -aα*γ*Dh ? (return (x̂,û)) : (γ *= aβ)
+        # println("γ=$γ, h-g=$(h-g)")
+    end
+    @warn "armijo maxiters"
+    return (x,u)
+end
+
+
+function stage_cost!(dh, h, (l,x,u), t)
+    dh .= l(x(t), u(t))
+end
+
+function cost(x,u,l,T)
+    h = solve(ODEProblem(stage_cost!, [0], (0.0,T), (l,x,u)))
+    return h
+end
+ 
 
 
 end #module

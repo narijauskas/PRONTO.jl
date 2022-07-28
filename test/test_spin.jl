@@ -57,12 +57,15 @@ model = merge(model, (
     end
 ))
 
+##
+
 #before: 16s
 @elapsed η = pronto(model)
-tx = map(1:10) do i
-    @elapsed pronto(model)
-end
+# tx = map(1:10) do i
+#     @elapsed pronto(model)
+# end
 
+##
 
 #= plot result
     using GLMakie
