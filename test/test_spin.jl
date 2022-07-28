@@ -59,18 +59,9 @@ model = merge(model, (
 
 #before: 16s
 @elapsed η = pronto(model)
-# @elapsed η = pronto(model)
-
 tx = map(1:10) do i
     @elapsed pronto(model)
 end
-# ts = model.ts
-
-
-# hardcode buffers: 0.83
-# functors: 0.62
-
-
 
 
 #= plot result

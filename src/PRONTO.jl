@@ -34,7 +34,7 @@ include("functors.jl")
 export Functor
 
 # include("interpolants.jl")
-include("itp.jl")
+include("interpolants.jl")
 export Interpolant
 
 include("autodiff.jl")
