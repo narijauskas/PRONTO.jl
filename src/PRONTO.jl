@@ -61,7 +61,7 @@ inv!(A) = LinearAlgebra.inv!(lu!(A)) # general
 include("regulator.jl")
 include("projection.jl")
 include("optimizer.jl")
-
+include("costate.jl")
 
 
 # --------------------------------- search direction --------------------------------- #
@@ -173,13 +173,13 @@ function search_direction(x, u, α, model, i)
 end
 
 
-function optimizer!(dP, P, (Ko,R,Q,A), t)
-    dP .= -A(t)'*P - P*A(t) + Ko(P,t)'*R(t)*Ko(P,t) - Q(t)
-end
+# function optimizer!(dP, P, (Ko,R,Q,A), t)
+#     dP .= -A(t)'*P - P*A(t) + Ko(P,t)'*R(t)*Ko(P,t) - Q(t)
+# end
 
-function costate_dynamics!(dx, x, (A,B,a,b,K), t)
-    dx .= -(A(t)-B(t)*K(t))'*x - a(t) + K(t)'*b(t)
-end
+# function costate_dynamics!(dx, x, (A,B,a,b,K), t)
+#     dx .= -(A(t)-B(t)*K(t))'*x - a(t) + K(t)'*b(t)
+# end
 
 function update_dynamics!(dz, z, (A,B,v), t)
     dz .= A(t)*z + B(t)*v(z,t)
@@ -305,6 +305,10 @@ function pronto(α,μ,model)
         end
         tinfo(i, "optimizer found", tx)
         
+        tx = @elapsed begin
+           vo = costate_dynamics(NX,NU,T,x,u,α,Ko,model.fx!,model.fu!,model.lx!,model.lu!,model.luu!,model.px!)
+        end
+        tinfo(i, "costate dynamics solved", tx)
         #=
         # ξ,Kr -> ζ # search direction
         tx = @elapsed begin

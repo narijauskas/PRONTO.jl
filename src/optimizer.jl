@@ -8,12 +8,13 @@ function optimizer(NX,NU,T,x,u,α,fx!,fu!,lxx!,luu!,lxu!,pxx!)
     S = functor((S,t) -> lxu!(S,x(t),u(t)), buffer(NX,NU))
 
     PT = buffer(NX,NX); pxx!(PT, α(T)) # P(T) around unregulated trajectory
+    #TODO: # PT = functor((PT)->(pxx!(PT, α(T))), buffer(NX,NX))
     P! = solve(ODEProblem(optimizer!, PT, (T,0.0), (A,B,Q,R,S)))
-    P = functor((P,t)->P!(P,t), buffer(NX))
+    P = functor((P,t)->P!(P,t), buffer(NX,NX))
 
     # Ko = R\(S'+B'*P) # maybe inv!()
     Ko = buffer(NU,NX)
-    function _Ko()
+    function _Ko(t)
         copy!(Ko, R(t)\(S(t)'+B(t)'*P(t)))
         return Ko
     end
