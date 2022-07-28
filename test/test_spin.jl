@@ -16,7 +16,7 @@ model = (
     # x_eq = zeros(NX),
     x_eq = [1.0;0.0;0.0;0.0], #For this example, we don't have any equilibrium points... xf is the target state here 
     u_eq = zeros(NU),
-    maxiters = 20,
+    maxiters = 10,
     α = 0.4,
     β = 0.7,
 )
@@ -59,8 +59,17 @@ model = merge(model, (
 
 #before: 16s
 @elapsed η = pronto(model)
+# @elapsed η = pronto(model)
 
+tx = map(1:10) do i
+    @elapsed pronto(model)
+end
 # ts = model.ts
+
+
+# hardcode buffers: 0.83
+# functors: 0.62
+
 
 
 

@@ -26,13 +26,14 @@ end
 
 function projection_x(NX,T,α,μ,Kr,f,x0)
     x! = solve(ODEProblem(stabilized_dynamics!, x0, (0.0,T), (α,μ,Kr,f)))
-    X = buffer(NX)
+    X = functor((X,t)->x!(X,t), buffer(NX))
+    return X
     # _x(t) = (x!(x, t); return x)
-    function _x(t)
-        x!(X, t)
-        return X
-    end
-    return _x
+    # function _x(t)
+    #     x!(X, t)
+    #     return X
+    # end
+    # return _x
 end
 
 function projection_u(NX,NU,α,μ,Kr,x)
