@@ -11,12 +11,8 @@ struct Functor{F,T}
 end
 
 
-# specify fxn! of the form:
-# (buf,args...)->()
-# eg.
-# A = Functor(NX,NX) do buf,t
-#     model.fx!(buf, X_x(t), U_u(t))
-# end
+
+# B = Functor{NX,NU}( (B,t)->fu!(B, x(t), u(t)) )
 
 function Functor(fxn!, dims::Vararg{Int})
     buf = MArray{Tuple{dims...},Float64}(undef) #FIX: generalize T beyond F64?
@@ -32,3 +28,14 @@ end
 
 Base.show(io::IO, ::Functor{F,T}) where {F,T} = print(io, "Functor of $(T)")
 
+
+
+
+buffer(dims::Vararg{Int}) = MArray{Tuple{dims...},Float64}(undef)
+
+B = buffer(NX,NU)
+fu!(B, x(t), u(t))
+
+function _B(t)
+    fu!(B, x(t), u(t))
+end

@@ -1,4 +1,5 @@
 using Revise
+using BenchmarkTools, JET
 using PRONTO
 using LinearAlgebra
 using StaticArrays
@@ -57,7 +58,7 @@ model = merge(model, (
 ))
 
 #before: 16s
-tx = @elapsed η = pronto(model)
+@elapsed η = pronto(model)
 
 # ts = model.ts
 

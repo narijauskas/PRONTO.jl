@@ -58,11 +58,10 @@ end
 
 # pure update, 29 μs, zero allocations
 # evals push into ms range, MiB of allocations
-function update!(X::Interpolant, ode)
+function update!(X::Interpolant, f)
     for (x,t) in zip(X.x,X.t)
-        # x .= f(t)
-        ode(x,t)
-        # src!(x, t) in-place version?
+        x .= f(t)
+        # ode(x,t)
     end
 end
 

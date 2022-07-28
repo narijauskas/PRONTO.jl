@@ -57,7 +57,6 @@ mapid!(dest, src) = map!(identity, dest, src)
 inv!(A) = LinearAlgebra.inv!(lu!(A)) # general
 
 # LinearAlgebra.inv!(choelsky!(A)) # if SPD
-buffer(dims::Vararg{Int}) = MArray{Tuple{dims...},Float64}(undef)
 
 include("regulator.jl")
 include("projection.jl")
@@ -292,18 +291,18 @@ function pronto(α,μ,model)
         tinfo(i, "regulator solved", tx)
         # info("allocated: $al")
         
+
+
         # η,Kr -> ξ # projection
         tx = @elapsed begin
-            ξ = projection(NX,NU,T,α,μ,Kr,model.f,model.x0)
+            _x = projection_x(NX,T,α,μ,Kr,model.f,model.x0)
+            update!(x, _x)
+            _u = projection_u(NX,NU,α,μ,Kr,x)
+            update!(u, _u)
         end
         tinfo(i, "projection solved", tx)
 
-        tx = @elapsed begin
-            update!(x, ξ[1])
-            update!(u, ξ[2])
-            ξ = (x,u)
-        end
-        tinfo(i, "(x,u) updated", tx)
+
         
         #=
         # ξ,Kr -> ζ # search direction
