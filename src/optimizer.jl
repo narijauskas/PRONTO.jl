@@ -1,3 +1,9 @@
+# Types:
+# Functor{NX,NU}() (simple version of closure + buffer)
+# Trajectory = (x,u) = an efficient pair of interpolants, update together
+# 
+
+
 
 # B = functor((B,t)->fu!(B, x(t), u(t)), NX, NU)
 

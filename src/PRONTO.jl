@@ -275,7 +275,6 @@ end
 function pronto(α,μ,model)
     info("initializing")
     ts = model.ts; T = last(ts); NX = model.NX; NU = model.NU
-    η = (α,μ)
 
     x = Interpolant(t->zeros(NX), ts)
     u = Interpolant(t->zeros(NU), ts)

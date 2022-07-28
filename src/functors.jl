@@ -1,41 +1,55 @@
 # an object that allows non-allocating, type-stable returns
 
-# Ar = Functor(model.fx, X_α, U_μ, NX, NX)
-# Ar(t) updates in-place and returns SArray{T}
-
-# Interpolation{S,T} = LinearInterpolation{Vector{SArray{S,T}}, Vector{Float64}}
+# B = Functor((B,t)->fu!(B,x(t),u(t)), NX, NU)
+# B = Functor( (B,t)->fu!(B,xu(t)...), NX, NU)
+# B = Functor(NX,NU) do B,t
+#     fu!(B,xu(t)...)
+# end
+# struct Functor{F,S}
+#     f!::F
+#     X::MArray{S,Float64}
+# end
 
 struct Functor{F,T}
-    fxn!::F
-    buf::T
+    f!::F
+    X::T
+    Functor(f!::Function, X::MArray) = new(f!,X)
 end
 
+Functor(f!, dims...) = Functor(f!, buffer(dims...))
+buffer(dims...) = MArray{Tuple{dims...},Float64}(undef)
 
-
-# B = Functor{NX,NU}( (B,t)->fu!(B, x(t), u(t)) )
-
-function Functor(fxn!, dims::Vararg{Int})
-    buf = MArray{Tuple{dims...},Float64}(undef) #FIX: generalize T beyond F64?
-    T = typeof(buf)
-    F = typeof(fxn!)
-    Functor{F,T}(fxn!,buf)
-end
-
-function (A::Functor{F,T})(args...) where {F,T}
-    A.fxn!(A.buf, args...) # in-place update
-    return A.buf::T
-end
+(F::Functor)(args...) = (F.f!(F.X, args...); return F.X)
 
 Base.show(io::IO, ::Functor{F,T}) where {F,T} = print(io, "Functor of $(T)")
 
 
+#TODO: goal is: what's the easiest way to combine
+
+# B = buffer(NX,NU)
+# fu!(B, x(t), u(t)) # or fu!(B, xu(t)...)
+# return B
+# should be zero-allocating & type stable
+
+buffer(dims...) = MArray{Tuple{dims...},Float64}(undef)
+functor(f!,dims...) = _F(f!, buffer(dims...))
+_F(f!,X) = (F(args...) = (f!(X, args...); return X); return F)
+
+# function functor(f!,dims...)
+#     X = buffer(dims...)
+#     function _F(args...)
+#             f!(X, args...)
+#         return X
+#     return _F
+# end
 
 
-buffer(dims::Vararg{Int}) = MArray{Tuple{dims...},Float64}(undef)
+# (buf,args...)->f!(buf, args...)
+# F(args...)->
+# function functor(f!,X)
+#     _F(args...) = (f!(X, args...); return X)
+#     return _F
+# end
 
-B = buffer(NX,NU)
-fu!(B, x(t), u(t))
 
-function _B(t)
-    fu!(B, x(t), u(t))
-end
+A = functor((A,t)->fx!(A, x(t), u(t)), NX, NX)
