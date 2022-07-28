@@ -60,7 +60,7 @@ inv!(A) = LinearAlgebra.inv!(lu!(A)) # general
 
 include("regulator.jl")
 include("projection.jl")
-
+include("optimizer.jl")
 
 
 
@@ -300,7 +300,10 @@ function pronto(α,μ,model)
         end
         tinfo(i, "projection solved", tx)
 
-
+        tx = @elapsed begin
+            Ko = optimizer(NX,NU,T,x,u,α,model.fx!,model.fu!,model.lxx!,model.luu!,model.lxu!,model.pxx!)
+        end
+        tinfo(i, "optimizer found", tx)
         
         #=
         # ξ,Kr -> ζ # search direction

@@ -1,17 +1,15 @@
 # --------------------------------- projection --------------------------------- #
 
-# for projection, provided Kr(t)
-# FUTURE: in-place f!(dx,x,u) 
-function stabilized_dynamics!(dx, x, (α,μ,Kr,f), t)
-    u = μ(t) - Kr(t)*(x-α(t))
-    dx .= f(x,u)
-end
-
-
 function projection_x(NX,T,α,μ,Kr,f,x0)
     x! = solve(ODEProblem(stabilized_dynamics!, x0, (0.0,T), (α,μ,Kr,f)))
     X = functor((X,t)->x!(X,t), buffer(NX))
     return X
+end
+
+
+function stabilized_dynamics!(dx, x, (α,μ,Kr,f), t)
+    u = μ(t) - Kr(t)*(x-α(t))
+    dx .= f(x,u)
 end
 
 

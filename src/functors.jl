@@ -9,6 +9,7 @@
 buffer(dims...) = MArray{Tuple{dims...},Float64}(undef)
 functor(f!,X) = (F(args...) = (f!(X, args...); return X); return F)
 
+export buffer, functor
 # function functor(f!,dims...)
 #     X = MArray{Tuple{dims...},Float64}(undef)
 #     function F(args...)
