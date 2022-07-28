@@ -7,6 +7,7 @@ function stabilized_dynamics!(dx, x, (α,μ,Kr,f), t)
     dx .= f(x,u)
 end
 
+
 # η,Kr -> ξ=(x,u) # projection to generate stabilized trajectory
 function projection(NX,NU,T,α,μ,Kr,f,x0)
     x! = solve(ODEProblem(stabilized_dynamics!, x0, (0.0,T), (α,μ,Kr,f)))

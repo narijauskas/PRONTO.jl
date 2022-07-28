@@ -287,7 +287,7 @@ function pronto(α,μ,model)
     for i in 1:model.maxiters
         # η -> Kr # regulator
         tx = @elapsed begin
-            Kr = regulator(NX,NU,T,α,μ,model.fx!,model.fu!,model.Rr,model.Qr)
+            Kr = regulator(NX,NU,T,α,μ,model.fx!,model.fu!,model.iRr,model.Rr,model.Qr)
         end
         tinfo(i, "regulator solved", tx)
         # info("allocated: $al")

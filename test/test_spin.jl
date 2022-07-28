@@ -1,11 +1,13 @@
 using Revise
 using PRONTO
 using LinearAlgebra
+using StaticArrays
 
 NX = 4
 NU = 1
+ts = 0:0.001:10
 model = (
-    ts = 0:0.001:10,
+    ts = ts,
     NX = NX,
     NU = NU,
     x0 = [0.0;1.0;0.0;0.0],
@@ -43,25 +45,16 @@ model = autodiff(model,f,l,p)
 
 
 model = merge(model, (
-    Qr = let M = Diagonal(1.0*diagm([1,1,1,1]))
+    Qr = let M = Diagonal(SMatrix{NX,NX}(diagm([1,1,1,1])))
         (t)->M
     end, # can Qr be a function of α?
-    Rr = let M = Diagonal(1.0*diagm([1]))
+    Rr = let M = Diagonal(SMatrix{NU,NU}(diagm([1])))
         (t)->M
     end,
-    iRr = let M = inv(Diagonal(1.0*diagm([1])))
+    iRr = let M = Diagonal(SMatrix{NU,NU}(inv(diagm([1]))))
         (t)->M
     end
 ))
-# (Qr, Rr, iRr) = let 
-#     Q = Diagonal(1.0*diagm([1,1,1,1])),
-#     R = Diagonal(1.0*diagm([1])),
-#     iR = inv(R)
-#     Qr = (t)->Q
-#     Rr = (t)->R
-#     iRr = (t)->iR
-#     return (Qr, Rr, iRr)
-# end, # can Qr be a function of α?
 
 #before: 16s
 tx = @elapsed η = pronto(model)
