@@ -53,6 +53,15 @@ model = merge(model, (
         (t)->M
     end
 ))
+# (Qr, Rr, iRr) = let 
+#     Q = Diagonal(1.0*diagm([1,1,1,1])),
+#     R = Diagonal(1.0*diagm([1])),
+#     iR = inv(R)
+#     Qr = (t)->Q
+#     Rr = (t)->R
+#     iRr = (t)->iR
+#     return (Qr, Rr, iRr)
+# end, # can Qr be a function of α?
 
 #before: 16s
 tx = @elapsed η = pronto(model)

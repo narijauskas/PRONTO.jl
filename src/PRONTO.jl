@@ -57,7 +57,7 @@ mapid!(dest, src) = map!(identity, dest, src)
 inv!(A) = LinearAlgebra.inv!(lu!(A)) # general
 
 # LinearAlgebra.inv!(choelsky!(A)) # if SPD
-Buffer(dims::Vararg{Int}) = MArray{Tuple{dims...},Float64}(undef)
+buffer(dims::Vararg{Int}) = MArray{Tuple{dims...},Float64}(undef)
 
 include("regulator.jl")
 include("projection.jl")
@@ -67,7 +67,7 @@ include("projection.jl")
 
 # --------------------------------- search direction --------------------------------- #
 
-Ko = optimizer()
+# Ko = optimizer()
 
 
 #FUTURE: break apart to separate functions

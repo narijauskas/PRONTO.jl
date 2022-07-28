@@ -9,21 +9,22 @@ end
 
 # η,Kr -> ξ=(x,u) # projection to generate stabilized trajectory
 function projection(NX,NU,T,α,μ,Kr,f,x0)
-    x_ode = solve(ODEProblem(stabilized_dynamics!, x0, (0.0,T), (α,μ,Kr,f)))
-    xbuf = Buffer(NX)
-    ubuf = Buffer(NU)
+    x! = solve(ODEProblem(stabilized_dynamics!, x0, (0.0,T), (α,μ,Kr,f)))
+    x = buffer(NX)
+    u = buffer(NU)
 
-    function x(t)
-        copy!(xbuf, x_ode(t))
-        return xbuf
+    # _x(t) = (x!(x, t); return x)
+    function _x(t)
+        x!(x, t)
+        return x
     end
 
-    function u(t)
-        mul!(ubuf, Kr(t), α(t)-x(t))
-        ubuf .+= μ(t)
-        return ubuf
+    function _u(t)
+        mul!(u, Kr(t), α(t)-_x(t))
+        u .+= μ(t)
+        return u
     end
 
-    return (x,u)
+    return (_x,_u)
 end
 
