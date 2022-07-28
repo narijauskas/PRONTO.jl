@@ -10,6 +10,9 @@
 #     X::MArray{S,Float64}
 # end
 
+
+
+#= object implementation
 struct Functor{F,T}
     f!::F
     X::T
@@ -22,7 +25,7 @@ buffer(dims...) = MArray{Tuple{dims...},Float64}(undef)
 (F::Functor)(args...) = (F.f!(F.X, args...); return F.X)
 
 Base.show(io::IO, ::Functor{F,T}) where {F,T} = print(io, "Functor of $(T)")
-
+=#
 
 #TODO: goal is: what's the easiest way to combine
 
@@ -31,9 +34,11 @@ Base.show(io::IO, ::Functor{F,T}) where {F,T} = print(io, "Functor of $(T)")
 # return B
 # should be zero-allocating & type stable
 
+
+
+# Buffer{S} = MArray{S,Float64}
 buffer(dims...) = MArray{Tuple{dims...},Float64}(undef)
-functor(f!,dims...) = _F(f!, buffer(dims...))
-_F(f!,X) = (F(args...) = (f!(X, args...); return X); return F)
+functor(f!,X) = (F(args...) = (f!(X, args...); return X); return F)
 
 # function functor(f!,dims...)
 #     X = buffer(dims...)
@@ -43,13 +48,22 @@ _F(f!,X) = (F(args...) = (f!(X, args...); return X); return F)
 #     return _F
 # end
 
-
-# (buf,args...)->f!(buf, args...)
-# F(args...)->
-# function functor(f!,X)
-#     _F(args...) = (f!(X, args...); return X)
-#     return _F
+# A = functor((A,t)->fx!(A, x(t), u(t)), buffer(NX,NX)) # defines A(t)
+# A = functor(buffer(NX,NX)) do A,t
+#     fx!(A, x(t), u(t))
 # end
 
+# # zero allocations:
+# F = functor((F,t) -> (F .= SVector{3}(1,2,3).*sin(t)), buffer(3)) # defines F(t)
+# G = let F = F
+#     functor((G,t) -> copy!(G, F(t)), buffer(3))
+# end
 
-A = functor((A,t)->fx!(A, x(t), u(t)), NX, NX)
+# # alternatively, since let is clumsy
+# function foo()
+#     F = functor((F,t) -> (F .= SVector{3}(1,2,3).*sin(t)), buffer(3)) # defines F(t)
+#     G = functor((G,t) -> copy!(G, F(t)), buffer(3))
+#     return (F,G)
+# end
+
+# (F,G) = foo()

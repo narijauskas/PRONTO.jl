@@ -2,6 +2,9 @@
 # --------------------------------- regulator --------------------------------- #
 
 function regulator(NX,NU,T,α,μ,fx!,fu!,iRr,Rr,Qr)
+    # Ar = functor((Ar,t) -> fx!(Ar,α(t),μ(t)), buffer(NX,NX))
+    # Br = functor((Br,t) -> fu!(Br,α(t),μ(t)), buffer(NX,NU))
+
     Ar = buffer(NX,NX) 
     Br = buffer(NX,NU)
     Kr = buffer(NU,NX)
