@@ -96,7 +96,7 @@ end
 
 #TODO: split model into model/params/t
 # pronto(model,t,α,μ; params)
-
+# pronto(t,α,μ,model; params)
 #params:
     # tol
     # maxiters
@@ -119,19 +119,19 @@ function pronto(α,μ,model)
     stats = Dict( (s=>Float64[] for s in _subroutines())...)
 
     
-    A = functor(@closure((A,t) -> fx!(A,x(t),u(t))), buffer(NX,NX))
-    B = functor(@closure((B,t) -> fu!(B,x(t),u(t))), buffer(NX,NU))
-    a = functor(@closure((a,t) -> lx!(a,x(t),u(t))), buffer(NX))
-    b = functor(@closure((b,t) -> lu!(b,x(t),u(t))), buffer(NU))
-    Q = functor(@closure((Q,t) -> lxx!(Q,x(t),u(t))), buffer(NX,NX))
-    R = functor(@closure((R,t) -> luu!(R,x(t),u(t))), buffer(NU,NU))
-    S = functor(@closure((S,t) -> lxu!(S,x(t),u(t))), buffer(NX,NU))
+    # A = functor(@closure((A,t) -> fx!(A,x(t),u(t))), buffer(NX,NX))
+    # B = functor(@closure((B,t) -> fu!(B,x(t),u(t))), buffer(NX,NU))
+    # a = functor(@closure((a,t) -> lx!(a,x(t),u(t))), buffer(NX))
+    # b = functor(@closure((b,t) -> lu!(b,x(t),u(t))), buffer(NU))
+    # Q = functor(@closure((Q,t) -> lxx!(Q,x(t),u(t))), buffer(NX,NX))
+    # R = functor(@closure((R,t) -> luu!(R,x(t),u(t))), buffer(NU,NU))
+    # S = functor(@closure((S,t) -> lxu!(S,x(t),u(t))), buffer(NX,NU))
 
     # PT = buffer(NX,NX); pxx!(PT, α(T)) # P(T) around unregulated trajectory
-    PT = functor(@closure((PT) -> pxx!(PT, α(T))), buffer(NX,NX))
+    PT = functor(@closure((PT,α) -> pxx!(PT, α(T))), buffer(NX,NX))
 
     # rT = buffer(NX); px!(rT, α(T)) # around unregulated trajectory
-    rT = functor(@closure((rT) -> px!(rT, α(T))), buffer(NX))
+    rT = functor(@closure((rT,α) -> px!(rT, α(T))), buffer(NX))
 
 
     for i in 1:model.maxiters
@@ -146,30 +146,30 @@ function pronto(α,μ,model)
 
         # # η,Kr -> ξ # projection
         tx = @elapsed begin
-            _x = projection_x(NX,T,α,μ,Kr,f,x0)
+            _x = projection_x(α,μ,Kr,model)
             update!(x, _x)
-            _u = projection_u(NX,NU,α,μ,Kr,x)
+            _u = projection_u(α,μ,Kr,x,model)
             update!(u, _u)
         end
         push!(stats[:projection], tx)
         tinfo(i, "projection solved", tx)
         
         tx = @elapsed begin
-            Ko = optimizer(A,B,Q,R,S,PT(),NX,NU,T)
+            Ko = optimizer(x,u,PT(α),model)
         end
         push!(stats[:optimizer], tx)
         tinfo(i, "optimizer found", tx)
         
         tx = @elapsed begin
-            vo = costate_dynamics(Ko,A,B,a,b,R,rT(),NX,NU,T)
+            vo = costate_dynamics(x,u,Ko,rT(α),model)
         end
         push!(stats[:costate], tx)
         tinfo(i, "costate dynamics solved", tx)
         
         tx = @elapsed begin
-            _z = search_z(NX,T,Ko,vo,A,B)
+            _z = search_z(x,u,Ko,vo,model)
             update!(z, _z)
-            _v = search_v(NU,z,Ko,vo)
+            _v = search_v(z,Ko,vo,model)
             update!(v, _v)
         end
         push!(stats[:search_dir], tx)
@@ -177,7 +177,7 @@ function pronto(α,μ,model)
 
         # check Dh criteria -> return η
         tx = @elapsed begin
-            (Dh,D2g) = cost_derivatives(z,v,a,b,Q,S,R,rT(),PT(),T)
+            (Dh,D2g) = cost_derivatives(x,u,z,v,rT(α),PT(α),model)
         end
         push!(stats[:cost_derivs], tx)
         tinfo(i, "cost derivatives solved", tx)
@@ -188,7 +188,7 @@ function pronto(α,μ,model)
         
         # ξ,ζ,Kr -> γ -> ξ̂ # armijo
         tx = @elapsed begin
-            (x̂,û) = armijo_backstep(x,u,Kr,z,v,Dh,i,f,l,p,x0,NX,NU,T)
+            (x̂,û) = armijo_backstep(x,u,z,v,Kr,Dh,i,model)
             update!(α, x̂)
             update!(μ, û)
             # η = (α,μ)
@@ -235,7 +235,9 @@ _ms(tx) = "$(round(tx*1000; digits=2)) ms"
 # ----------------------------------- armijo ----------------------------------- #
 
 # armijo_backstep:
-function armijo_backstep(x,u,Kr,z,v,Dh,i,f,l,p,x0,NX,NU,T; aα=0.4, aβ=0.7)
+function armijo_backstep(x,u,z,v,Kr,Dh,i,model; aα=0.4, aβ=0.7)
+    NX = model.NX; NU = model.NU; T = model.T;
+    f = model.f; l = model.l; p = model.p; x0 = model.x0;
     γ = 1
     
     # compute cost
@@ -259,9 +261,9 @@ function armijo_backstep(x,u,Kr,z,v,Dh,i,f,l,p,x0,NX,NU,T; aα=0.4, aβ=0.7)
             mul!(U, γ, v(t))
             U .+= u(t)
         end
-        
-        x̂ = projection_x(NX,T,α̂,μ̂,Kr,f,x0)
-        û = projection_u(NX,NU,α̂,μ̂,Kr,x̂)
+        x̂ = projection_x(α̂,μ̂,Kr,model)
+        û = projection_u(α̂,μ̂,Kr,x̂,model)
+
 
         J = cost(x̂,û,l,T)
         g = J(T)[1] + p(x̂(T))

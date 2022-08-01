@@ -1,6 +1,10 @@
 # --------------------------------- projection --------------------------------- #
 
-function projection_x(NX,T,α,μ,Kr,f,x0)
+function projection_x(α,μ,Kr,model)
+    f = model.f
+    x0 = model.x0 #TODO: remove from model
+    NX = model.NX; NU = model.NU; T = model.T;
+
     x! = solve(ODEProblem(stabilized_dynamics!, x0, (0.0,T), (α,μ,Kr,f)))
     X = functor((X,t)->x!(X,t), buffer(NX))
     return X
@@ -13,7 +17,8 @@ function stabilized_dynamics!(dx, x, (α,μ,Kr,f), t)
 end
 
 
-function projection_u(NX,NU,α,μ,Kr,x)
+function projection_u(α,μ,Kr,x,model)
+    NX = model.NX; NU = model.NU
     U = buffer(NU)
     X = buffer(NX)
     function _u(t)
