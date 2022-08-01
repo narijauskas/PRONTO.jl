@@ -60,7 +60,7 @@ model = merge(model, (
 ##
 
 #before: 16s
-@elapsed η = pronto(model)
+@elapsed pronto(model)
 # tx = map(1:10) do i
 #     @elapsed pronto(model)
 # end

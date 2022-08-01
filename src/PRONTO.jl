@@ -99,14 +99,48 @@ end
 # end
 
 #TODO: @functor
-function pronto(α,μ,model)
-    NX = model.NX; NU = model.NU; ts = model.ts; T = last(ts); 
-    Qr = model.Qr; Rr = model.Rr; iRr = model.iRr;
-    fx! = model.fx!; fu! = model.fu!;
-    lx! = model.lx!; lu! = model.lu!;
-    lxx! = model.lxx!; luu! = model.luu!; lxu! = model.lxu!;
-    px! = model.px!; pxx! = model.pxx!;
+# function pronto(α,μ,model)
+#     NX = model.NX; NU = model.NU; ts = model.ts; T = last(ts); 
+#     Qr = model.Qr; Rr = model.Rr; iRr = model.iRr;
+#     fx! = model.fx!; fu! = model.fu!;
+#     lx! = model.lx!; lu! = model.lu!;
+#     lxx! = model.lxx!; luu! = model.luu!; lxu! = model.lxu!;
+#     px! = model.px!; pxx! = model.pxx!;
 
+#     x = Interpolant(t->zeros(NX), ts)
+#     u = Interpolant(t->zeros(NU), ts)
+
+#     z = Interpolant(t->zeros(NX), ts)
+#     v = Interpolant(t->zeros(NU), ts)
+
+#     Ar = functor((Ar,t) -> fx!(Ar,α(t),μ(t)), buffer(NX,NX))
+#     Br = functor((Br,t) -> fu!(Br,α(t),μ(t)), buffer(NX,NU))
+
+#     A = functor((A,t) -> fx!(A,x(t),u(t)), buffer(NX,NX))
+#     B = functor((B,t) -> fu!(B,x(t),u(t)), buffer(NX,NU))
+#     a = functor((a,t) -> lx!(a,x(t),u(t)), buffer(NX))
+#     b = functor((b,t) -> lu!(b,x(t),u(t)), buffer(NU))
+#     Q = functor((Q,t) -> lxx!(Q,x(t),u(t)), buffer(NX,NX))
+#     R = functor((R,t) -> luu!(R,x(t),u(t)), buffer(NU,NU))
+#     S = functor((S,t) -> lxu!(S,x(t),u(t)), buffer(NX,NU))
+
+#     # PT = buffer(NX,NX); pxx!(PT, α(T)) # P(T) around unregulated trajectory
+#     PT = functor((PT) -> pxx!(PT, α(T)), buffer(NX,NX))
+
+#     # rT = buffer(NX); px!(rT, α(T)) # around unregulated trajectory
+#     rT = functor((rT) -> px!(rT, α(T)), buffer(NX))
+
+#     pronto(α,μ,x,u,z,v,Ar,Br,iRr,Rr,Qr,A,B,a,b,Q,R,S,PT,rT,NX,NU,T,model.f,model.l,model.p,model.x0,model.maxiters,model.tol)
+# end
+
+# function pronto(α,μ,f,l,p,fx!,fu!,lx!,lu!,lxx!,luu!,lxu!,px!,pxx!,model)
+# function pronto(α,μ,x,u,z,v,Ar,Br,iRr,Rr,Qr,A,B,a,b,Q,R,S,PT,rT,NX,NU,T,f,l,p,x0,maxiters,tol)
+function pronto(α,μ,model)
+
+    info("initializing")
+    @unpack model
+    T = last(ts)
+    
     x = Interpolant(t->zeros(NX), ts)
     u = Interpolant(t->zeros(NU), ts)
 
@@ -130,16 +164,8 @@ function pronto(α,μ,model)
     # rT = buffer(NX); px!(rT, α(T)) # around unregulated trajectory
     rT = functor((rT) -> px!(rT, α(T)), buffer(NX))
 
-    pronto(α,μ,x,u,z,v,Ar,Br,iRr,Rr,Qr,A,B,a,b,Q,R,S,PT,rT,NX,NU,T,model.f,model.l,model.p,model.x0,model.maxiters,model.tol)
-end
 
-# function pronto(α,μ,f,l,p,fx!,fu!,lx!,lu!,lxx!,luu!,lxu!,px!,pxx!,model)
-function pronto(α,μ,x,u,z,v,Ar,Br,iRr,Rr,Qr,A,B,a,b,Q,R,S,PT,rT,NX,NU,T,f,l,p,x0,maxiters,tol)
-
-    info("initializing")
-    # @unpack model
-
-    for i in 1:maxiters
+    for i in 1:model.maxiters
         
         # η -> Kr # regulator
         tx = @elapsed begin
@@ -176,10 +202,13 @@ function pronto(α,μ,x,u,z,v,Ar,Br,iRr,Rr,Qr,A,B,a,b,Q,R,S,PT,rT,NX,NU,T,f,l,p,
         tinfo(i, "search direction found", tx)
 
         # check Dh criteria -> return η
-        (Dh,D2g) = cost_derivatives(z,v,a,b,Q,S,R,rT(),PT(),T)
+        tx = @elapsed begin
+            (Dh,D2g) = cost_derivatives(z,v,a,b,Q,S,R,rT(),PT(),T)
+        end
+        tinfo(i, "cost derivatives solved", tx)
         info(i, "Dh is $Dh")
         Dh > 0 && (@warn "increased cost - quitting"; return (α,μ))
-        -Dh < tol && (info(as_bold("PRONTO converged")); return (α,μ))
+        -Dh < model.tol && (info(as_bold("PRONTO converged")); return (α,μ))
         
         
         # ξ,ζ,Kr -> γ -> ξ̂ # armijo
