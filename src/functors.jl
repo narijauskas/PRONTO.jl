@@ -5,11 +5,10 @@
 # fx!(A, x(t), u(t))
 
 # should be zero-allocating & type stable
-
 buffer(dims...) = MArray{Tuple{dims...},Float64}(undef)
 
-macro buffer(dims...)
-    S = Tuple{dims...}
+macro buffer(S)
+    S = Tuple{NX}
     :(MArray{$S,Float64}(undef))
 end
 

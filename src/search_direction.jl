@@ -15,6 +15,7 @@ end
 
 
 function update_dynamics!(dz, z, (Ko,vo,A,B), t)
+    # (Ko,vo) = Kovo(t)
     v = -Ko(t)*z+vo(t)
     dz .= A(t)*z + B(t)*v
 end
@@ -25,6 +26,7 @@ function search_v(z,Ko,vo,model)
     V = buffer(NU)
     # v = -Ko(t)*z+vo(t)
     function _v(t)
+        # (Ko,vo) = Kovo(t)
         mul!(V, Ko(t), z(t))
         V .*= -1
         V .+= vo(t)

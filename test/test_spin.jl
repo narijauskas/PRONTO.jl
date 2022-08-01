@@ -64,7 +64,7 @@ model = merge(model, (
 ##
 
 # tx = @elapsed begin 
-@show @elapsed (η,stats) = pronto(model); PRONTO.overview(stats)
+(η,stats) = pronto(model); PRONTO.overview(stats)
 # end
 # PRONTO.overview(stats)
 
