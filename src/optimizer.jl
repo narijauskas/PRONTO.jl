@@ -1,20 +1,20 @@
 # --------------------------------- optimizer Ko --------------------------------- #
 
 function optimizer(x,u,PT,model)
-    fx! = model.fx!; fu! = model.fu!;
-    lxx! = model.lxx!; luu! = model.luu!; lxu! = model.lxu!;
     NX = model.NX; NU = model.NU; T = model.T;
-
-    A = functor(@closure((A,t) -> fx!(A,x(t),u(t))), buffer(NX,NX))
-    B = functor(@closure((B,t) -> fu!(B,x(t),u(t))), buffer(NX,NU))
-   
-    Q = functor(@closure((Q,t) -> lxx!(Q,x(t),u(t))), buffer(NX,NX))
-    R = functor(@closure((R,t) -> luu!(R,x(t),u(t))), buffer(NU,NU))
-    S = functor(@closure((S,t) -> lxu!(S,x(t),u(t))), buffer(NX,NU))
+    fx! = model.fx!; _A = buffer(NX,NX)
+    A = @closure (t)->(fx!(_A,x(t),u(t)); return _A)
+    fu! = model.fu!; _B = buffer(NX,NU)
+    B = @closure (t)->(fu!(_B,x(t),u(t)); return _B)
+    lxx! = model.lxx!; _Q = buffer(NX,NX)
+    Q = @closure (t)->(lxx!(_Q,x(t),u(t)); return _Q)
+    luu! = model.luu!; _R = buffer(NU,NU)
+    R = @closure (t)->(luu!(_R,x(t),u(t)); return _R)
+    lxu! = model.lxu!; _S = buffer(NX,NU)
+    S = @closure (t)->(lxu!(_S,x(t),u(t)); return _S)
 
     P! = solve(ODEProblem(optimizer!, PT, (T,0.0), (A,B,Q,R,S)))
     P = functor((P,t)->P!(P,t), buffer(NX,NX))
-
     # Ko = R\(S'+B'*P) # maybe inv!()
     Ko = buffer(NU,NX)
     function _Ko(t)

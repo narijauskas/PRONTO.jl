@@ -2,15 +2,16 @@
 
 function cost_derivatives(x,u,z,v,rT,PT,model)
     NX = model.NX; NU = model.NU; T = model.T;
-    lx! = model.lx!; lu! = model.lu!;
-    lxx! = model.lxx!; luu! = model.luu!; lxu! = model.lxu!;
-
-    a = functor(@closure((a,t) -> lx!(a,x(t),u(t))), buffer(NX))
-    b = functor(@closure((b,t) -> lu!(b,x(t),u(t))), buffer(NU))
-    Q = functor(@closure((Q,t) -> lxx!(Q,x(t),u(t))), buffer(NX,NX))
-    R = functor(@closure((R,t) -> luu!(R,x(t),u(t))), buffer(NU,NU))
-    S = functor(@closure((S,t) -> lxu!(S,x(t),u(t))), buffer(NX,NU))
-
+    lx! = model.lx!; _a = buffer(NX)
+    a = @closure (t)->(lx!(_a,x(t),u(t)); return _a)
+    lu! = model.lu!; _b = buffer(NU)
+    b = @closure (t)->(lu!(_b,x(t),u(t)); return _b)
+    lxx! = model.lxx!; _Q = buffer(NX,NX)
+    Q = @closure (t)->(lxx!(_Q,x(t),u(t)); return _Q)
+    luu! = model.luu!; _R = buffer(NU,NU)
+    R = @closure (t)->(luu!(_R,x(t),u(t)); return _R)
+    lxu! = model.lxu!; _S = buffer(NX,NU)
+    S = @closure (t)->(lxu!(_S,x(t),u(t)); return _S)
     y0 = [0;0]
     y = solve(ODEProblem(cost_derivatives!, y0, (0.0,T), (z,v,a,b,Q,S,R)))
     Dh = y(T)[1] + rT'*z(T)

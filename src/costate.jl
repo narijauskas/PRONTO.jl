@@ -1,17 +1,16 @@
 # --------------------------------- costate dynamics vo --------------------------------- #
 function costate_dynamics(x,u,Ko,rT,model)
-    fx! = model.fx!; fu! = model.fu!;
-    lx! = model.lx!; lu! = model.lu!;
-    luu! = model.luu!;
     NX = model.NX; NU = model.NU; T = model.T;     
-
-    A = functor(@closure((A,t) -> fx!(A,x(t),u(t))), buffer(NX,NX))
-    B = functor(@closure((B,t) -> fu!(B,x(t),u(t))), buffer(NX,NU))
-    a = functor(@closure((a,t) -> lx!(a,x(t),u(t))), buffer(NX))
-    b = functor(@closure((b,t) -> lu!(b,x(t),u(t))), buffer(NU))
-    # Q = functor(@closure((Q,t) -> lxx!(Q,x(t),u(t))), buffer(NX,NX))
-    R = functor(@closure((R,t) -> luu!(R,x(t),u(t))), buffer(NU,NU))
-    # S = functor(@closure((S,t) -> lxu!(S,x(t),u(t))), buffer(NX,NU))
+    fx! = model.fx!; _A = buffer(NX,NX)
+    A = @closure (t)->(fx!(_A,x(t),u(t)); return _A)
+    fu! = model.fu!; _B = buffer(NX,NU)
+    B = @closure (t)->(fu!(_B,x(t),u(t)); return _B)
+    lx! = model.lx!; _a = buffer(NX)
+    a = @closure (t)->(lx!(_a,x(t),u(t)); return _a)
+    lu! = model.lu!; _b = buffer(NU)
+    b = @closure (t)->(lu!(_b,x(t),u(t)); return _b)
+    luu! = model.luu!; _R = buffer(NU,NU)
+    R = @closure (t)->(luu!(_R,x(t),u(t)); return _R)
 
     r! = solve(ODEProblem(costate_dynamics!, rT, (T,0.0), (A,B,a,b,Ko)))
     r = functor((r,t)->r!(r,t), buffer(NX))

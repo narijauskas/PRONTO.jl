@@ -49,6 +49,7 @@ macro unpack(model)
     return esc(quote
         NX = $(model).NX
         NU = $(model).NU
+        T = $(model).T
         ts = $(model).ts
         f = $(model).f
         fx! = $(model).fx!

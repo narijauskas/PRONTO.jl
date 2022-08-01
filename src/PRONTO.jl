@@ -66,18 +66,18 @@ include("optimizer.jl")
 include("costate.jl")
 include("search_direction.jl")
 include("cost_derivatives.jl")
-
+include("armijo.jl")
 
 
 
 # ----------------------------------- main loop ----------------------------------- #
 
 # generate a guess curve between the initial state and equilibrium
-guess(t, x0, x_eq, T) = @. (x_eq - x0)*(tanh((2π/T)*t - π) + 1)/2 + x0
+guess(t, x0, xf, T) = @. (xf - x0)*(tanh((2π/T)*t - π) + 1)/2 + x0
 
 function pronto(model)
-    ts = model.ts; T = last(ts); NX = model.NX; NU = model.NU
-    α = Interpolant(t->guess(t, model.x0, model.x_eq, T), ts)
+    NX = model.NX; NU = model.NU; T = model.T; ts = model.ts;
+    α = Interpolant(t->guess(t, model.x0, model.xf, T), ts)
     μ = Interpolant(t->zeros(NU), ts)
     pronto(α,μ,model)
 end
@@ -106,7 +106,7 @@ function pronto(α,μ,model)
 
     info("initializing")
     @unpack model
-    T = last(ts)
+    # T = model.T
     
     # memory boffers
     x = Interpolant(t->zeros(NX), ts)
@@ -118,21 +118,15 @@ function pronto(α,μ,model)
     # to track runtimes
     stats = Dict( (s=>Float64[] for s in _subroutines())...)
 
-    
-    # A = functor(@closure((A,t) -> fx!(A,x(t),u(t))), buffer(NX,NX))
-    # B = functor(@closure((B,t) -> fu!(B,x(t),u(t))), buffer(NX,NU))
-    # a = functor(@closure((a,t) -> lx!(a,x(t),u(t))), buffer(NX))
-    # b = functor(@closure((b,t) -> lu!(b,x(t),u(t))), buffer(NU))
-    # Q = functor(@closure((Q,t) -> lxx!(Q,x(t),u(t))), buffer(NX,NX))
-    # R = functor(@closure((R,t) -> luu!(R,x(t),u(t))), buffer(NU,NU))
-    # S = functor(@closure((S,t) -> lxu!(S,x(t),u(t))), buffer(NX,NU))
-
     # PT = buffer(NX,NX); pxx!(PT, α(T)) # P(T) around unregulated trajectory
-    PT = functor(@closure((PT,α) -> pxx!(PT, α(T))), buffer(NX,NX))
+    pxx! = model.pxx!; _PT = buffer(NX,NX)
+    PT = @closure (α)->(pxx!(_PT, α(T)); return _PT)
+    # PT = functor(@closure((PT,α) -> pxx!(PT, α(T))), buffer(NX,NX))
 
     # rT = buffer(NX); px!(rT, α(T)) # around unregulated trajectory
-    rT = functor(@closure((rT,α) -> px!(rT, α(T))), buffer(NX))
-
+    px! = model.px!; _rT = buffer(NX)
+    rT = @closure (α)->(px!(_rT, α(T)); return _rT)
+    # rT = functor(@closure((rT,α) -> px!(rT, α(T))), buffer(NX))
 
     for i in 1:model.maxiters
         
@@ -146,9 +140,9 @@ function pronto(α,μ,model)
 
         # # η,Kr -> ξ # projection
         tx = @elapsed begin
-            _x = projection_x(α,μ,Kr,model)
+            _x = projection_x(x0,α,μ,Kr,model)
             update!(x, _x)
-            _u = projection_u(α,μ,Kr,x,model)
+            _u = projection_u(x,α,μ,Kr,model)
             update!(u, _u)
         end
         push!(stats[:projection], tx)
@@ -198,7 +192,7 @@ function pronto(α,μ,model)
         
     end
     # @warn "maxiters"
-    return nothing
+    return ((α,μ),stats)
 end
 
 #TODO: PRONTO stats function
@@ -231,61 +225,6 @@ function overview(stats)
 end
 
 _ms(tx) = "$(round(tx*1000; digits=2)) ms"
-
-# ----------------------------------- armijo ----------------------------------- #
-
-# armijo_backstep:
-function armijo_backstep(x,u,z,v,Kr,Dh,i,model; aα=0.4, aβ=0.7)
-    NX = model.NX; NU = model.NU; T = model.T;
-    f = model.f; l = model.l; p = model.p; x0 = model.x0;
-    γ = 1
-    
-    # compute cost
-    J = cost(x,u,l,T)
-    h = J(T)[1] + p(x(T)) # around regulated trajectory
-
-    while γ > aβ^12
-        info(i, "armijo: γ = $γ")
-        
-        # generate estimate
-        # MAYBE: α̂(γ,t) & move up a level
-
-        # α̂ = x + γz
-        α̂ = functor(buffer(NX)) do X,t
-            mul!(X, γ, z(t))
-            X .+= x(t)
-        end
-
-        # μ̂ = u + γv
-        μ̂ = functor(buffer(NU)) do U,t
-            mul!(U, γ, v(t))
-            U .+= u(t)
-        end
-        x̂ = projection_x(α̂,μ̂,Kr,model)
-        û = projection_u(α̂,μ̂,Kr,x̂,model)
-
-
-        J = cost(x̂,û,l,T)
-        g = J(T)[1] + p(x̂(T))
-
-        # check armijo rule
-        h-g >= -aα*γ*Dh ? (return (x̂,û)) : (γ *= aβ)
-        # println("γ=$γ, h-g=$(h-g)")
-    end
-    @warn "armijo maxiters"
-    return (x,u)
-end
-
-
-function stage_cost!(dh, h, (l,x,u), t)
-    dh .= l(x(t), u(t))
-end
-
-function cost(x,u,l,T)
-    h = solve(ODEProblem(stage_cost!, [0], (0.0,T), (l,x,u)))
-    return h
-end
- 
 
 
 end #module

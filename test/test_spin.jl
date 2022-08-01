@@ -9,20 +9,22 @@ NU = 1
 T = 10
 ts = 0:0.001:T
 model = (
-    ts = ts,
     NX = NX,
     NU = NU,
-    T = T,
+    T = T, #TODO: remove
+    ts = ts, #TODO: remove
     x0 = [0.0;1.0;0.0;0.0],
-    tol = 1e-5,
-    # x_eq = zeros(NX),
-    x_eq = [1.0;0.0;0.0;0.0], #For this example, we don't have any equilibrium points... xf is the target state here 
-    u_eq = zeros(NU),
-    maxiters = 10,
-    α = 0.4,
-    β = 0.7,
+    u0 = zeros(NU),
+    xf = [1.0;0.0;0.0;0.0], #For this example, we don't have any equilibrium points... xf is the target state here
+    uf = zeros(NU),
+    tol = 1e-5, #TODO: remove
+    maxiters = 10, #TODO: remove
 )
 
+# params = (
+#     tol = 1e-5,
+#     maxiters = 10,
+# )
 
 H0 = [0 0 1 0;0 0 0 -1;-1 0 0 0;0 1 0 0]
 H1 = [0 -1 0 0;1 0 0 0;0 0 0 -1;0 0 1 0]
@@ -61,8 +63,13 @@ model = merge(model, (
 
 ##
 
+# tx = @elapsed begin 
+@show @elapsed (η,stats) = pronto(model); PRONTO.overview(stats)
+# end
+# PRONTO.overview(stats)
+
 #before: 16s
-@elapsed pronto(model)
+# @elapsed pronto(model)
 # tx = map(1:10) do i
 #     @elapsed pronto(model)
 # end

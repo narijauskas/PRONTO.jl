@@ -50,9 +50,9 @@ end
 function interpolate!(X,τ,x,t)
     i = findindex(t,τ)
 
-    @inbounds if t[i] == τ
+    @inbounds if i == 1 || t[i] == τ
         copy!(X, x[i])
-    elseif t[i-1] == τ # Can happen if it's the first value!
+    elseif t[i-1] == τ
         copy!(X, x[i-1])
     else
         dt = t[i] - t[i-1]

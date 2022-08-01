@@ -1,16 +1,18 @@
 # --------------------------------- search direction forward integration --------------------------------- #
 function search_z(x,u,Ko,vo,model)
     NX = model.NX; NU = model.NU; T = model.T;
-    fx! = model.fx!; fu! = model.fu!;
-
-    A = functor(@closure((A,t) -> fx!(A,x(t),u(t))), buffer(NX,NX))
-    B = functor(@closure((B,t) -> fu!(B,x(t),u(t))), buffer(NX,NU))
+    fx! = model.fx!; _A = buffer(NX,NX)
+    A = @closure (t)->(fx!(_A, x(t), u(t)); return _A)
+    fu! = model.fu!; _B = buffer(NX,NU)
+    B = @closure (t)->(fu!(_B, x(t), u(t)); return _B)
+    # B(t) = (fu!(_B, x(t), u(t)); return _B)
 
     z0 = zeros(NX)
     z! = solve(ODEProblem(update_dynamics!, z0, (0.0,T), (Ko,vo,A,B)))
     Z = functor((Z,t)->z!(Z,t), buffer(NX))
     return Z
 end
+
 
 function update_dynamics!(dz, z, (Ko,vo,A,B), t)
     v = -Ko(t)*z+vo(t)
