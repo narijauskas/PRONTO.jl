@@ -147,22 +147,21 @@ function pronto(α,μ,model)
     z = Interpolant(t->zeros(NX), ts)
     v = Interpolant(t->zeros(NU), ts)
 
-    Ar = functor((Ar,t) -> fx!(Ar,α(t),μ(t)), buffer(NX,NX))
-    Br = functor((Br,t) -> fu!(Br,α(t),μ(t)), buffer(NX,NU))
-
-    A = functor((A,t) -> fx!(A,x(t),u(t)), buffer(NX,NX))
-    B = functor((B,t) -> fu!(B,x(t),u(t)), buffer(NX,NU))
-    a = functor((a,t) -> lx!(a,x(t),u(t)), buffer(NX))
-    b = functor((b,t) -> lu!(b,x(t),u(t)), buffer(NU))
-    Q = functor((Q,t) -> lxx!(Q,x(t),u(t)), buffer(NX,NX))
-    R = functor((R,t) -> luu!(R,x(t),u(t)), buffer(NU,NU))
-    S = functor((S,t) -> lxu!(S,x(t),u(t)), buffer(NX,NU))
+    Ar = functor(@closure((Ar,t) -> fx!(Ar,α(t),μ(t))), buffer(NX,NX))
+    Br = functor(@closure((Br,t) -> fu!(Br,α(t),μ(t))), buffer(NX,NU))
+    A = functor(@closure((A,t) -> fx!(A,x(t),u(t))), buffer(NX,NX))
+    B = functor(@closure((B,t) -> fu!(B,x(t),u(t))), buffer(NX,NU))
+    a = functor(@closure((a,t) -> lx!(a,x(t),u(t))), buffer(NX))
+    b = functor(@closure((b,t) -> lu!(b,x(t),u(t))), buffer(NU))
+    Q = functor(@closure((Q,t) -> lxx!(Q,x(t),u(t))), buffer(NX,NX))
+    R = functor(@closure((R,t) -> luu!(R,x(t),u(t))), buffer(NU,NU))
+    S = functor(@closure((S,t) -> lxu!(S,x(t),u(t))), buffer(NX,NU))
 
     # PT = buffer(NX,NX); pxx!(PT, α(T)) # P(T) around unregulated trajectory
-    PT = functor((PT) -> pxx!(PT, α(T)), buffer(NX,NX))
+    PT = functor(@closure((PT) -> pxx!(PT, α(T))), buffer(NX,NX))
 
     # rT = buffer(NX); px!(rT, α(T)) # around unregulated trajectory
-    rT = functor((rT) -> px!(rT, α(T)), buffer(NX))
+    rT = functor(@closure((rT) -> px!(rT, α(T))), buffer(NX))
 
 
     for i in 1:model.maxiters
