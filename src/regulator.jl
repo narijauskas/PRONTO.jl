@@ -1,7 +1,14 @@
 
 # --------------------------------- regulator --------------------------------- #
 
-function regulator(Ar,Br,iRr,Rr,Qr,NX,NU,T)
+#TODO: regulator(model,t,α,μ)
+function regulator(α,μ,model)
+    fx! = model.fx!; fu! = model.fu!;
+    Qr = model.Qr; Rr = model.Rr; iRr = model.iRr;
+    NX = model.NX; NU = model.NU; T = model.T;
+
+    Ar = functor(@closure((Ar,t) -> fx!(Ar,α(t),μ(t))), buffer(NX,NX))
+    Br = functor(@closure((Br,t) -> fu!(Br,α(t),μ(t))), buffer(NX,NU))
     
     Kr = buffer(NU,NX)
 

@@ -10,6 +10,7 @@ using DifferentialEquations: init # silences linter
 # using ControlSystems # provides lqr
 using MatrixEquations # provides arec
 using FastClosures
+using Statistics: median
 
 # ---------------------------- for runtime feedback ---------------------------- #
 using Crayons
@@ -92,63 +93,32 @@ function pronto(μ, model)
     pronto(α,μ,model)
 end
 
-# before 0.55
 
-# function pronto(α,μ,model)
-#     pronto(α,μ,model.f,model.l,model.p,model.fx!,model.fu!,model.lx!,model.lu!,model.lxx!,model.luu!,model.lxu!,model.px!,model.pxx!,model)
-# end
+#TODO: split model into model/params/t
+# pronto(model,t,α,μ; params)
 
-#TODO: @functor
-# function pronto(α,μ,model)
-#     NX = model.NX; NU = model.NU; ts = model.ts; T = last(ts); 
-#     Qr = model.Qr; Rr = model.Rr; iRr = model.iRr;
-#     fx! = model.fx!; fu! = model.fu!;
-#     lx! = model.lx!; lu! = model.lu!;
-#     lxx! = model.lxx!; luu! = model.luu!; lxu! = model.lxu!;
-#     px! = model.px!; pxx! = model.pxx!;
+#params:
+    # tol
+    # maxiters
 
-#     x = Interpolant(t->zeros(NX), ts)
-#     u = Interpolant(t->zeros(NU), ts)
 
-#     z = Interpolant(t->zeros(NX), ts)
-#     v = Interpolant(t->zeros(NU), ts)
-
-#     Ar = functor((Ar,t) -> fx!(Ar,α(t),μ(t)), buffer(NX,NX))
-#     Br = functor((Br,t) -> fu!(Br,α(t),μ(t)), buffer(NX,NU))
-
-#     A = functor((A,t) -> fx!(A,x(t),u(t)), buffer(NX,NX))
-#     B = functor((B,t) -> fu!(B,x(t),u(t)), buffer(NX,NU))
-#     a = functor((a,t) -> lx!(a,x(t),u(t)), buffer(NX))
-#     b = functor((b,t) -> lu!(b,x(t),u(t)), buffer(NU))
-#     Q = functor((Q,t) -> lxx!(Q,x(t),u(t)), buffer(NX,NX))
-#     R = functor((R,t) -> luu!(R,x(t),u(t)), buffer(NU,NU))
-#     S = functor((S,t) -> lxu!(S,x(t),u(t)), buffer(NX,NU))
-
-#     # PT = buffer(NX,NX); pxx!(PT, α(T)) # P(T) around unregulated trajectory
-#     PT = functor((PT) -> pxx!(PT, α(T)), buffer(NX,NX))
-
-#     # rT = buffer(NX); px!(rT, α(T)) # around unregulated trajectory
-#     rT = functor((rT) -> px!(rT, α(T)), buffer(NX))
-
-#     pronto(α,μ,x,u,z,v,Ar,Br,iRr,Rr,Qr,A,B,a,b,Q,R,S,PT,rT,NX,NU,T,model.f,model.l,model.p,model.x0,model.maxiters,model.tol)
-# end
-
-# function pronto(α,μ,f,l,p,fx!,fu!,lx!,lu!,lxx!,luu!,lxu!,px!,pxx!,model)
-# function pronto(α,μ,x,u,z,v,Ar,Br,iRr,Rr,Qr,A,B,a,b,Q,R,S,PT,rT,NX,NU,T,f,l,p,x0,maxiters,tol)
 function pronto(α,μ,model)
 
     info("initializing")
     @unpack model
     T = last(ts)
     
+    # memory boffers
     x = Interpolant(t->zeros(NX), ts)
     u = Interpolant(t->zeros(NU), ts)
 
     z = Interpolant(t->zeros(NX), ts)
     v = Interpolant(t->zeros(NU), ts)
 
-    Ar = functor(@closure((Ar,t) -> fx!(Ar,α(t),μ(t))), buffer(NX,NX))
-    Br = functor(@closure((Br,t) -> fu!(Br,α(t),μ(t))), buffer(NX,NU))
+    # to track runtimes
+    stats = Dict( (s=>Float64[] for s in _subroutines())...)
+
+    
     A = functor(@closure((A,t) -> fx!(A,x(t),u(t))), buffer(NX,NX))
     B = functor(@closure((B,t) -> fu!(B,x(t),u(t))), buffer(NX,NU))
     a = functor(@closure((a,t) -> lx!(a,x(t),u(t))), buffer(NX))
@@ -168,8 +138,9 @@ function pronto(α,μ,model)
         
         # η -> Kr # regulator
         tx = @elapsed begin
-            Kr = regulator(Ar,Br,iRr,Rr,Qr,NX,NU,T)
+            Kr = regulator(α,μ,model)
         end
+        push!(stats[:regulator], tx)
         tinfo(i, "regulator solved", tx)
 
 
@@ -180,16 +151,19 @@ function pronto(α,μ,model)
             _u = projection_u(NX,NU,α,μ,Kr,x)
             update!(u, _u)
         end
+        push!(stats[:projection], tx)
         tinfo(i, "projection solved", tx)
         
         tx = @elapsed begin
             Ko = optimizer(A,B,Q,R,S,PT(),NX,NU,T)
         end
+        push!(stats[:optimizer], tx)
         tinfo(i, "optimizer found", tx)
         
         tx = @elapsed begin
             vo = costate_dynamics(Ko,A,B,a,b,R,rT(),NX,NU,T)
         end
+        push!(stats[:costate], tx)
         tinfo(i, "costate dynamics solved", tx)
         
         tx = @elapsed begin
@@ -198,16 +172,18 @@ function pronto(α,μ,model)
             _v = search_v(NU,z,Ko,vo)
             update!(v, _v)
         end
+        push!(stats[:search_dir], tx)
         tinfo(i, "search direction found", tx)
 
         # check Dh criteria -> return η
         tx = @elapsed begin
             (Dh,D2g) = cost_derivatives(z,v,a,b,Q,S,R,rT(),PT(),T)
         end
+        push!(stats[:cost_derivs], tx)
         tinfo(i, "cost derivatives solved", tx)
         info(i, "Dh is $Dh")
-        Dh > 0 && (@warn "increased cost - quitting"; return (α,μ))
-        -Dh < model.tol && (info(as_bold("PRONTO converged")); return (α,μ))
+        Dh > 0 && (@warn "increased cost - quitting"; return ((α,μ),stats))
+        -Dh < model.tol && (info(as_bold("PRONTO converged")); return ((α,μ),stats))
         
         
         # ξ,ζ,Kr -> γ -> ξ̂ # armijo
@@ -217,6 +193,7 @@ function pronto(α,μ,model)
             update!(μ, û)
             # η = (α,μ)
         end
+        push!(stats[:trajectory], tx)
         tinfo(i, "trajectory update found", tx)
         
     end
@@ -224,8 +201,36 @@ function pronto(α,μ,model)
     return nothing
 end
 
+#TODO: PRONTO stats function
+# print max/median/min of each section
+# push!(stats[trajectory], tx)
 
+function _subroutines()
+    return [
+        :regulator,
+        :projection,
+        :optimizer,
+        :costate,
+        :search_dir,
+        :cost_derivs,
+        :trajectory,
+    ]
+end
 
+function overview(stats)
+    println("\t\tminimum  ...  median  ...  maximum  ...  compile")
+    for name in _subroutines()
+        print("$name:\t")
+        tx = stats[name]
+        print(_ms(minimum(tx)), "  ...  ")
+        print(_ms(median(tx)), "  ...  ")
+        print(_ms(maximum(tx)), "  ...  ")
+        print(_ms(tx[1]))
+        println()
+    end
+end
+
+_ms(tx) = "$(round(tx*1000; digits=2)) ms"
 
 # ----------------------------------- armijo ----------------------------------- #
 

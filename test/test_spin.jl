@@ -6,11 +6,13 @@ using StaticArrays
 
 NX = 4
 NU = 1
-ts = 0:0.001:10
+T = 10
+ts = 0:0.001:T
 model = (
     ts = ts,
     NX = NX,
     NU = NU,
+    T = T,
     x0 = [0.0;1.0;0.0;0.0],
     tol = 1e-5,
     # x_eq = zeros(NX),
