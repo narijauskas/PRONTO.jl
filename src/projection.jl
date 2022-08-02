@@ -20,8 +20,7 @@ function projection_x(x0,α,μ,Kr,model)
     f = model.f
     x! = solve(ODEProblem(stabilized_dynamics!, x0, (0.0,T), (α,μ,Kr,f)))
     _x = Buffer{Tuple{NX}}()
-    # x(t) = (x!(_x,t); return _x)
-    x = @closure (t)->(x!(_x,t); return _x)
+    x(t) = (x!(_x,t); return _x)
     return x
 end
 
