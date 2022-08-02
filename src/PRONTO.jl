@@ -8,6 +8,7 @@ using Symbolics: derivative
 using DifferentialEquations
 using DifferentialEquations: init # silences linter
 # using ControlSystems # provides lqr
+using StaticArrays
 using MatrixEquations # provides arec
 using FastClosures
 using Statistics: median
@@ -253,7 +254,6 @@ _ms(tx) = "$(round(tx*1000; digits=2)) ms"
 
 
 # --------------------------------- other/experimental --------------------------------- #
-using LinearAlgebra: inv!
 
 function optimizer_costate(x,u,PT,rT,model)
     NX = model.NX; NU = model.NU; T = model.T;
