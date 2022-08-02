@@ -1,5 +1,17 @@
 # Dev Notes and Version History
 
+
+## v0.2.0
+    - code refactor
+    - custom linear interpolant
+    - buffered closures (capture autodiff)
+    
+### TODO
+    - type stable buffer
+    - argument cleanup
+    - (maybe) model type
+    - (future) ODESolution type simplification
+
 ## v0.1.0
     - package setup
     - working autodiff

@@ -1,11 +1,12 @@
 # --------------------------------- projection --------------------------------- #
 
 function projection_x(x0,α,μ,Kr,model)
-    # x0 = model.x0 #TODO: remove from model
     NX = model.NX; NU = model.NU; T = model.T;
     f = model.f
     x! = solve(ODEProblem(stabilized_dynamics!, x0, (0.0,T), (α,μ,Kr,f)))
-    X = functor((X,t)->x!(X,t), buffer(NX))
+    _x = buffer(NX)
+    X = @closure (t)->(x!(_x,t); return _x)
+    # X = functor((X,t)->x!(X,t), buffer(NX))
     return X
 end
 

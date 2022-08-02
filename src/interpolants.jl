@@ -6,33 +6,42 @@
 using StaticArrays
 
 
-struct Interpolant{S,A,T}
-    x::Vector{MVector{S,A}}
-    t::T
-    buf::MVector{S,A}
+struct Interpolant{S,T}
+    x::Vector{MVector{S,T}}
+    t::StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}, Int64}
+    buf::MVector{S,T}
 end
+
+# struct Interpolant{S,T}
+#     x::Vector{MVector{S,T}}
+#     buf::MVector{S,T}
+    # ts::StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}, Int64}
+#     t0::Float64
+#     dt::Float64
+#     tf::Float64
+# end
 
 
 # where f is a function f(t)
-function Interpolant(f::Function,ts::T; A=Float64) where {T}
+function Interpolant(f::Function,ts; T=Float64)
     S = length(f(first(ts)))
-    xs = map(t->MVector{S,A}(f(t)), ts)
-    buf = MVector{S,A}(undef)
-    Interpolant{S,A,T}(xs,ts,buf)
+    xs = map(t->MVector{S,T}(f(t)), ts)
+    buf = MVector{S,T}(undef)
+    Interpolant{S,T}(xs,ts,buf)
 end
 
 # where x is a matrix of size NX x length(ts)
 # in other words, column vectors of x
-function Interpolant(x::AbstractMatrix, ts::T,dims...; A=Float64) where {T}
+function Interpolant(x::AbstractMatrix, ts, dims...; T=Float64)
     S,l = size(x)
     @assert l = length(ts) "time dimension mismatch"
-    xs = map(col->MVector{S,A}(col), eachcol(x))
-    buf = MVector{S,A}(undef)
-    Interpolant{S,A,T}(xs,ts,buf)
+    xs = map(col->MVector{S,T}(col), eachcol(x))
+    buf = MVector{S,T}(undef)
+    Interpolant{S,T}(xs,ts,buf)
 end
 
 
-function (X::Interpolant{S,A,T})(τ)::MVector{S,A} where {S,A,T}
+function (X::Interpolant{S,T})(τ)::MVector{S,T} where {S,T}
     interpolate!(X.buf, τ, X.x, X.t)
 end
 
@@ -85,7 +94,7 @@ Base.setindex!(X::Interpolant, val, inds...) = setindex!(X.x, val, inds...)
 Base.iterate(X::Interpolant, i=1) = i > length(X) ? nothing : (X[i], i+1)
 
 # show
-Base.show(io::IO, ::Interpolant{S,<:Any,<:Any}) where {S} = print(io, "$S - element Interpolant")
+Base.show(io::IO, ::Interpolant{S,<:Any}) where {S} = print(io, "$S - element Interpolant")
 
 # times(X::Interpolant) = X.t
 # Base.eltype(::Interpolant{T}) where {T} = T

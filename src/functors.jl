@@ -5,7 +5,20 @@
 # fx!(A, x(t), u(t))
 
 # should be zero-allocating & type stable
-buffer(dims...) = MArray{Tuple{dims...},Float64}(undef)
+# buffer(dims...) = MArray{Tuple{dims...},Float64}(undef)
+
+buffer(S) = MVector{S,Float64}(undef)
+buffer(S1,S2) = MMatrix{S1,S2,Float64}(undef)
+
+Buffer{S} = MArray{S,Float64}
+Buffer{S}() where {S} = MArray{S,Float64}(undef)
+
+# Buffer{S} = MVector{S,Float64}
+# Buffer{S}() where {S} = MVector{S,Float64}(undef)
+
+# Buffer{S1,S2} = MMatrix{S1,S2,Float64}
+# Buffer{S1,S2}() where {S1,S2} = MMatrix{S1,S2,Float64}(undef)
+
 
 macro buffer(S)
     S = Tuple{NX}
@@ -14,7 +27,7 @@ end
 
 functor(f!,X) = (F(args...) = (f!(X, args...); return X); return F)
 
-export buffer, @buffer, functor
+export buffer, @buffer, functor, Buffer
 # function functor(f!,dims...)
 #     X = MArray{Tuple{dims...},Float64}(undef)
 #     function F(args...)

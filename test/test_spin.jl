@@ -3,6 +3,7 @@ using BenchmarkTools, JET
 using PRONTO
 using LinearAlgebra
 using StaticArrays
+using FastClosures
 
 NX = 4
 NU = 1
@@ -31,7 +32,7 @@ H1 = [0 -1 0 0;1 0 0 0;0 0 0 -1;0 0 1 0]
 
 
 # model dynamics
-f = (x,u)->collect((H0 + u[1]*H1)*x)
+f = @closure (x,u) -> collect((H0 + u[1]*H1)*x)
 
 
 # stage cost
@@ -40,10 +41,11 @@ Rl = 0.01
 Pl = [0 0 0 0;0 1 0 0;0 0 0 0;0 0 0 1] #terminal cost matrix Pl
 
 l = (x,u) -> 1/2*collect(x)'*Ql*collect(x) + 1/2*collect(u)'*Rl*collect(u)
-p = (x)-> 1/2*collect(x)'*Pl*collect(x)
+p = (x) -> 1/2*collect(x)'*Pl*collect(x)
 
 @info "running autodiff"
 model = autodiff(model,f,l,p)
+# model = PRONTO.Model(NX,NU,f,l,p) # returns a Model{NX,NU}
 @info "autodiff complete"
 
 

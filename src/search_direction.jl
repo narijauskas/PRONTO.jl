@@ -13,6 +13,11 @@ function search_z(x,u,Ko,vo,model)
     return Z
 end
 
+# _iR .= inv(R(t))
+# mul!(_Ko, _iR, (S(t)'+B(t)'*P(t)))
+# _iR .*= -1
+# mul!(_vo, _iR, (B(t)'*r(t)+b(t)))
+# v(z) = -Ko(t)*z+vo(t)
 
 function update_dynamics!(dz, z, (Ko,vo,A,B), t)
     # (Ko,vo) = Kovo(t)
