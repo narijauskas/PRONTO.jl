@@ -1,5 +1,5 @@
 
-# --------------------------------- regulator --------------------------------- #
+# --------------------------------- regulator  η -> Kr --------------------------------- #
 
 #TODO: regulator(model,t,α,μ)
 # function regulator(::Val{NX},::Val{NU},α,μ,model) where {NX,NU}
