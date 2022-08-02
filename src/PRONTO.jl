@@ -106,12 +106,9 @@ function pronto(α,μ,model)
 
     info("initializing")
     @unpack model
-    # T = model.T
     
-    # memory boffers
     x = Interpolant(t->zeros(NX), ts)
     u = Interpolant(t->zeros(NU), ts)
-
     z = Interpolant(t->zeros(NX), ts)
     v = Interpolant(t->zeros(NU), ts)
 
