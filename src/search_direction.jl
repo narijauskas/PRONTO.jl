@@ -5,22 +5,15 @@ function search_z(x,u,Ko,vo,model)
     A = @closure (t)->(fx!(_A, x(t), u(t)); return _A)
     fu! = model.fu!; _B = Buffer{Tuple{NX,NU}}()
     B = @closure (t)->(fu!(_B, x(t), u(t)); return _B)
-    # B(t) = (fu!(_B, x(t), u(t)); return _B)
 
     z0 = zeros(NX)
     z! = solve(ODEProblem(update_dynamics!, z0, (0.0,T), (Ko,vo,A,B)))
-    Z = functor((Z,t)->z!(Z,t), Buffer{Tuple{NX}}())
-    return Z
+    z = functor((_z,t)->z!(_z,t), Buffer{Tuple{NX}}())
+    return z
 end
 
-# _iR .= inv(R(t))
-# mul!(_Ko, _iR, (S(t)'+B(t)'*P(t)))
-# _iR .*= -1
-# mul!(_vo, _iR, (B(t)'*r(t)+b(t)))
-# v(z) = -Ko(t)*z+vo(t)
 
 function update_dynamics!(dz, z, (Ko,vo,A,B), t)
-    # (Ko,vo) = Kovo(t)
     v = -Ko(t)*z+vo(t)
     dz .= A(t)*z + B(t)*v
 end
@@ -28,14 +21,13 @@ end
 
 function search_v(z,Ko,vo,model)
     NU = model.NU;
-    V = buffer(NU)
+    _v = buffer(NU)
     # v = -Ko(t)*z+vo(t)
-    function _v(t)
-        # (Ko,vo) = Kovo(t)
-        mul!(V, Ko(t), z(t))
-        V .*= -1
-        V .+= vo(t)
-        return V
+    function v(t)
+        mul!(_v, Ko(t), z(t))
+        _v .*= -1
+        _v .+= vo(t)
+        return _v
     end
-    return _v
+    return v
 end

@@ -13,13 +13,13 @@ function costate_dynamics(x,u,Ko,rT,model)
     R = @closure (t)->(luu!(_R,x(t),u(t)); return _R)
 
     r! = solve(ODEProblem(costate_dynamics!, rT, (T,0.0), (A,B,a,b,Ko)))
-    r = functor((r,t)->r!(r,t), Buffer{Tuple{NX}}())
+    r = functor((_r,t)->r!(_r,t), Buffer{Tuple{NX}}())
 
-    vo = Buffer{Tuple{NU}}()
-    function _vo(t)
-        copy!(vo, -R(t)\(B(t)'*r(t)+b(t)))
+    _vo = Buffer{Tuple{NU}}()
+    function vo(t)
+        copy!(_vo, -R(t)\(B(t)'*r(t)+b(t)))
     end
-    return _vo
+    return vo
 end
 
 function costate_dynamics!(dx, x, (A,B,a,b,K), t)

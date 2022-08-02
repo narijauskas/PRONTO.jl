@@ -14,14 +14,14 @@ function optimizer(x,u,PT,model)
     S = @closure (t)->(lxu!(_S,x(t),u(t)); return _S)
 
     P! = solve(ODEProblem(optimizer!, PT, (T,0.0), (A,B,Q,R,S)))
-    P = functor((P,t)->P!(P,t), Buffer{Tuple{NX,NX}}())
+    P = functor((_P,t)->P!(_P,t), Buffer{Tuple{NX,NX}}())
     # Ko = R\(S'+B'*P) # maybe inv!()
-    Ko = Buffer{Tuple{NU,NX}}()
-    function _Ko(t)
-        copy!(Ko, R(t)\(S(t)'+B(t)'*P(t)))
-        return Ko
+    _Ko = Buffer{Tuple{NU,NX}}()
+    function Ko(t)
+        copy!(_Ko, R(t)\(S(t)'+B(t)'*P(t)))
+        return _Ko
     end
-    return _Ko
+    return Ko
 end
 
 function optimizer!(dP, P, (A,B,Q,R,S), t)
