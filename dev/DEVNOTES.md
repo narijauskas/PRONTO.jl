@@ -1,4 +1,3 @@
-
 ## Problem
 
 The ODE solution type from SciMLBase is very complex in terms of parametric type signature:
