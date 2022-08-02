@@ -18,8 +18,8 @@ model = (
     u0 = zeros(NU),
     xf = [1.0;0.0;0.0;0.0], #For this example, we don't have any equilibrium points... xf is the target state here
     uf = zeros(NU),
-    tol = 1e-5, #TODO: remove
-    maxiters = 10, #TODO: remove
+    tol = 1e-9, #TODO: remove
+    maxiters = 20, #TODO: remove
 )
 
 # params = (
@@ -78,16 +78,26 @@ model = merge(model, (
 
 ##
 
-#= plot result
-    using GLMakie
-    fig = Figure()
-    ax = Axis(fig[1,1])
-    for i in 1:NX
-        lines!(ax, ts, map(t->η[1](t)[i], ts))
-    end
-    ax = Axis(fig[2,1])
-    for i in 1:NU
-        lines!(ax, ts, map(t->η[2](t)[i], ts))
-    end
-    display(fig)
-=#
+#  plot result
+##
+using GLMakie
+fig = Figure()
+ax = Axis(fig[1,1])
+for i in 1:NX
+    lines!(ax, ts, map(t->η[1](t)[i], ts))
+end
+ax = Axis(fig[2,1])
+for i in 1:NU
+    lines!(ax, ts, map(t->η[2](t)[i], ts))
+end
+display(fig)
+
+# ax = Axis(fig[3,1])
+# for i in 1:NX
+#     lines!(ax, ts, map(t->x(t)[i], ts))
+# end
+# ax = Axis(fig[4,1])
+# for i in 1:NU
+#     lines!(ax, ts, map(t->u(t)[i], ts))
+# end
+display(fig)

@@ -8,10 +8,14 @@ function regulator(α,μ,model)
     T = model.T;
     Qr = model.Qr; Rr = model.Rr; iRr = model.iRr;
 
-    fx! = model.fx!; _Ar = Buffer{Tuple{NX,NX}}()
-    Ar = @closure (t)->(fx!(_Ar,α(t),μ(t)); return _Ar)
+    fx! = model.fx!
+    _Ar = Buffer{Tuple{NX,NX}}()
+    Ar(t) = (fx!(_Ar,α(t),μ(t)); return _Ar)
+    Ar(x,u) = (fx!(_Ar,x,u); return _Ar)
+    Ar(x,u,t) = (fx!(_Ar,x(t),u(t),t); return _Ar)
+
     fu! = model.fu!; _Br = Buffer{Tuple{NX,NU}}()
-    Br = @closure (t)->(fu!(_Br,α(t),μ(t)); return _Br)
+    Br(t) = (fu!(_Br,α(t),μ(t)); return _Br)
     
     _Kr = Buffer{Tuple{NU,NX}}()
     
@@ -31,6 +35,10 @@ function regulator(α,μ,model)
 end
 
 function riccati!(dP, P, (Ar,Br,Rr,Qr,Kr), t)
-    mul!(Kr, Rr(t)\Br(t)', P)
-    dP .= -Ar(t)'P - P*Ar(t) + Kr'*Rr(t)*Kr - Qr(t)
+    # mul!(Kr, Rr(t)\Br(t)', P)
+    Kr = Rr(t)\Br(t)'*P
+    dP .= -Ar(t)'*P - P*Ar(t) + Kr'*Rr(t)*Kr - Qr(t)
+    #NOTE: dP is symmetric, as should be P
 end
+
+# NOTE: is it possible to store Kr directly?
