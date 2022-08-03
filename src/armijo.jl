@@ -16,21 +16,19 @@ function armijo_backstep(x,u,z,v,Kr,Dh,i,model; aα=0.4, aβ=0.7)
         # generate estimate
 
         # α̂ = x + γz
-        _α̂ = Buffer{Tuple{NX}}()
-        function α̂(t)
-            mul!(_α̂, γ, z(t))
-            _α̂ .+= x(t)
+        α̂ = functor(buffer(NX)) do X,t
+            mul!(X, γ, z(t))
+            X .+= x(t)
         end
 
         # μ̂ = u + γv
-        _μ̂ = Buffer{Tuple{NU}}()
-        function μ̂(t)
-            mul!(_μ̂, γ, v(t))
-            _μ̂ .+= u(t)
+        μ̂ = functor(buffer(NU)) do U,t
+            mul!(U, γ, v(t))
+            U .+= u(t)
         end
-
         x̂ = projection_x(x0,α̂,μ̂,Kr,model)
         û = projection_u(x̂,α̂,μ̂,Kr,model)
+
 
         J = cost(x̂,û,l,T)
         g = J(T)[1] + p(x̂(T))

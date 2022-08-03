@@ -1,14 +1,10 @@
 # --------------------------------- search direction forward integration --------------------------------- #
 function search_z(x,u,Ko,vo,model)
     NX = model.NX; NU = model.NU; T = model.T;
-    
-    fx! = model.fx!;
-    _A = Buffer{Tuple{NX,NX}}()
-    A(t) = (fx!(_A, x(t), u(t)); return _A)
-    
-    fu! = model.fu!;
-    _B = Buffer{Tuple{NX,NU}}()
-    B(t) = (fu!(_B, x(t), u(t)); return _B)
+    fx! = model.fx!; _A = Buffer{Tuple{NX,NX}}()
+    A = @closure (t)->(fx!(_A, x(t), u(t)); return _A)
+    fu! = model.fu!; _B = Buffer{Tuple{NX,NU}}()
+    B = @closure (t)->(fu!(_B, x(t), u(t)); return _B)
 
     z0 = zeros(NX)
     z! = solve(ODEProblem(update_dynamics!, z0, (0.0,T), (Ko,vo,A,B)))

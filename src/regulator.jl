@@ -27,21 +27,18 @@ function regulator(α,μ,model)
     Pr = @closure (t)->(Pr!(_Pr, t); return _Pr)
     
     return Pr!
-
-    _Kr = Buffer{Tuple{NU,NX}}()
-    _iRrBr = Buffer{Tuple{NU,NX}}()
-    #MAYBE: Kr(α,μ)
-
+    
+    iRrBr = Buffer{Tuple{NU,NX}}()
     function Kr(t)
-        mul!(_iRrBr, iRr(t), Br(t)')
-        mul!(_Kr, _iRrBr, Pr(t))
+        mul!(iRrBr, iRr(t), Br(t)')
+        mul!(_Kr, iRrBr, Pr(t))
         return _Kr
     end
     # Kr(t) = Kr(α(t), μ(t),t)
     return Kr
 end
 
-function riccati!(dP, P, (Ar,Br,Rr,Qr), t)
+function riccati!(dP, P, (Ar,Br,Rr,Qr,Kr), t)
     # mul!(Kr, Rr(t)\Br(t)', P)
     Kr = Rr(t)\Br(t)'*P
     dP .= -Ar(t)'*P - P*Ar(t) + Kr'*Rr(t)*Kr - Qr(t)
