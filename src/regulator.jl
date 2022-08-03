@@ -3,6 +3,12 @@
 
 #TODO: regulator(model,t,α,μ)
 # function regulator(::Val{NX},::Val{NU},α,μ,model) where {NX,NU}
+# (::M)(α,μ) = (M.f!(...);...)
+# (::M)(t) = M(M.α(t), M.μ(t))
+
+
+
+
 function regulator(α,μ,model)
     NX = model.NX; NU = model.NU; 
     T = model.T;
@@ -18,16 +24,20 @@ function regulator(α,μ,model)
     PT = collect(I(NX))
     Pr! = solve(ODEProblem(riccati!, PT, (T,0.0), (Ar,Br,Rr,Qr)))
     _Pr = Buffer{Tuple{NX,NX}}()
-    Pr(t) = (Pr!(_Pr, t); return _Pr)
+    Pr = @closure (t)->(Pr!(_Pr, t); return _Pr)
     
+    return Pr!
+
     _Kr = Buffer{Tuple{NU,NX}}()
     _iRrBr = Buffer{Tuple{NU,NX}}()
     #MAYBE: Kr(α,μ)
+
     function Kr(t)
         mul!(_iRrBr, iRr(t), Br(t)')
         mul!(_Kr, _iRrBr, Pr(t))
         return _Kr
     end
+    # Kr(t) = Kr(α(t), μ(t),t)
     return Kr
 end
 
