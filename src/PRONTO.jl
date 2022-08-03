@@ -132,10 +132,10 @@ function pronto(α,μ,model)
         tinfo(i, :regulator, tx)
 
         tx = @elapsed begin
-            _x = projection_x(x0,α,μ,Kr,model)
-            update!(x, _x)
-            _u = projection_u(x,α,μ,Kr,model)
-            update!(u, _u)
+            x! = projection_x(x0,α,μ,Kr,model)
+            update!(x, x!)
+            u! = projection_u(x,α,μ,Kr,model)
+            update!(u, u!)
         end
         push!(stats[:projection], tx)
         tinfo(i, :projection, tx)
@@ -155,7 +155,7 @@ function pronto(α,μ,model)
         tx = @elapsed begin
             _z = search_z(x,u,Ko,vo,model)
             update!(z, _z)
-            _v = search_v(z,Ko,vo,model)
+            _v = search_v(x,u,z,Ko,vo,model)
             update!(v, _v)
         end
         push!(stats[:search_dir], tx)
