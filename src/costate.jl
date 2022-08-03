@@ -12,8 +12,9 @@ function costate_dynamics(x,u,Ko,rT,model)
     luu! = model.luu!; _R = Buffer{Tuple{NU,NU}}()
     R = @closure (t)->(luu!(_R,x(t),u(t)); return _R)
 
-    r! = solve(ODEProblem(costate_dynamics!, rT, (T,0.0), (A,B,a,b,Ko)))
-    r = functor((_r,t)->r!(_r,t), Buffer{Tuple{NX}}())
+    r! = solve(ODEProblem(costate_dynamics!, collect(rT), (T,0.0), (A,B,a,b,Ko)))
+    _r = Buffer{Tuple{NX}}()
+    r = @closure (t)->(r!(_r,t); return _r)
 
     _vo = Buffer{Tuple{NU}}()
     function vo(t)

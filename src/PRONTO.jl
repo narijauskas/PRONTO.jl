@@ -155,7 +155,7 @@ function pronto(α,μ,model)
         tx = @elapsed begin
             _z = search_z(x,u,Ko,vo,model)
             update!(z, _z)
-            _v = search_v(x,u,z,Ko,vo,model)
+            _v = search_v(z,Ko,vo,model)
             update!(v, _v)
         end
         push!(stats[:search_dir], tx)
@@ -215,7 +215,9 @@ function overview(stats)
         println()
         t_all += sum(tx)
     end
-    println("total: $(round(t_all; digits=2)) seconds")
+    print(as_bold("total: "), "$(round(t_all; digits=2)) seconds")
+    i = length(stats[_subroutines()[1]])
+    println("  (", i, " iterations)")
 end
 
 _ms(tx) = "$(round(tx*1000; digits=2)) ms"

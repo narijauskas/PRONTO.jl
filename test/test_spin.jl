@@ -19,7 +19,7 @@ model = (
     xf = [1.0;0.0;0.0;0.0], #For this example, we don't have any equilibrium points... xf is the target state here
     uf = zeros(NU),
     tol = 1e-5, #TODO: remove
-    maxiters = 10, #TODO: remove
+    maxiters = 15, #TODO: remove
 )
 
 # params = (
@@ -64,7 +64,6 @@ model = merge(model, (
 ))
 
 ##
-
 # tx = @elapsed begin 
 (η,stats) = pronto(model); PRONTO.overview(stats)
 # end

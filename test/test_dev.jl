@@ -86,15 +86,39 @@ A = @closure (x,u)->(fx!(_A,x,u); return _A)
 # macro buffer(S...)
 #     return :(Buffer{Tuple{$(S...)}}())
 # end
+update! = PRONTO.update!
+# P(T) around unregulated trajectory
+pxx! = model.pxx!; _PT = buffer(NX,NX)
+PT = @closure (α)->(pxx!(_PT, α(T)); return _PT)
+
+# around unregulated trajectory
+px! = model.px!; _rT = buffer(NX)
+rT = @closure (α)->(px!(_rT, α(T)); return _rT)
 
 
 ## --------------------------------- pronto components --------------------------------- ##
-Kr = PRONTO.regulator(α,μ,model)
-x! = projection_x(x0,α,μ,Kr,model)
+t = rand()
+r = PRONTO.regulator(α,μ,model)
+@benchmark Kr(t) # 316 ns ... 827 ns
+@allocated Kr(t) # 2304
+@report_opt Kr(t) # no errors
+
+x! = PRONTO.projection_x(x0,α,μ,Kr,model)
+@benchmark x!(t) # 212 ns ... 726 ns
+@allocated x!(t) # 2304
+@report_opt x!(t) # no errors
 update!(x, x!)
-u! = projection_u(x,α,μ,Kr,model)
+
+u! = PRONTO.projection_u(x,α,μ,Kr,model)
+@benchmark u!(t) # 438 ns ... 957 ns
+@allocated u!(t) # 2304
+@report_opt u!(t) # no errors
 update!(u, u!)
-Ko = optimizer(x,u,PT(α),model) 
+
+Ko = PRONTO.optimizer(x,u,PT(α),model)
+@benchmark Ko(t) # 468 ns ... 1 μs
+@allocated Ko(t) # 2352
+@report_opt Ko(t) # no errors
 
 ## ---------------------------------  --------------------------------- ##
 

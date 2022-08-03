@@ -21,13 +21,10 @@ function regulator(α,μ,model)
     
     _Kr = Buffer{Tuple{NU,NX}}()
     
-    PT = collect(I(NX))
-    Pr! = solve(ODEProblem(riccati!, PT, (T,0.0), (Ar,Br,Rr,Qr)))
+    Pr! = solve(ODEProblem(riccati!, collect(1.0*I(NX)), (T,0.0), (Ar,Br,Rr,Qr)))
     _Pr = Buffer{Tuple{NX,NX}}()
     Pr = @closure (t)->(Pr!(_Pr, t); return _Pr)
-    
-    return Pr!
-    
+        
     iRrBr = Buffer{Tuple{NU,NX}}()
     function Kr(t)
         mul!(iRrBr, iRr(t), Br(t)')
@@ -38,7 +35,7 @@ function regulator(α,μ,model)
     return Kr
 end
 
-function riccati!(dP, P, (Ar,Br,Rr,Qr,Kr), t)
+function riccati!(dP, P, (Ar,Br,Rr,Qr), t)
     # mul!(Kr, Rr(t)\Br(t)', P)
     Kr = Rr(t)\Br(t)'*P
     dP .= -Ar(t)'*P - P*Ar(t) + Kr'*Rr(t)*Kr - Qr(t)

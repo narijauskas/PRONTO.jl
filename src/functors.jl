@@ -10,12 +10,12 @@ macro buffer(S...)
     return :(Buffer{Tuple{$(S...)}}())
 end
 
-function functor(f!,x,u,dims...)
-    A = buffer(dims...)
-    return @closure (t)->(f!(A,x(t),u(t)); return A)
-end
+# function functor(f!,x,u,dims...)
+#     A = buffer(dims...)
+#     return @closure (t)->(f!(A,x(t),u(t)); return A)
+# end
 
-# functor(f!,X) = (F(args...) = (f!(X, args...); return X); return F)
+functor(f!,X) = (F(args...) = (f!(X, args...); return X); return F)
 # expanded, essentially:
 # function functor(f!,X::Buffer)
 #     function F(args...)
