@@ -8,17 +8,12 @@ function regulator(α,μ,model)
     T = model.T;
     Qr = model.Qr; Rr = model.Rr; iRr = model.iRr;
 
-    fx! = model.fx!
-    _Ar = Buffer{Tuple{NX,NX}}()
-    Ar(α,μ) = (fx!(_Ar,α,μ); return _Ar)
-    Ar(t) = Ar(α(t),μ(t))
-    # Ar(t) = (fx!(_Ar,α(t),μ(t)); return _Ar)
-    # Ar(α,μ,t) = (fx!(_Ar,α(t),μ(t),t); return _Ar)
-
-    fu! = model.fu!
-    _Br = Buffer{Tuple{NX,NU}}()
-    Br(α,μ) = (fu!(_Br,α,μ); return _Br)
-    Br(t) = Br(α(t),μ(t))
+    fx! = model.fx!; _Ar = Buffer{Tuple{NX,NX}}()
+    Ar = @closure (t)->(fx!(_Ar,α(t),μ(t)); return _Ar)
+    fu! = model.fu!; _Br = Buffer{Tuple{NX,NU}}()
+    Br = @closure (t)->(fu!(_Br,α(t),μ(t)); return _Br)
+    
+    _Kr = Buffer{Tuple{NU,NX}}()
     
     PT = collect(I(NX))
     Pr! = solve(ODEProblem(riccati!, PT, (T,0.0), (Ar,Br,Rr,Qr)))
@@ -42,5 +37,3 @@ function riccati!(dP, P, (Ar,Br,Rr,Qr), t)
     dP .= -Ar(t)'*P - P*Ar(t) + Kr'*Rr(t)*Kr - Qr(t)
     #NOTE: dP is symmetric, as should be P
 end
-
-# NOTE: is it possible to store Kr directly?
