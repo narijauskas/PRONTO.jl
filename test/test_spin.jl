@@ -19,7 +19,7 @@ model = (
     xf = [1.0;0.0;0.0;0.0], #For this example, we don't have any equilibrium points... xf is the target state here
     uf = zeros(NU),
     tol = 1e-5, #TODO: remove
-    maxiters = 10, #TODO: remove
+    maxiters = 15, #TODO: remove
 )
 
 # params = (
@@ -52,19 +52,12 @@ model = autodiff(model,f,l,p)
 
 
 model = merge(model, (
-    Qr = let M = Diagonal(SMatrix{NX,NX}(diagm([1,1,1,1])))
-        (t)->M
-    end, # can Qr be a function of α?
-    Rr = let M = Diagonal(SMatrix{NU,NU}(diagm([1])))
-        (t)->M
-    end,
-    iRr = let M = Diagonal(SMatrix{NU,NU}(inv(diagm([1]))))
-        (t)->M
-    end
+    Qr = @closure (t)->Diagonal(SMatrix{NX,NX}(diagm([1,1,1,1]))),
+    # can Qr be a function of α?
+    Rr = @closure (t)->Diagonal(SMatrix{NU,NU}(diagm([1])))
 ))
 
 ##
-
 # tx = @elapsed begin 
 (η,stats) = pronto(model); PRONTO.overview(stats)
 # end
@@ -91,3 +84,4 @@ model = merge(model, (
     end
     display(fig)
 =#
+

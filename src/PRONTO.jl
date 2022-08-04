@@ -83,6 +83,8 @@ function pronto(model)
     NX = model.NX; NU = model.NU; T = model.T; ts = model.ts;
     α = Interpolant(t->guess(t, model.x0, model.xf, T), ts)
     μ = Interpolant(t->zeros(NU), ts)
+    #TODO: projection operator to guarantee α/μ is a trajectory
+    # pronto(x,u,model)
     pronto(α,μ,model)
 end
 
@@ -94,6 +96,7 @@ function pronto(μ, model)
     ts = model.ts; T = last(ts); NX = model.NX; NU = model.NU
     α_ode = solve(ODEProblem(ol_dynamics!, model.x0, (0,T), (model.f, μ)))
     α = Interpolant((t->α_ode(t)), ts)
+    # this is already a trajectory
     pronto(α,μ,model)
 end
 
@@ -132,10 +135,10 @@ function pronto(α,μ,model)
         tinfo(i, :regulator, tx)
 
         tx = @elapsed begin
-            _x = projection_x(x0,α,μ,Kr,model)
-            update!(x, _x)
-            _u = projection_u(x,α,μ,Kr,model)
-            update!(u, _u)
+            x! = projection_x(x0,α,μ,Kr,model)
+            update!(x, x!)
+            u! = projection_u(x,α,μ,Kr,model)
+            update!(u, u!)
         end
         push!(stats[:projection], tx)
         tinfo(i, :projection, tx)
@@ -215,7 +218,9 @@ function overview(stats)
         println()
         t_all += sum(tx)
     end
-    println("total: $(round(t_all; digits=2)) seconds")
+    print(as_bold("total: "), "$(round(t_all; digits=2)) seconds")
+    i = length(stats[_subroutines()[1]])
+    println("  (", i, " iterations)")
 end
 
 _ms(tx) = "$(round(tx*1000; digits=2)) ms"

@@ -1,7 +1,7 @@
 name = "PRONTO"
 uuid = "97df7862-8962-462b-83f4-d1fea1a8c26c"
 authors = ["mantas <mantas@case.edu>", "jay"]
-version = "0.2.0"
+version = "0.2.1"
 
 [deps]
 ColorSchemes = "35d6a980-a343-548e-a6ea-1d62b119f2f4"
