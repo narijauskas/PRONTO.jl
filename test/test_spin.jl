@@ -52,15 +52,9 @@ model = autodiff(model,f,l,p)
 
 
 model = merge(model, (
-    Qr = let M = Diagonal(SMatrix{NX,NX}(diagm([1,1,1,1])))
-        (t)->M
-    end, # can Qr be a function of α?
-    Rr = let M = Diagonal(SMatrix{NU,NU}(diagm([1])))
-        (t)->M
-    end,
-    iRr = let M = Diagonal(SMatrix{NU,NU}(inv(diagm([1]))))
-        (t)->M
-    end
+    Qr = @closure (t)->Diagonal(SMatrix{NX,NX}(diagm([1,1,1,1]))),
+    # can Qr be a function of α?
+    Rr = @closure (t)->Diagonal(SMatrix{NU,NU}(diagm([1])))
 ))
 
 ##
@@ -90,3 +84,4 @@ model = merge(model, (
     end
     display(fig)
 =#
+

@@ -83,6 +83,8 @@ function pronto(model)
     NX = model.NX; NU = model.NU; T = model.T; ts = model.ts;
     α = Interpolant(t->guess(t, model.x0, model.xf, T), ts)
     μ = Interpolant(t->zeros(NU), ts)
+    #TODO: projection operator to guarantee α/μ is a trajectory
+    # pronto(x,u,model)
     pronto(α,μ,model)
 end
 
@@ -94,6 +96,7 @@ function pronto(μ, model)
     ts = model.ts; T = last(ts); NX = model.NX; NU = model.NU
     α_ode = solve(ODEProblem(ol_dynamics!, model.x0, (0,T), (model.f, μ)))
     α = Interpolant((t->α_ode(t)), ts)
+    # this is already a trajectory
     pronto(α,μ,model)
 end
 
