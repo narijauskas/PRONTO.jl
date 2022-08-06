@@ -12,7 +12,7 @@
 function regulator(α,μ,model)
     NX = model.NX; NU = model.NU; 
     T = model.T;
-    Qr = model.Qr; Rr = model.Rr; iRr = model.iRr;
+    Qr = model.Qr; Rr = model.Rr; #iRr = model.iRr;
 
     fx! = model.fx!; _Ar = Buffer{Tuple{NX,NX}}()
     Ar = @closure (t)->(fx!(_Ar,α(t),μ(t)); return _Ar)
@@ -27,8 +27,8 @@ function regulator(α,μ,model)
         
     iRrBr = Buffer{Tuple{NU,NX}}()
     function Kr(t)
-        mul!(iRrBr, iRr(t), Br(t)')
-        mul!(_Kr, iRrBr, Pr(t))
+        # mul!(iRrBr, iRr(t), Br(t)')
+        mul!(_Kr, Rr(t)\Br(t)', Pr(t))
         return _Kr
     end
     # Kr(t) = Kr(α(t), μ(t),t)

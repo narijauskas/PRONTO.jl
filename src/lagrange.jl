@@ -2,7 +2,7 @@
 
 # dλ = (A-B*Kr)'λ + a - Kr'b
 
-function lagrange(x,u,Kr,rT,model)
+function lagrange(x,u,λ,Kr,rT,model)
     NX = model.NX; NU = model.NU; T = model.T;     
     fx! = model.fx!; _A = Buffer{Tuple{NX,NX}}()
     A = @closure (t)->(fx!(_A,x(t),u(t)); return _A)
@@ -16,7 +16,7 @@ function lagrange(x,u,Kr,rT,model)
     R = @closure (t)->(luu!(_R,x(t),u(t)); return _R)
 
     λ! = solve(ODEProblem(costate_dynamics!, collect(rT), (T,0.0), (A,B,a,b,Kr)))
-    return λ!
+    # return @closure t->λ!(t)
 end
 
 # --------------------------------- costate dynamics vo --------------------------------- #

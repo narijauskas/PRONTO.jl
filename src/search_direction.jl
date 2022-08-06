@@ -8,8 +8,8 @@ function search_z(x,u,Ko,vo,model)
 
     z0 = zeros(NX)
     z! = solve(ODEProblem(update_dynamics!, z0, (0.0,T), (Ko,vo,A,B)))
-    z = functor((_z,t)->z!(_z,t), Buffer{Tuple{NX}}())
-    return z
+    # z = functor((_z,t)->z!(_z,t), Buffer{Tuple{NX}}())
+    return z!
 end
 
 

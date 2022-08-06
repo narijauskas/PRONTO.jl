@@ -2,6 +2,7 @@ using Revise
 using BenchmarkTools, JET
 using PRONTO
 using LinearAlgebra
+using SparseArrays
 using StaticArrays
 using FastClosures
 
@@ -48,30 +49,22 @@ model = autodiff(model,f,l,p)
 # model = PRONTO.Model(NX,NU,f,l,p) # returns a Model{NX,NU}
 @info "autodiff complete"
 
-Qr = (t)->Diagonal(SMatrix{NX,NX}(diagm([1,1,1,1])))
-Rr = (t)->Diagonal(SMatrix{NU,NU}(diagm([1])))
-iRr = (t)->Diagonal(SMatrix{NU,NU}(diagm([1])))
+QM = Diagonal(SMatrix{NX,NX}(diagm([1,1,1,1])))
+Qr = @closure (t)->QM
+RM = Diagonal(SMatrix{NU,NU}(diagm([1])))
+Rr = @closure (t)->RM
 
 model = merge(model, (
     Qr = Qr,
     # can Qr be a function of α?
     Rr = Rr,
-    iRr = iRr,
 ))
 
 ##
-# tx = @elapsed begin 
 (η,stats) = pronto(model); PRONTO.overview(stats)
-# end
-# PRONTO.overview(stats)
-
-#before: 16s
-# @elapsed pronto(model)
-# tx = map(1:10) do i
-#     @elapsed pronto(model)
-# end
-
 ##
+
+# pronto(model,reg,t,x0)
 
 #= plot result
     using GLMakie

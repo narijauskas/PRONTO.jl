@@ -82,6 +82,11 @@ function update!(X::Interpolant, f)
 end
 # foreach((x,t)->(x .= f(t)), zip(X.x,X.t))
 
+function update!(X::Interpolant, x!::SciMLBase.AbstractODESolution)
+    for (x,t) in zip(X.x,X.t)
+        x!(x,t)
+    end
+end
 
 # indexable
 Base.firstindex(X::Interpolant) = 1

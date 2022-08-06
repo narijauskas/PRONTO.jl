@@ -113,6 +113,7 @@ function pronto(α,μ,model)
     
     x = Interpolant(t->zeros(NX), ts)
     u = Interpolant(t->zeros(NU), ts)
+    λ = Interpolant(t->zeros(NX), ts)
     z = Interpolant(t->zeros(NX), ts)
     v = Interpolant(t->zeros(NU), ts)
 
@@ -143,6 +144,13 @@ function pronto(α,μ,model)
         end
         push!(stats[:projection], tx)
         tinfo(i, :projection, tx)
+
+        tx = @elapsed begin
+            λ! = lagrange(x,u,Kr,rT(α),model)
+            update!(λ,λ!)
+        end
+        push!(stats[:lagrange], tx)
+        tinfo(i, :lagrange, tx)
         
         tx = @elapsed begin
             Ko = optimizer(x,u,PT(α),model) 
@@ -151,7 +159,7 @@ function pronto(α,μ,model)
         tinfo(i, :optimizer, tx)
         
         tx = @elapsed begin
-            vo = costate_dynamics(x,u,Ko,rT(α),model)
+            vo = optimizer_costate(x,u,Ko,rT(α),model)
         end
         push!(stats[:costate], tx)
         tinfo(i, :costate, tx)
@@ -198,6 +206,7 @@ function _subroutines()
     return [
         :regulator,
         :projection,
+        :lagrange,
         :optimizer,
         :costate,
         :search_dir,
