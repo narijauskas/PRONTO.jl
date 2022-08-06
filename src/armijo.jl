@@ -4,7 +4,7 @@
 # armijo_backstep:
 function armijo_backstep(x,u,z,v,Kr,Dh,i,model; aα=0.4, aβ=0.7)
     NX = model.NX; NU = model.NU; T = model.T;
-    f = model.f; l = model.l; p = model.p; x0 = model.x0;
+    f! = model.f!; l = model.l; p = model.p; x0 = model.x0;
     γ = 1
     
     # compute cost

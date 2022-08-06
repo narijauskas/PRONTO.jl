@@ -12,6 +12,7 @@ using StaticArrays
 using MatrixEquations # provides arec
 using FastClosures
 using Statistics: median
+using SparseArrays
 
 # ---------------------------- for runtime feedback ---------------------------- #
 using Crayons
@@ -88,13 +89,13 @@ function pronto(model)
     pronto(α,μ,model)
 end
 
-function ol_dynamics!(dx, x, (f,u), t)
-    dx .= f(x,u(t))
+function ol_dynamics!(dx, x, (f!,u), t)
+    f!(dx,x,u(t))
 end
 
 function pronto(μ, model)
     ts = model.ts; T = last(ts); NX = model.NX; NU = model.NU
-    α_ode = solve(ODEProblem(ol_dynamics!, model.x0, (0,T), (model.f, μ)))
+    α_ode = solve(ODEProblem(ol_dynamics!, model.x0, (0,T), (model.f!, μ)))
     α = Interpolant((t->α_ode(t)), ts)
     # this is already a trajectory
     pronto(α,μ,model)

@@ -5,7 +5,7 @@ macro unpack(model)
         NU = $(model).NU
         T = $(model).T
         ts = $(model).ts
-        f = $(model).f
+        # f = $(model).f
         fx! = $(model).fx!
         fu! = $(model).fu!
         fxx! = $(model).fxx!

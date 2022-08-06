@@ -48,13 +48,15 @@ model = autodiff(model,f,l,p)
 # model = PRONTO.Model(NX,NU,f,l,p) # returns a Model{NX,NU}
 @info "autodiff complete"
 
-
-
+Qr = (t)->Diagonal(SMatrix{NX,NX}(diagm([1,1,1,1])))
+Rr = (t)->Diagonal(SMatrix{NU,NU}(diagm([1])))
+iRr = (t)->Diagonal(SMatrix{NU,NU}(diagm([1])))
 
 model = merge(model, (
-    Qr = @closure (t)->Diagonal(SMatrix{NX,NX}(diagm([1,1,1,1]))),
+    Qr = Qr,
     # can Qr be a function of α?
-    Rr = @closure (t)->Diagonal(SMatrix{NU,NU}(diagm([1])))
+    Rr = Rr,
+    iRr = iRr,
 ))
 
 ##
