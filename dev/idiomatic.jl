@@ -1,5 +1,10 @@
 ## ----------------------------------- module ----------------------------------- ##
 module PRONTO
+
+using Symbolics
+using Symbolics: derivative
+include("../src/autodiff.jl")
+
 abstract type Model{NX,NU} end
 
 f(M::Model,x,u) = @error "function f undefined for models of type $(typeof(M))"
@@ -16,16 +21,34 @@ end
 pronto(T::DataType, args...) = pronto(T(), args...)
 
 
+
+macro configure(T)
+    return quote
+        @variables _x[1:nx(Main.$T())] _u[1:nu(Main.$T())]
+
+        local f = Main.f
+        PRONTO.f(::Main.$T,x,u) = f(x,u)
+
+        local fx = jacobian(_x,f,_x,_u; inplace=false)
+        PRONTO.fx(::Main.$T,x,u) = fx(x,u) # NX,NX #NOTE: for testing
+        
+    end
+end
+
+
 end # module
-## ----------------------------------- module ----------------------------------- ##
+
+
+## ----------------------------------- dependencies ----------------------------------- ##
 
 using Main.PRONTO
 using Main.PRONTO: nx,nu
-using Symbolics
-using Symbolics: derivative
-using FastClosures
-include("../src/autodiff.jl")
+using Main.PRONTO: @configure
 
+
+
+
+## ----------------------------------- problem setup ----------------------------------- ##
 
 # define problem type:
 NX = 2; NU = 1
@@ -34,23 +57,8 @@ struct FooSystem <: PRONTO.Model{NX,NU} end
 # define: f,l,p, regulator
 f(x,u) = collect(x)
 
-## ----------------------------------- @configure FooSystem ----------------------------------- ##
-
-macro configure(T)
-    return quote
-        @variables _x[1:nx($T())] _u[1:nu($T())]
-
-        local f = Main.f
-        PRONTO.f(::$T,x,u) = f(x,u)
-
-        local fx = jacobian(_x,f,_x,_u; inplace=false)
-        PRONTO.fx(::$T,x,u) = fx(x,u) # NX,NX #NOTE: for testing
-        
-    end
-end
-
-@configure FooSystem
 # autodiff/model setup
+@configure FooSystem
 
 ## ----------------------------------- tests ----------------------------------- ##
 
