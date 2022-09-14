@@ -32,9 +32,9 @@ NX = 2; NU = 1
 struct FooSystem <: PRONTO.Model{NX,NU} end
 
 # define: f,l,p, regulator
-@inline f(x,u) = collect(x)
+f(x,u) = collect(x)
 
-##
+## ----------------------------------- @configure FooSystem ----------------------------------- ##
 
 macro configure(T)
     return quote
@@ -52,22 +52,13 @@ end
 @configure FooSystem
 # autodiff/model setup
 
-## ----------------------------------- @configure FooSystem ----------------------------------- ##
-PRONTO.f(::FooSystem,x,u,t) = f(x,u)
-@variables _x[1:nx(FooSystem())] _u[1:nu(FooSystem())]
-let fx = jacobian(_x,f,_x,_u; inplace=false)
-    PRONTO.fx(::FooSystem,x,u) = fx(x,u) # NX,NX #NOTE: for testing
-end
+## ----------------------------------- tests ----------------------------------- ##
+
 
 # run pronto
 # pronto(FooSystem, α, μ, parameters...)
 M = FooSystem()
-PRONTO.pronto(M,0)
 PRONTO.f(M,[0,0],[0])
 PRONTO.fx(M,[0,0],[0])
 
-
-x = state(ξ)
-u = input(ξ)
-ξ = Trajectory(x,u) # ,t) maybe?
 
