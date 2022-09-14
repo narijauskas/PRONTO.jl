@@ -7,7 +7,9 @@
 # (::M)(t) = M(M.α(t), M.μ(t))
 
 
+function regulator(M::Model{NX,NU},α,μ,t) where {NX,NU}
 
+end
 
 function regulator(α,μ,model)
     NX = model.NX; NU = model.NU; 
@@ -41,3 +43,4 @@ function riccati!(dP, P, (Ar,Br,Rr,Qr), t)
     dP .= -Ar(t)'*P - P*Ar(t) + Kr'*Rr(t)*Kr - Qr(t)
     #NOTE: dP is symmetric, as should be P
 end
+
