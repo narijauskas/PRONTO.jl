@@ -14,29 +14,9 @@ using FastClosures
 using Statistics: median
 using SparseArrays
 
-# ---------------------------- for runtime feedback ---------------------------- #
-using Crayons
-as_tag(str) = as_tag(crayon"default", str)
-as_tag(c::Crayon, str) = as_color(c, as_bold("[$str: "))
-as_color(c::Crayon, str) = "$c" * str * "$(crayon"default")"
-as_bold(str) = "$(crayon"bold")" * str * "$(crayon"!bold")"
-clearln() = print("\e[2K","\e[1G")
-
-info(str) = println(as_tag(crayon"magenta","PRONTO"), str)
-info(i, str) = println(as_tag(crayon"magenta","PRONTO[$i]"), str)
-tinfo(i, str, tx) = println(as_tag(crayon"magenta","PRONTO[$i]"), str, " in $(round(tx*1000; digits=2)) ms")
-
-
-
-
 # --------------------------------- helper functions --------------------------------- #
-mapid!(dest, src) = map!(identity, dest, src)
-# same as: mapid!(dest, src) = map!(x->x, dest, src)
 
-inv!(A) = LinearAlgebra.inv!(lu!(A)) # general
-# LinearAlgebra.inv!(choelsky!(A)) # if SPD
-
-
+include("helpers.jl")
 
 # ---------------------------- functional components ---------------------------- #
 
@@ -64,6 +44,7 @@ export guess, pronto
 # type ProntoModel{NX,NU}, pass buffer dimensions parametrically?
 # otherwise, model holds functions and parameters
 
+#=
 
 include("regulator.jl")
 include("projection.jl")
@@ -234,5 +215,7 @@ function overview(stats)
 end
 
 _ms(tx) = "$(round(tx*1000; digits=2)) ms"
+
+=#
 
 end #module

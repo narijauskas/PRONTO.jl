@@ -6,6 +6,7 @@ using Symbolics: derivative
 include("../src/autodiff.jl")
 
 abstract type Model{NX,NU} end
+#TODO: Model{NX,NU,NΘ}
 
 f(M::Model,x,u) = @error "function f undefined for models of type $(typeof(M))"
 fx(M::Model,x,u) = @error "function fx undefined for models of type $(typeof(M))"
@@ -13,6 +14,7 @@ fx(M::Model,x,u) = @error "function fx undefined for models of type $(typeof(M))
 
 nx(::Model{NX,NU}) where {NX,NU} = NX
 nu(::Model{NX,NU}) where {NX,NU} = NU
+# nθ(::Model) nθ doesn't matter!
 
 function pronto(M::Model{NX,NU},t,args...) where {NX,NU}
     f(M,x,u)
