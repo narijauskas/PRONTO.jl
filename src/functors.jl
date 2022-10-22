@@ -1,4 +1,4 @@
-
+using StaticArrays
 # buffer(S) = MVector{S,Float64}(undef)
 # buffer(S1,S2) = MMatrix{S1,S2,Float64}(undef)
 buffer(S...) = MArray{Tuple{S...},Float64}(undef)

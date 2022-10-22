@@ -4,6 +4,7 @@ module PRONTO
 using Symbolics
 using Symbolics: derivative
 include("../src/autodiff.jl")
+include("../src/functors.jl")
 
 abstract type Model{NX,NU} end
 
@@ -26,33 +27,56 @@ end
 pronto(T::DataType, args...) = pronto(T(), args...)
 
 
-# loads definitions into pronto from autodiff based on current definitions in Main
-macro configure(T, NΘ=0)
+# loads definitions for model M into pronto from autodiff based on current definitions in Main
+macro configure(M, NΘ=0)
+    T = :(Main.$M)
     return quote
-        @variables vx[1:nx(Main.$T())] 
-        @variables vu[1:nu(Main.$T())] 
+        @variables vx[1:nx($T())] 
+        @variables vu[1:nu($T())] 
         @variables vt
         @variables vθ[1:$NΘ]
 
         local f = Main.f # NX
-        PRONTO.f(::Main.$T,x,u,t,θ) = f(x,u,t,θ)
+        # PRONTO.f(::$T,x,u,t,θ) = f(x,u,t,θ)
 
         local f! = inplace(f,vx,vu,vt,vθ)
-        PRONTO.f!(buf,::Main.$T,x,u,t,θ) = f!(buf,x,u,t,θ)
+        let buf = @buffer nx($T()) 
+            # neat behavior, but I don't love how it shares memory...
+            # buffer memory should be shared on a per-instance basis
+            PRONTO.f(::$T,x,u,t,θ) = (f!(buf,x,u,t,θ); return SArray(buf))
+        end
 
         #NOTE: for testing
         local fx = jacobian(vx,f,vx,vu,vt,vθ; inplace=false)
-        PRONTO.fx(::Main.$T,x,u,t,θ) = fx(x,u,t,θ) # NX,NX
+        PRONTO.fx(::$T,x,u,t,θ) = fx(x,u,t,θ) # NX,NX
     end
 end
 
+
+# struct A
+#     α # refs to the correct trajectories
+#     μ # refs to the correct trajectories
+#     buf # internal buffer?
+# end
+# (a::A)(θ,t) = a.α
+# A holds α and μ as internal type parameters?
+
+# function PRONTO.f(::M,x,u,t,θ)
+#     f!(buf,x,u,t,θ)
+#     return buf
+# end
+
+
+# fx! = model.fx!; _Ar = Buffer{Tuple{NX,NX}}()
+# Ar = @closure (t)->fx!(_Ar,α(t),μ(t))
+# # Ar = @closure (t)->(fx!(_Ar,α(t),μ(t)); return _Ar)
 
 end # module
 
 
 # ----------------------------------- dependencies ----------------------------------- #
 
-using Main.PRONTO
+using Main.PRONTO # import?
 using Main.PRONTO: nx,nu
 using Main.PRONTO: @configure
 
@@ -82,20 +106,18 @@ x = [0,0]
 u = [0]
 t = 1
 θ = nothing
-buf = similar(x)
 PRONTO.f(M,x,u,t,θ)
-PRONTO.f!(buf,M,x,u,t,θ)
 PRONTO.fx(M,x,u,t,θ)
 
 
 
 ## ----------------------------------- change model ----------------------------------- ##
 
-# oh, but now I want to add a parameter
-f(x,u,t,θ) = collect(x) .+ t*θ[1]
+# oh, but now I want to add some parameters
+f(x,u,t,θ) = θ[1]*collect(x) .+ t*θ[2]
 
 # re-autodiff
-@configure FooSystem 1
+@configure FooSystem 2
 
-θ = 2
+θ = [2,3]
 PRONTO.f(M,x,u,t,θ)
