@@ -27,19 +27,22 @@ pronto(T::DataType, args...) = pronto(T(), args...)
 
 
 # loads definitions into pronto from autodiff based on current definitions in Main
-macro configure(T)
+macro configure(T, NΘ=0)
     return quote
-        @variables vx[1:nx(Main.$T())] vu[1:nu(Main.$T())] vt
+        @variables vx[1:nx(Main.$T())] 
+        @variables vu[1:nu(Main.$T())] 
+        @variables vt
+        @variables vθ[1:$NΘ]
 
         local f = Main.f # NX
-        PRONTO.f(::Main.$T,x,u,t) = f(x,u,t)
+        PRONTO.f(::Main.$T,x,u,t,θ) = f(x,u,t,θ)
 
-        local f! = inplace(f,vx,vu,vt)
-        PRONTO.f!(buf,::Main.$T,x,u,t) = f!(buf,x,u,t)
+        local f! = inplace(f,vx,vu,vt,vθ)
+        PRONTO.f!(buf,::Main.$T,x,u,t,θ) = f!(buf,x,u,t,θ)
 
         #NOTE: for testing
-        local fx = jacobian(vx,f,vx,vu,vt; inplace=false)
-        PRONTO.fx(::Main.$T,x,u,t) = fx(x,u,t) # NX,NX
+        local fx = jacobian(vx,f,vx,vu,vt,vθ; inplace=false)
+        PRONTO.fx(::Main.$T,x,u,t,θ) = fx(x,u,t,θ) # NX,NX
     end
 end
 
@@ -64,7 +67,7 @@ struct FooSystem <: PRONTO.Model{NX,NU} end
 
 # define: f,l,p, regulator
 # fn(x,u,t,θ)
-f(x,u,t) = collect(x).+t
+f(x,u,t,θ) = collect(x) .+ t
 
 # autodiff/model setup
 @configure FooSystem
@@ -78,9 +81,21 @@ M = FooSystem()
 x = [0,0]
 u = [0]
 t = 1
+θ = nothing
 buf = similar(x)
-PRONTO.f(M,x,u,t)
-PRONTO.f!(buf,M,x,u,t)
-PRONTO.fx(M,x,u,t)
+PRONTO.f(M,x,u,t,θ)
+PRONTO.f!(buf,M,x,u,t,θ)
+PRONTO.fx(M,x,u,t,θ)
 
 
+
+## ----------------------------------- change model ----------------------------------- ##
+
+# oh, but now I want to add a parameter
+f(x,u,t,θ) = collect(x) .+ t*θ[1]
+
+# re-autodiff
+@configure FooSystem 1
+
+θ = 2
+PRONTO.f(M,x,u,t,θ)
