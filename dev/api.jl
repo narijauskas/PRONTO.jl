@@ -1,41 +1,24 @@
-# sketch of high-level PRONTO api
+# user must define:
 
-# create t vector, pre-allocate x(t) & u(t) (defines output dimensions)
-# each iteration modifies the trajectory in-place
-pronto!(x, u, t, fxns...; opts...)
-pronto!(ξ, fxns...; opts...)
-pronto!(ξ, f, l, p; opts...)
+# a model type, with any scalar parameters as fields
+struct Model <: Pronto.Model
+end
 
-# trajectory type
-ξ.x
-ξ.u
-ξ.t
-# maybe: built in projection?
+f(θ,x,u,t)
+l(θ,x,u,t)
+m(θ,x,t)
 
+Rr(θ,x,u,t)
+Qr(θ,x,u,t)
+# Pr(θ,x) ... for final condition?
 
-# maybe: debug/diagnostic version -> sa ves each iteration step
-# pronto(x, u, t, fxns...; opts...)
+# teach PRONTO the model and build a model kernel
+@configure Model
 
-# user provided functions:
-f(x,u,t)
-l(x,u,t)
-p(x)
+# create an instance of the model with parameters
+θ = Model(params...)
 
-
-# helper/convenience functions:
-project()
-# ways to make f,l,p
-ξ = ξ_init(x_eq, u_guess, t)
-
-
-
-
-
-# intermediary functions:
-# compute the trajectory ξ stabilized around the initial guess ξ0
-Kr = regulator((α,μ,t); Rr, Qr, Pr0, fx, fu)
-
-(x,u,t) = projection(f, (α,μ,t), Kr)
-projection!(f, (x,u,t), Kr; f, x0)
-
-cost(l, p, (x,u,t))
+x0
+guess(...)->αg,μg
+# T = [t0:dt:tf]
+T = (t0,tf) # if variable timestep
