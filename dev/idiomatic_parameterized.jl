@@ -40,6 +40,7 @@ macro configure(M, NΘ=0)
         # PRONTO.f(::$T,x,u,t,θ) = f(x,u,t,θ)
 
         local f! = inplace(f,vx,vu,vt,vθ)
+        PRONTO.f!(buf,::$T,x,u,t,θ) = (f!(buf,x,u,t,θ); return buf)
         let buf = @buffer nx($T()) 
             # neat behavior, but I don't love how it shares memory...
             # buffer memory should be shared on a per-instance basis
@@ -83,7 +84,7 @@ using Main.PRONTO: @configure
 
 
 
-## ----------------------------------- problem setup ----------------------------------- ##
+# ----------------------------------- problem setup ----------------------------------- ##
 
 # define problem type:
 NX = 2; NU = 1

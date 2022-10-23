@@ -91,3 +91,58 @@ function riccati!(dP, P, (Ar,Br,Rr,Qr), t)
     #NOTE: dP is symmetric, as should be P
 end
 
+# 1. solve P0
+# 2. solve Pr(t)
+Rr()
+Br(t) = fu(M,α,μ,t,θ)
+# 2a. solve Kr(Rr,Br,P)
+
+Kr = Rr\Br'*P
+
+struct Regulator{NX,NU}
+    θ # type and parameters
+    α # as args? refs? wrappers?
+    μ # as args? refs? wrappers?
+    P0
+    Pr
+    Kr
+    Ar
+    # others?
+end
+
+# (reg::Regulator)(t) # return Kr(t)
+
+reg.Ar
+Ar!(reg,t) = fx!(reg.Ar,θ,α(t),μ(t),t)
+Br!(reg,t) = fu!(reg.Br,θ,α(t),μ(t),t)
+Kr!(reg,t,P) = reg.Rr\reg.Br'*P
+
+function Pr!(reg,...)
+    Pr! = solve(ODEProblem(riccati!, collect(1.0*I(NX)), (T,0.0), (Ar,Br,Rr,Qr)))
+end
+
+# ultimate goal:
+Kr(t)
+Kr(θ,α,μ,t)
+
+
+
+
+
+
+
+evaluate_strfun(str, arg) = str.fun(arg, str.second_arg)
+
+
+@code_warntype evaluate_strfun(example, 1.5) # all good
+
+
+struct Yeet
+    y
+end
+yeet = Yeet(1)
+fn = FunctionWrapper{Float64, Tuple{Float64, Float64}}((x,y)->hypot(x,y))
+
+
+
+FunctionWrapper
