@@ -80,3 +80,31 @@ model = merge(model, (
     display(fig)
 =#
 
+
+
+
+
+
+
+
+
+
+
+
+NX = 4
+NU = 1
+struct TwoSpin <: PRONTO.Kernel{NX,NU}
+end
+
+f(θ,x,u,t)
+l(θ,x,u,t)
+p(θ,x,u,t)
+
+Rr(θ,x,u,t)
+Qr(θ,x,u,t)
+Pr(θ,x,u,t)
+
+t0 = 0.0
+tf = 10.0
+x0 = [0.0;1.0;0.0;0.0]
+xf = [1.0;0.0;0.0;0.0]

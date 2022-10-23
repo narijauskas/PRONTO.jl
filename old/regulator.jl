@@ -42,19 +42,6 @@ function Ar(M::Model{NX,NU},α,μ,t) where {NX,NU}
     return Ar
 end
 
-struct Buffer{S,F}
-    f::F
-    X::MArray{S,Float64}
-end
-
-X[] = get buffer
-X(...) = update buffer & return
-
-
-struct ModelBuffer{NX,NU}
-    Ar::Buffer{Tuple{NX,NX}}
-    # ...
-end
 # Ar = buffer(fx!, nx, nx, α, μ)
 # I'm already creating new buffers each run...
 
@@ -99,16 +86,6 @@ Br(t) = fu(M,α,μ,t,θ)
 
 Kr = Rr\Br'*P
 
-struct Regulator{NX,NU}
-    θ # type and parameters
-    α # as args? refs? wrappers?
-    μ # as args? refs? wrappers?
-    P0
-    Pr
-    Kr
-    Ar
-    # others?
-end
 
 # (reg::Regulator)(t) # return Kr(t)
 
