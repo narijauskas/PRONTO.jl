@@ -38,40 +38,7 @@ Kr!(buf,M::Model,x,u,t,θ,P) = @error "PRONTO.Kr! is not defined for model type 
 
 
 
-# ----------------------------------- autodiff ----------------------------------- #
-
-# # what do I need?
-# fxn -> inplace fxn
-# fxn -> simplified fxn
-# fxn -> jacobian
-# jacobian -> inplace fxn
-# jacobian -> hessian
-# hessian -> inplace fxn
-
-# problem
-# symbolic -> standalone inplace fxn syntax would be clunky due to repeated args
-
-
-
-
-#MAYBE: refactor with functors
-#TODO: better document mappings
-# Jx = Jacobian(x)
-# Hxx = Hessian(x,x) # == Jx∘Jx
-
-# Jx(f, args...; inplace)
-# Hxx(f, args...; inplace)
-
-# build_inplace(f, args...)
-# build_normal(f, args...)
-
-# function allocating(ex)
-#     @eval $(ex[1])
-# end
-
-# function inplace(ex)
-#     @eval $(ex[2])
-# end
+# ----------------------------------- symbolics & autodiff ----------------------------------- #
 
 function build(f, args...)
     f_sym = cat(Base.invokelatest(f, args...); dims=1)
@@ -79,9 +46,6 @@ function build(f, args...)
     return eval.(f_ex)
 end
 
-
-
-# fx = jacobian(x, f, x, u)
 function jacobian(dx, f, args...)
     f_sym = Base.invokelatest(f, args...)
 
@@ -98,8 +62,6 @@ function jacobian(dx, f, args...)
     return eval.(fx_ex)
 end
 
-# fxx = hessian(x, u, f, x, u)
-# hessian(dx1, dx2, f, args...; inplace = false) = jacobian(dx2, jacobian(dx1, f, args...), args...; inplace)
 
 struct Jacobian
     dx
@@ -114,10 +76,13 @@ end
 macro derive(T)
     T = esc(T) # make sure we use the local context
     return quote
-        # find local definitions
+
+        # load user definitions
         local Rr = $(esc(:(Rr)))
         local Qr = $(esc(:(Qr)))
         local f = $(esc(:(f)))
+        local l = $(esc(:(l)))
+        local p = $(esc(:(p)))
 
         # define symbolics for derivation
         @variables x[1:nx($T())] 
@@ -125,14 +90,12 @@ macro derive(T)
         @variables t
         @variables θ[1:nθ($T())]
         @variables P[1:nx($T()),1:nx($T())]
-
         Jx,Ju = Jacobian.([x,u])
 
         # derive models
         local f,f! = build(f,x,u,t,θ)
         local fx,fx! = Jx(f,x,u,t,θ)
         local fu,fu! = Ju(f,x,u,t,θ)
-
         local fxx,fxx! = Jx(fx,x,u,t,θ)
 
         # local fx = allocating(jacobian(x,f,x,u,t,θ; inplace=false))
