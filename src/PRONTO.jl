@@ -1,7 +1,7 @@
 # PRONTO.jl v0.3.0-dev
 module PRONTO
 include("kernels.jl")
-
+include("utils.jl")
 using FunctionWrappers
 using FunctionWrappers: FunctionWrapper
 using StaticArrays

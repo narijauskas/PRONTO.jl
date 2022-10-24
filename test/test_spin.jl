@@ -67,6 +67,7 @@ NΘ = 0
 struct TwoSpin <: PRONTO.Model{NX,NU,NΘ}
 end
 
+##
 let
     # model dynamics
     H0 = [0 0 1 0;0 0 0 -1;-1 0 0 0;0 1 0 0]
@@ -96,7 +97,7 @@ tf = 10.0
 x0 = [0.0;1.0;0.0;0.0]
 xf = [1.0;0.0;0.0;0.0]
 
-
+PRONTO.Kr(M,x,u,t,θ,P)
 ## ----------------------------------- tests ----------------------------------- ##
 M = TwoSpin()
 x = x0
@@ -104,8 +105,10 @@ u = [0.0]
 t = t0
 θ = nothing
 P = collect(I(NX))
+buf = similar(x)
 
 PRONTO.f(M,x,u,t,θ)
 PRONTO.fx(M,x,u,t,θ)
 PRONTO.Rr(M,x,u,t,θ)
 PRONTO.Kr(M,x,u,t,θ,P)
+PRONTO.f!(buf,M,x,u,t,θ)
