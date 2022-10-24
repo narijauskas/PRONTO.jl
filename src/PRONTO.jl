@@ -188,28 +188,28 @@ end
 
 
 
-# maps t->ξ=(x,u)::(TX,TU)
-struct Trajectory{TX,TU}
-    x::FunctionWrapper{TX, Tuple{Float64}}
-    u::FunctionWrapper{TU, Tuple{Float64}}
-    xbuf::TX
-    ubuf::TU
-    sln::SciMLBase.AbstractODESolution
-end
-(ξ::Trajectory)(t) = (x=ξ.x(t), ξ.u(x,t))
+# # maps t->ξ=(x,u)::(TX,TU)
+# struct Trajectory{TX,TU}
+#     x::FunctionWrapper{TX, Tuple{Float64}}
+#     u::FunctionWrapper{TU, Tuple{Float64}}
+#     xbuf::TX
+#     ubuf::TU
+#     sln::SciMLBase.AbstractODESolution
+# end
+# (ξ::Trajectory)(t) = (ξ.x(t), ξ.u(x,t))
 
 
-function Trajectory(prob, TX, ctrl, TU)
-    sln = solve(prob) # solves for x(t)
-    xbuf = TX(undef)
-    ubuf = TU(undef)
-    x = FunctionWrapper{TX, Tuple{Float64}}(t->sln(buf,t))
-    u = FunctionWrapper{TU, Tuple{Float64}}(t->ctrl(buf,t))
-end
+# function Trajectory(prob, TX, ctrl, TU)
+#     sln = solve(prob) # solves for x(t)
+#     xbuf = TX(undef)
+#     ubuf = TU(undef)
+#     x = FunctionWrapper{TX, Tuple{Float64}}(t->sln(buf,t))
+#     u = FunctionWrapper{TU, Tuple{Float64}}(t->ctrl(buf,t))
+# end
 
 
 # u(x,t)
-u = μ(t) - Kr(α,μ,t,θ,Pr)*(x(t)-α(t))
+# u = μ(t) - Kr(α,μ,t,θ,Pr)*(x(t)-α(t))
 
 
 
