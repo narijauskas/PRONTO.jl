@@ -51,24 +51,23 @@ end
 
 
 
-
 # Kr(t,P) = ... 
 
 
 
-function pronto(θ,x0,t0,tf,αg,μg)
+# function pronto(θ,x0,t0,tf,αg,μg)
+ 
+#     Pr = solution(ODEProblem)
 
-    Pr = solution(ODEProblem)
+# end
+# fx(θ,x,u,t)'*P - P*fx(θ,x,u,t)
 
-end
-fx(θ,x,u,t)'*P - P*fx(θ,x,u,t)
-
-function riccati!(dP, P, (Ar,Br,Rr,Qr), t)
-    # mul!(Kr, Rr(t)\Br(t)', P)
-    # Kr = Rr(t)\Br(t)'*P
-    dP .= -Ar(t)'*P - P*Ar(t) + Kr(t,P)'*Rr(t)*Kr(t,P) - Qr(t)
-    #NOTE: dP is symmetric, as should be P
-end
+# function riccati!(dP, P, (Ar,Br,Rr,Qr), t)
+#     # mul!(Kr, Rr(t)\Br(t)', P)
+#     # Kr = Rr(t)\Br(t)'*P
+#     dP .= -Ar(t)'*P - P*Ar(t) + Kr(t,P)'*Rr(t)*Kr(t,P) - Qr(t)
+#     #NOTE: dP is symmetric, as should be P
+# end
 
 
 # # pronto(θ::Kernel, x0, T/dt, θ, xg, ug)

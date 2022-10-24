@@ -23,42 +23,6 @@ model = (
     maxiters = 15, #TODO: remove
 )
 
-# params = (
-#     tol = 1e-5,
-#     maxiters = 10,
-# )
-
-H0 = [0 0 1 0;0 0 0 -1;-1 0 0 0;0 1 0 0]
-H1 = [0 -1 0 0;1 0 0 0;0 0 0 -1;0 0 1 0]
-
-
-# model dynamics
-f = @closure (x,u) -> collect((H0 + u[1]*H1)*x)
-
-
-# stage cost
-Ql = zeros(NX,NX)
-Rl = 0.01
-Pl = [0 0 0 0;0 1 0 0;0 0 0 0;0 0 0 1] #terminal cost matrix Pl
-
-l = (x,u) -> 1/2*collect(x)'*Ql*collect(x) + 1/2*collect(u)'*Rl*collect(u)
-p = (x) -> 1/2*collect(x)'*Pl*collect(x)
-
-@info "running autodiff"
-model = autodiff(model,f,l,p)
-# model = PRONTO.Model(NX,NU,f,l,p) # returns a Model{NX,NU}
-@info "autodiff complete"
-
-QM = Diagonal(SMatrix{NX,NX}(diagm([1,1,1,1])))
-Qr = @closure (t)->QM
-RM = Diagonal(SMatrix{NU,NU}(diagm([1])))
-Rr = @closure (t)->RM
-
-model = merge(model, (
-    Qr = Qr,
-    # can Qr be a function of α?
-    Rr = Rr,
-))
 
 ##
 (η,stats) = pronto(model); PRONTO.overview(stats)
@@ -88,23 +52,60 @@ model = merge(model, (
 
 
 
+## ----------------------------------- kernel definition ----------------------------------- ##
+
+
+using PRONTO
+using StaticArrays
+using LinearAlgebra
 
 
 
 NX = 4
 NU = 1
-struct TwoSpin <: PRONTO.Kernel{NX,NU}
+NΘ = 0
+struct TwoSpin <: PRONTO.Model{NX,NU,NΘ}
 end
 
-f(θ,x,u,t)
-l(θ,x,u,t)
-p(θ,x,u,t)
+let
+    # model dynamics
+    H0 = [0 0 1 0;0 0 0 -1;-1 0 0 0;0 1 0 0]
+    H1 = [0 -1 0 0;1 0 0 0;0 0 0 -1;0 0 1 0]
+    f = (x,u,t,θ) -> collect((H0 + u[1]*H1)*x)
 
-Rr(θ,x,u,t)
-Qr(θ,x,u,t)
-Pr(θ,x,u,t)
+
+    # stage cost
+    Ql = zeros(NX,NX)
+    Rl = 0.01
+    l = (x,u,t,θ) -> 1/2*collect(x)'*Ql*collect(x) + 1/2*collect(u)'*Rl*collect(u)
+
+    # terminal cost
+    Pl = [0 0 0 0;0 1 0 0;0 0 0 0;0 0 0 1]
+    p = (x,u,t,θ) -> 1/2*collect(x)'*Pl*collect(x)
+
+    # regulator
+    Rr = (x,u,t,θ) -> diagm([1])
+    Qr = (x,u,t,θ) -> diagm([1,1,1,1])
+    # Pr(x,u,t,θ)
+
+    @derive TwoSpin
+end
 
 t0 = 0.0
 tf = 10.0
 x0 = [0.0;1.0;0.0;0.0]
 xf = [1.0;0.0;0.0;0.0]
+
+
+## ----------------------------------- tests ----------------------------------- ##
+M = TwoSpin()
+x = x0
+u = [0.0]
+t = t0
+θ = nothing
+P = collect(I(NX))
+
+PRONTO.f(M,x,u,t,θ)
+PRONTO.fx(M,x,u,t,θ)
+PRONTO.Rr(M,x,u,t,θ)
+PRONTO.Kr(M,x,u,t,θ,P)
