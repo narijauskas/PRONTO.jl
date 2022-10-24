@@ -10,13 +10,13 @@ function symbolic(f::Function, M::Model)
     f(M,x,u,t,θ)
 end
 
-function symbolic(Kr::typeof(Kr), M::Model)
+function symbolic(f::typeof(dPr), M::Model)
     @variables α[1:nx(M)] 
     @variables μ[1:nu(M)] 
     @variables t
     @variables θ[1:nθ(M)]
-    @variables P[1:nx(M),1:nx(M)]
-    Kr(M,α,μ,t,θ,P)
+    @variables Pr[1:nx(M),1:nx(M)]
+    f(M,α,μ,t,θ,Pr)
 end
 # sweep parameters -> create 10 θ instances with varying k and @spawn threads to solve each
 # sweep(θ; k=[1:10]) 

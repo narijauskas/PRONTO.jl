@@ -1,7 +1,6 @@
 # PRONTO.jl v0.3.0-dev
 module PRONTO
 # include("kernels.jl")
-include("utils.jl")
 using FunctionWrappers
 using FunctionWrappers: FunctionWrapper
 using StaticArrays
@@ -73,6 +72,8 @@ Kr(M,x,u,t,θ,P) = @error "PRONTO.Kr is missing a method for the $(typeof(M)) mo
 f!(buf,M,x,u,t,θ) = @error "PRONTO.f! is missing a method for the $(typeof(M)) model."
 Kr!(buf,M,x,u,t,θ,P) = @error "PRONTO.Kr! is missing a method for the $(typeof(M)) model."
 dPr!(M,buf,x,u,t,θ,P) = nothing
+dPr(M,x,u,t,θ,P) = nothing
+
 #TODO: Kr
 #TODO: Pt
 
@@ -151,6 +152,7 @@ macro derive(T)
         PRONTO.Kr(M::$T,x,u,t,θ,P) = Kr(x,u,t,θ,P) # NU,NX
         PRONTO.Kr!(buf,M::$T,x,u,t,θ,P) = Kr!(buf,x,u,t,θ,P) # NU,NX
         PRONTO.dPr!(M::$T,buf,x,u,t,θ,P) = dPr!(buf,x,u,t,θ,P) # NX,NX
+        PRONTO.dPr(M::$T,x,u,t,θ,P) = dPr(x,u,t,θ,P) # NX,NX
     end
 end
 
@@ -182,8 +184,38 @@ function Solution(prob, T)
     Solution(fxn,buf,sln)
 end
 
-#FUTURE: show size, length, time span, solver method?
+
+
+
+
+# maps t->ξ=(x,u)::(TX,TU)
+struct Trajectory{TX,TU}
+    x::FunctionWrapper{TX, Tuple{Float64}}
+    u::FunctionWrapper{TU, Tuple{Float64}}
+    xbuf::TX
+    ubuf::TU
+    sln::SciMLBase.AbstractODESolution
+end
+(ξ::Trajectory)(t) = (x=ξ.x(t), ξ.u(x,t))
+
+
+function Trajectory(prob, TX, ctrl, TU)
+    sln = solve(prob) # solves for x(t)
+    xbuf = TX(undef)
+    ubuf = TU(undef)
+    x = FunctionWrapper{TX, Tuple{Float64}}(t->sln(buf,t))
+    u = FunctionWrapper{TU, Tuple{Float64}}(t->ctrl(buf,t))
+end
+
+
+# u(x,t)
+u = μ(t) - Kr(α,μ,t,θ,Pr)*(x(t)-α(t))
+
+
+
+
 Base.show(io::IO, sln::Solution) = show(io,typeof(sln))
+#FUTURE: show size, length, time span, solver method?
 
 # this might be type piracy... but prevents the obscenely long error messages
 function Base.show(io::IO, fn::FunctionWrapper)
@@ -232,6 +264,7 @@ end
 # # fallback: if type is given, creates an instance
 # pronto(T::DataType, args...) = pronto(T(), args...)
 
+include("utils.jl")
 
 
 end # module
