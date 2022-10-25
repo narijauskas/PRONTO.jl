@@ -1,6 +1,5 @@
 using DifferentialEquations
 using LinearAlgebra
-using FunctionWrappers: FunctionWrapper
 using FastClosures
 
 
@@ -28,12 +27,6 @@ sol = solve(prob)
 
 # α = @buffer (nx(M),) t->MVector{nx(M)}(zeros(nx(M)))
 
-α = @buffer (nx(M),) t->zeros(nx(M))
-μ = @buffer (nu(M),) t->zeros(nu(M))
-P = @buffer (nx(M), nx(M)) t->(1.0*I(NX))
-
-
-
-α = FunctionWrapper{Vector{Float64}, Tuple{Float64}}(@closure t->ones(nx(M)))
-μ = FunctionWrapper{Vector{Float64}, Tuple{Float64}}(@closure t->zeros(nu(M)))
-P = FunctionWrapper{Matrix{Float64}, Tuple{Float64}}(@closure t->diagm(ones(nx(M))))
+α = Buffer((@closure (buf,t)->(buf.=ones(nx(M)))), nx(M))
+μ = Buffer((@closure (buf,t)->(buf.=zeros(nu(M)))), nu(M))
+P = Buffer((@closure (buf,t)->(buf.=diagm(ones(nx(M))))), nx(M), nx(M))

@@ -10,10 +10,12 @@ using DifferentialEquations
 using Symbolics
 using Symbolics: derivative
 
-export Buffer, @buffer
 export @derive
 export nx,nu,nθ
+
+export Buffer
 export Solution
+export Trajectory
 
 
 
@@ -166,19 +168,27 @@ end
 
 # ----------------------------------- ode solution handling ----------------------------------- #
 
+#TODO: abstract type AbstractBuffer{T}
 
-#MArray{S,T,N,L}
-Buffer(S...) = MArray{Tuple{S...}, Float64, length(S), prod(S)}
-
-macro buffer(S,f)
-    # S = esc(S)
-    # f = esc(f)
-    return quote
-        FunctionWrapper{Buffer($S...), Tuple{Float64}}(@closure t->Buffer($S...)($f(t)))
-    end
+# maps t->x::T
+struct Buffer{T}
+    fxn::FunctionWrapper{T, Tuple{Float64}}
+    buf::T
+    fn!::Function
 end
 
-# maps t->v::T
+(buf::Buffer)(t) = buf.fxn(t)
+
+function Buffer(fn!, N::Vararg{Int})
+    T = MArray{Tuple{N...}, Float64, length(N), prod(N)}
+    buf = T(undef)
+    fxn = FunctionWrapper{T, Tuple{Float64}}(t->(fn!(buf, t); return buf))
+    Buffer(fxn,buf,fn!)
+end
+
+
+
+# maps t->x::T
 struct Solution{T}
     fxn::FunctionWrapper{T, Tuple{Float64}}
     buf::T
@@ -188,10 +198,11 @@ end
 (sln::Solution)(t) = sln.fxn(t)
 
 # T = BufferType(S...)
-function Solution(prob, T)
+function Solution(prob, N::Vararg{Int})
     sln = solve(prob)
+    T = MArray{Tuple{N...}, Float64, length(N), prod(N)}
     buf = T(undef)
-    fxn = FunctionWrapper{T, Tuple{Float64}}(t->sln(buf, t))
+    fxn = FunctionWrapper{T, Tuple{Float64}}(t->(sln(buf, t); return buf))
     Solution(fxn,buf,sln)
 end
 
@@ -199,24 +210,30 @@ end
 
 
 
-# # maps t->ξ=(x,u)::(TX,TU)
-# struct Trajectory{TX,TU}
-#     x::FunctionWrapper{TX, Tuple{Float64}}
-#     u::FunctionWrapper{TU, Tuple{Float64}}
-#     xbuf::TX
-#     ubuf::TU
-#     sln::SciMLBase.AbstractODESolution
-# end
-# (ξ::Trajectory)(t) = (ξ.x(t), ξ.u(x,t))
+# maps t->ξ=(x,u)::(TX,TU)
+struct Trajectory{TX,TU}
+    x::FunctionWrapper{TX, Tuple{Float64}}
+    u::FunctionWrapper{TU, Tuple{Float64}}
+    xbuf::TX
+    ubuf::TU
+    sln::SciMLBase.AbstractODESolution
+end
 
+(ξ::Trajectory)(t) = (ξ.x(t), ξ.u(t))
 
-# function Trajectory(prob, TX, ctrl, TU)
-#     sln = solve(prob) # solves for x(t)
-#     xbuf = TX(undef)
-#     ubuf = TU(undef)
-#     x = FunctionWrapper{TX, Tuple{Float64}}(t->sln(buf,t))
-#     u = FunctionWrapper{TU, Tuple{Float64}}(t->ctrl(buf,t))
-# end
+function Trajectory(prob, NX::Int, NU::Int)
+    sln = solve(prob) # solves for ξ(t)
+
+    TX = MArray{Tuple{NX...}, Float64, length(NX), prod(NX)}
+    xbuf = TX(undef)
+    x = FunctionWrapper{TX, Tuple{Float64}}(t->(sln(xbuf,t;idxs=1:NX); return xbuf))
+
+    TU = MArray{Tuple{NU...}, Float64, length(NU), prod(NU)}
+    ubuf = TU(undef)
+    u = FunctionWrapper{TU, Tuple{Float64}}(t->(sln(ubuf,t;idxs=NX+1:NU); return ubuf))
+
+    Trajectory(x,u,xbuf,ubuf,sln)
+end
 
 
 # u(x,t)
@@ -224,13 +241,15 @@ end
 
 
 
-
+Base.show(io::IO, buf::Buffer) = show(io,typeof(buf))
 Base.show(io::IO, sln::Solution) = show(io,typeof(sln))
+#FUTURE: show size, length, time span, solver method?
+Base.show(io::IO, trj::Trajectory) = show(io,typeof(trj))
 #FUTURE: show size, length, time span, solver method?
 
 # this might be type piracy... but prevents the obscenely long error messages
-function Base.show(io::IO, fn::FunctionWrapper)
-    print(io, "$(typeof(fn)) $(fn.ptr)")
+function Base.show(io::IO, fn::FunctionWrapper{T,A}) where {T,A}
+    print(io, "FunctionWrapper: $A -> $T $(fn.ptr)")
 end
 
 
