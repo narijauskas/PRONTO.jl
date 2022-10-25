@@ -26,8 +26,8 @@ let
 
     # stage cost
     Ql = zeros(NX,NX)
-    Rl = 0.01
-    l = (θ,t,x,u) -> 1/2*collect(x)'*Ql*collect(x) + 1/2*collect(u)'*Rl*collect(u)
+    Rl = [0.01]
+    l = (θ,t,x,u) -> (1/2*collect(x)'*Ql*collect(x) .+ 1/2*collect(u)'*Rl*collect(u))
 
     # terminal cost
     Pl = [0 0 0 0;0 1 0 0;0 0 0 0;0 0 0 1]
@@ -41,6 +41,8 @@ let
     @derive TwoSpin
 end
 
+PRONTO.Ko(M)
+# PRONTO.ξ_t(M)
 
 ## ----------------------------------- tests ----------------------------------- ##
 
@@ -57,3 +59,5 @@ u0 = [0.0]
 φ = PRONTO.guess_zi(M,θ,xf,u0,t0,tf)
 ξ = pronto(M,θ,t0,tf,x0,u0,φ)
 
+
+Kr_fn = (θ,t,x,u,P) -> (PRONTO.luu(M,θ,t,x,u)\(PRONTO.lxu(M,θ,t,x,u)' .+ PRONTO.fu(M,θ,t,x,u)'collect(P)))

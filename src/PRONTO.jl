@@ -88,6 +88,7 @@ macro genfunc(fn, args)
             @variables t
             @variables x[1:nx(M)] 
             @variables u[1:nu(M)]
+            ξ = vcat(x,u)
             @variables α[1:nx(M)] 
             @variables μ[1:nu(M)] 
             @variables Pr[1:nx(M),1:nx(M)]
@@ -176,21 +177,33 @@ riccati(A,K,P,Q,R) = -A'P - P*A + K'R*K - Q
 
 
 function build(f, args...)
-    f_sym = cat(Base.invokelatest(f, args...); dims=1)
+    f_sym = collect(Base.invokelatest(f, args...))
     f_ex = build_function(f_sym, args...)
     return eval.(f_ex)
 end
 
-function jacobian(dx, f, args...)
-    f_sym = Base.invokelatest(f, args...)
-
+function jacobian(dx, f, args...; force_dims=nothing)
+    f_sym = collect(Base.invokelatest(f, args...))
+    
     # symbolic derivatives
-    fx_sym = cat(
-        map(1:length(dx)) do i
-            map(f_sym) do f
-                derivative(f, dx[i])
-            end
-        end...; dims = ndims(f_sym)+1)
+    jac_sym = map(1:length(dx)) do i
+        map(f_sym) do f
+            derivative(f, dx[i])
+        end
+    end
+
+    fx_sym = cat(jac_sym...; dims=ndims(f_sym)+1)
+
+    if !isnothing(force_dims)
+        fx_sym = reshape(fx_sym, force_dims...)
+    end
+
+    # fx_sym = cat(
+    #     map(1:length(dx)) do i
+    #         map(f_sym) do f
+    #             derivative(f, dx[i])
+    #         end
+    #     end...; dims = ndims(f_sym)+1)
 
     # return build_function(fx_sym, args...)
     fx_ex = build_function(fx_sym, args...)
@@ -201,7 +214,7 @@ end
 struct Jacobian
     dx
 end
-(J::Jacobian)(f, args...) = jacobian(J.dx, f, args...)
+(J::Jacobian)(f, args...; kw...) = jacobian(J.dx, f, args...; kw...)
 
 
 # ----------------------------------- model derivation ----------------------------------- #
@@ -227,8 +240,8 @@ macro derive(T)
         # define symbolics for derivation
         #MAYBE: pre-collect so user doesn't have to?
         @variables θ[1:nθ($T())]
-        @variables t
-        @variables x[1:nx($T())] 
+        @variables t[1:1]
+        @variables x[1:nx($T())]
         @variables u[1:nu($T())]
         ξ = vcat(x,u)
         @variables α[1:nx($T())] 
@@ -248,20 +261,14 @@ macro derive(T)
         local fuu,fuu! = Ju(fu,θ,t,x,u)
 
         local l,l! = build(l,θ,t,x,u)
-        local lx,lx! = Jx(θ,t,x,u) do θ,t,x,u
-            l(θ,t,x,u)[]
-        end
-        local lu,lu! = Ju(θ,t,x,u) do θ,t,x,u
-            l(θ,t,x,u)[]
-        end
+        local lx,lx! = Jx(l,θ,t,x,u; force_dims=(nx($T()),))
+        local lu,lu! = Ju(l,θ,t,x,u; force_dims=(nu($T()),))
         local lxx,lxx! = Jx(lx,θ,t,x,u)
         local lxu,lxu! = Ju(lx,θ,t,x,u)
         local luu,luu! = Ju(lu,θ,t,x,u)
 
         local p,p! = build(p,θ,t,x,u)
-        local px,px! = Jx(θ,t,x,u) do θ,t,x,u
-            p(θ,t,x,u)[]
-        end
+        local px,px! = Jx(p,θ,t,x,u; force_dims=(nx($T()),))
         local pxx,pxx! = Jx(px,θ,t,x,u)
 
         #Kr = Rr\(Br'Pr)
@@ -274,22 +281,39 @@ macro derive(T)
         end
 
         local ξ_t,ξ_t! = build(θ,t,ξ,α,μ,Pr) do θ,t,ξ,α,μ,Pr
-            x,u = split($T(),ξ)
+            local x,u = split($T(),ξ)
             vcat(
                 f(θ,t,x,u)...,
                 (collect(μ) - Kr(θ,t,α,μ,Pr)*(collect(x)-collect(α)) - collect(u))...
             )
         end
 
+        Ko_sym = (θ,t,x,u,P) -> luu(θ,t,x,u)\(lxu(θ,t,x,u)' .+ fu(θ,t,x,u)'collect(P))
         #Ko = R\(S'+B'P)
-        local Ko,Ko! = build(θ,t,x,u,P) do θ,t,x,u,P
-            luu(θ,t,x,u)\(lxu(θ,t,x,u)' + fu(θ,t,x,u)'collect(P))
+        # show(Ko_sym(θ,t,x,u,P))
+        # println()
+        # println()
+
+        local Ko,Ko! = build(Ko_sym,θ,t,x,u,P)# do θ,t,x,u,P
+            # Ko_sym
+            # luu(θ,t,x,u)\(lxu(θ,t,x,u)' .+ fu(θ,t,x,u)'collect(P))
             # luu(θ,t,x,u)\(fu(θ,t,x,u)'collect(P))
             # fu(θ,t,x,u)'collect(P)
             # lxu(θ,t,x,u)'
-        end
+        # end
+        # show(Ko(θ,t,x,u,P))
+        # println()
+        # println()
 
-        local P_t,Pt! = build(θ,t,x,u,P) do θ,t,x,u,P
+
+        # P_t_sym = (θ,t,x,u,P) -> riccati(fx(θ,t,x,u), Ko(θ,t,x,u,P), collect(P), lxx(θ,t,x,u), luu(θ,t,x,u))
+
+        # show(P_t_sym(θ,t,x,u,P))
+        # println()
+        # println()
+
+
+        local P_t,P_t! = build(θ,t,x,u,P) do θ,t,x,u,P
             riccati(fx(θ,t,x,u), Ko(θ,t,x,u,P), collect(P), lxx(θ,t,x,u), luu(θ,t,x,u))
         end
 
@@ -300,7 +324,6 @@ macro derive(T)
         PRONTO.Qr(M::$T,θ,t,α,μ) = Qr(θ,t,α,μ)
         PRONTO.Kr(M::$T,θ,t,α,μ,Pr) = Kr(θ,t,α,μ,Pr) # NU,NX
         PRONTO.Ko(M::$T,θ,t,x,u,P) = Ko(θ,t,x,u,P) # NU,NX
-
 
         PRONTO.f(M::$T,θ,t,x,u) = f(θ,t,x,u) # NX
         PRONTO.fx(M::$T,θ,t,x,u) = fx(θ,t,x,u) # NX,NX
@@ -321,7 +344,7 @@ macro derive(T)
         PRONTO.pxx(M::$T,θ,t,x,u) = pxx(θ,t,x,u) # NX,NX
 
         PRONTO.Pr_t(M::$T,θ,t,α,μ,Pr) = Pr_t(θ,t,α,μ,Pr) # NX,NX
-        PRONTO.ξ_t(M::$T,θ,t,x,u,α,μ,P) = ξ_t(θ,t,x,u,α,μ,P) # NX+NU
+        PRONTO.ξ_t(M::$T,θ,t,ξ,α,μ,P) = ξ_t(θ,t,ξ,α,μ,P) # NX+NU
         PRONTO.P_t(M::$T,θ,t,x,u,P) = P_t(θ,t,x,u,P) # NX,NX
 
         PRONTO.f!(M::$T,buf,θ,t,x,u) = f!(buf,θ,t,x,u) #NX
@@ -349,14 +372,14 @@ function pronto(M::Model, θ, t0, tf, x0, u0, φ)
     
     info("solving regulator")
     Prf = diagm(ones(nx(M)))
-    Pr = Solution(ODEProblem(Pr_ode,Prf,(t0,tf),(M,φ,θ)), nx(M), nx(M))
+    Pr = Solution(ODEProblem(Pr_ode,Prf,(tf,t0),(M,φ,θ)), nx(M), nx(M))
 
     info("solving projection")
     ξ = Trajectory(M, ξ_ode, [x0;u0], (t0,tf), (M,θ,φ,Pr))
 
-    # info("solving optimizer")
-    # Pf = pxx(M,θ,tf,φ(tf)...)
-    # P = Solution(ODEProblem(P_ode,Pf,(t0,tf),(M,ξ,θ)), nx(M), nx(M))
+    info("solving optimizer")
+    Pf = pxx(M,θ,tf,φ(tf)...)
+    P = Solution(ODEProblem(P_ode,Pf,(tf,t0),(M,ξ,θ)), nx(M), nx(M))
     return ξ
 end
 
