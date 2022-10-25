@@ -118,5 +118,6 @@ PRONTO.Kr(M,θ,t,x,u,P)
 PRONTO.f!(M,buf,θ,t,x,u)
 
 ##
-φg = PRONTO.guess_zi(M,θ,x0,u0,t0,tf)
-pronto(M,θ,t0,tf,x0,u0,φg)
+φ = PRONTO.guess_zi(M,θ,xf,u0,t0,tf)
+# φg = Trajectory(M, PRONTO.zi_dyn!,[x0;u0], (t0,tf), (M,θ))
+ξ = pronto(M,θ,t0,tf,x0,u0,φ)

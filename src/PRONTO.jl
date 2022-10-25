@@ -78,8 +78,8 @@ end
 @genfunc Rr    (θ,t,α,μ) 
 @genfunc Qr    (θ,t,α,μ) 
 @genfunc Kr    (θ,t,α,μ,Pr) 
-@genfunc Prt   (θ,t,α,μ,Pr)
-@genfunc ξt    (θ,t,x,u,α,μ,Pr)
+@genfunc Pr_t   (θ,t,α,μ,Pr)
+@genfunc ξ_t    (θ,t,x,u,α,μ,Pr)
 
 
 f(M::Model,θ,t,x,u) = throw(ModelDefError(M,:f))
@@ -104,13 +104,13 @@ Rr(M::Model,θ,t,α,μ) = throw(ModelDefError(M,:Rr))
 Qr(M::Model,θ,t,α,μ) = throw(ModelDefError(M,:Qr))
 Kr(M::Model,θ,t,α,μ,P) = throw(ModelDefError(M,:Kr))
 
-Prt(M::Model,θ,t,α,μ,Pr) = throw(ModelDefError(M, :Prt))
-ξt(M::Model,θ,t,x,u,α,μ,P) = throw(ModelDefError(M, :ξt))
+Pr_t(M::Model,θ,t,α,μ,Pr) = throw(ModelDefError(M, :Pr_t))
+ξ_t(M::Model,θ,t,x,u,α,μ,P) = throw(ModelDefError(M, :ξ_t))
 
 
 f!(M::Model,buf,θ,t,x,u) = throw(ModelDefError(M, :f!))
-Prt!(M::Model,buf,θ,t,α,μ,Pr) = throw(ModelDefError(M, :Prt!))
-ξt!(M::Model,buf,θ,t,x,u,α,μ,P) = throw(ModelDefError(M, :ξt!))
+Pr_t!(M::Model,buf,θ,t,α,μ,Pr) = throw(ModelDefError(M, :Pr_t!))
+ξ_t!(M::Model,buf,θ,t,x,u,α,μ,P) = throw(ModelDefError(M, :ξ_t!))
 
 
 # FUTURE: for each function and signature, macro-define:
@@ -120,6 +120,8 @@ Prt!(M::Model,buf,θ,t,α,μ,Pr) = throw(ModelDefError(M, :Prt!))
 
 
 riccati(A,K,P,Q,R) = -A'P - P*A + K'R*K - Q
+
+
 
 # @genfunc(:Kr,θ,t,α,μ,P)
 # ----------------------------------- symbolics & autodiff ----------------------------------- #
@@ -192,11 +194,11 @@ macro derive(T)
             Rr(θ,t,α,μ)\(fu(θ,t,α,μ)'*collect(Pr))
         end
 
-        local Prt,Prt! = build(θ,t,α,μ,Pr) do θ,t,α,μ,Pr
+        local Pr_t,Pr_t! = build(θ,t,α,μ,Pr) do θ,t,α,μ,Pr
             riccati(fx(θ,t,α,μ), Kr(θ,t,α,μ,Pr), collect(Pr), Qr(θ,t,α,μ), Rr(θ,t,α,μ))
         end
 
-        local ξt,ξt! = build(θ,t,x,u,α,μ,Pr) do θ,t,x,u,α,μ,Pr
+        local ξ_t,ξ_t! = build(θ,t,x,u,α,μ,Pr) do θ,t,x,u,α,μ,Pr
             vcat(
                 f(θ,t,x,u)...,
                 (collect(μ) - Kr(θ,t,α,μ,Pr)*(collect(x)-collect(α)) - collect(u))...
@@ -216,13 +218,13 @@ macro derive(T)
         PRONTO.fu(M::$T,θ,t,x,u) = fu(θ,t,x,u) # NX,NU
         PRONTO.fxx(M::$T,θ,t,x,u) = fxx(θ,t,x,u) # NX,NX
         
+        PRONTO.Pr_t(M::$T,θ,t,α,μ,Pr) = Pr_t(θ,t,α,μ,Pr) # NX,NX
+        PRONTO.ξ_t(M::$T,θ,t,x,u,α,μ,P) = ξ_t(θ,t,x,u,α,μ,P) # NX+NU
+        
+        
         PRONTO.f!(M::$T,buf,θ,t,x,u) = f!(buf,θ,t,x,u) #NX
-
-        PRONTO.Prt(M::$T,θ,t,α,μ,Pr) = Prt(θ,t,α,μ,Pr) # NX,NX
-        PRONTO.Prt!(M::$T,buf,θ,t,α,μ,Pr) = Prt!(buf,θ,t,α,μ,Pr) # NX,NX    
-
-        PRONTO.ξt(M::$T,θ,t,x,u,α,μ,P) = ξt(θ,t,x,u,α,μ,P) # NX+NU
-        PRONTO.ξt!(M::$T,buf,θ,t,x,u,α,μ,P) = ξt!(buf,θ,t,x,u,α,μ,P) # NX+NU
+        PRONTO.Pr_t!(M::$T,buf,θ,t,α,μ,Pr) = Pr_t!(buf,θ,t,α,μ,Pr) # NX,NX    
+        PRONTO.ξ_t!(M::$T,buf,θ,t,x,u,α,μ,P) = ξ_t!(buf,θ,t,x,u,α,μ,P) # NX+NU
 
         @info "$($T) model derivation complete!"
     end
@@ -230,124 +232,32 @@ end
 
 
 # ----------------------------------- ode solution handling ----------------------------------- #
-
-#TODO: abstract type AbstractBuffer{T}
-
-# maps t->x::T
-struct Buffer{T}
-    fxn::FunctionWrapper{T, Tuple{Float64}}
-    buf::T
-    fn!::Function
-end
-
-(buf::Buffer)(t) = buf.fxn(t)
-
-function Buffer(fn!, N::Vararg{Int})
-    @assert length(N) >= 1
-    T = MArray{Tuple{N...}, Float64, length(N), prod(N)}
-    buf = T(undef)
-    fxn = FunctionWrapper{T, Tuple{Float64}}(t->(fn!(buf, t); return copy(buf)))
-    Buffer(fxn,buf,fn!)
-end
-
-
-# maps t->x::T
-struct Solution{T}
-    fxn::FunctionWrapper{T, Tuple{Float64}}
-    buf::T
-    sln::SciMLBase.AbstractODESolution
-end
-
-(sln::Solution)(t) = sln.fxn(t)
-
-# T = BufferType(S...)
-function Solution(prob, N::Vararg{Int})
-    @assert length(N) >= 1
-    sln = solve(prob)
-    T = MArray{Tuple{N...}, Float64, length(N), prod(N)}
-    buf = T(undef)
-    fxn = FunctionWrapper{T, Tuple{Float64}}(t->(sln(buf, t); return copy(buf)))
-    Solution(fxn,buf,sln)
-end
-
-Base.size(sln::Solution) = size(sln.buf)
-
-
-
-
-# maps t->ξ=(x,u)::(TX,TU)
-struct Trajectory{TX,TU}
-    x::FunctionWrapper{TX, Tuple{Float64}}
-    u::FunctionWrapper{TU, Tuple{Float64}}
-    xbuf::TX
-    ubuf::TU
-    sln::SciMLBase.AbstractODESolution
-end
-
-(ξ::Trajectory)(t) = (ξ.x(t), ξ.u(t))
-
-function Trajectory(prob, NX::Int, NU::Int)
-    sln = solve(prob) # solves for ξ(t)
-
-    TX = MArray{Tuple{NX...}, Float64, length(NX), prod(NX)}
-    xbuf = TX(undef)
-    x = FunctionWrapper{TX, Tuple{Float64}}(t->(sln(xbuf,t;idxs=1:NX); return copy(xbuf)))
-
-    TU = MArray{Tuple{NU...}, Float64, length(NU), prod(NU)}
-    ubuf = TU(undef)
-    u = FunctionWrapper{TU, Tuple{Float64}}(t->(sln(ubuf,t;idxs=(NX+1):(NX+NU)); return copy(ubuf)))
-
-    Trajectory(x,u,xbuf,ubuf,sln)
-end
-
-
-function preview(ξ::Trajectory)
-    T = LinRange(extrema(ξ.sln.t)..., 1001)
-    x = [ξ.x(t)[i] for t in T, i in CartesianIndices(size(ξ.xbuf))]
-    lineplot(T,x; height=20, width=80)
-end
-
-
-
-Base.show(io::IO, buf::Buffer) = show(io,typeof(buf))
-Base.show(io::IO, sln::Solution) = show(io,typeof(sln))
-#FUTURE: show size, length, time span, solver method?
-Base.show(io::IO, trj::Trajectory) = show(io,typeof(trj))
-#FUTURE: show size, length, time span, solver method?
-
-# this might be type piracy... but prevents the obscenely long error messages
-function Base.show(io::IO, fn::FunctionWrapper{T,A}) where {T,A}
-    print(io, "FunctionWrapper: $A -> $T $(fn.ptr)")
-end
-
-
-
-
-
-
+include("utils.jl")
 
 # ----------------------------------- main ----------------------------------- #
 # where φ=(α,μ)::Trajectory{NX,NU}
 function Pr_ode(dPr, Pr,(M,φ,θ), t)
-    Prt!(M,dPr,θ,t,φ(t)...,Pr)
+    Pr_t!(M,dPr,θ,t,φ(t)...,Pr)
 end
 
 
 function ξ_ode(dξ,ξ,(M,θ,φ,Pr),t)
     x = @view ξ[1:nx(M)]
     u = @view ξ[nx(M)+1:end]
-    ξt!(M,dξ,θ,t,x,u,φ(t)...,Pr(t))
+    ξ_t!(M,dξ,θ,t,x,u,φ(t)...,Pr(t))
 end
 
 
 function pronto(M::Model, θ, t0, tf, x0, u0, φ)
-    @info "solving Pr"
     Prf = diagm(ones(nx(M)))
+    
+    @info "solving regulator"
     Pr = Solution(ODEProblem(Pr_ode,Prf,(t0,tf),(M,φ,θ)), nx(M), nx(M))
-    @info "solving ξ"
-    odefunc = ODEFunction(ξ_ode; mass_matrix=PRONTO.massmatrix(M))
-    Trajectory(ODEProblem(odefunc,[x0;u0],(t0,tf),(M,θ,φ,Pr)), nx(M), nu(M))
+    @info "solving projection"
+    ξ = Trajectory(M, ξ_ode, [x0;u0], (t0,tf), (M,θ,φ,Pr))
 end
+
+# Trajectory(M, ξ_ode, [x0;u0], (t0,tf), (M,θ,φ,Pr))
 
 
 
