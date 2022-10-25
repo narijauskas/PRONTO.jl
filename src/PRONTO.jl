@@ -98,12 +98,12 @@ macro genfunc(fn, args)
     end
 end
 
-@genfunc f     (θ,t,x,u)
-@genfunc fx    (θ,t,x,u)
-@genfunc fu    (θ,t,x,u)
-@genfunc fxx   (θ,t,x,u)
-@genfunc fxu   (θ,t,x,u)
-@genfunc fuu   (θ,t,x,u)
+@genfunc f     (θ,t,ξ)
+@genfunc fx    (θ,t,ξ)
+@genfunc fu    (θ,t,ξ)
+@genfunc fxx   (θ,t,ξ)
+@genfunc fxu   (θ,t,ξ)
+@genfunc fuu   (θ,t,ξ)
 
 @genfunc l     (θ,t,x,u)
 @genfunc lx    (θ,t,x,u)
@@ -185,31 +185,22 @@ end
 function jacobian(dx, f, args...; force_dims=nothing)
     f_sym = collect(Base.invokelatest(f, args...))
     
-    # symbolic derivatives
+    # generate symbolic derivatives
     jac_sym = map(1:length(dx)) do i
         map(f_sym) do f
             derivative(f, dx[i])
         end
     end
 
+    # reshape/concatenate
     fx_sym = cat(jac_sym...; dims=ndims(f_sym)+1)
-
     if !isnothing(force_dims)
         fx_sym = reshape(fx_sym, force_dims...)
     end
 
-    # fx_sym = cat(
-    #     map(1:length(dx)) do i
-    #         map(f_sym) do f
-    #             derivative(f, dx[i])
-    #         end
-    #     end...; dims = ndims(f_sym)+1)
-
-    # return build_function(fx_sym, args...)
     fx_ex = build_function(fx_sym, args...)
     return eval.(fx_ex)
 end
-
 
 struct Jacobian
     dx
@@ -239,11 +230,11 @@ macro derive(T)
         # load user definitions
         Rr = $(esc(:(Rr)))
         Qr = $(esc(:(Qr)))
-        f = $(esc(:(f)))
+        # f = $(esc(:(f)))
         l = $(esc(:(l)))
         p = $(esc(:(p)))
 
-        # define symbolics for derivation
+        println("\t -> defining symbolic variables and operators")
         #MAYBE: pre-collect so user doesn't have to?
         @variables θ[1:nθ($T())]
         @variables t[1:1]
@@ -258,16 +249,29 @@ macro derive(T)
 
         Jx,Ju = Jacobian.([x,u])
 
+        println("\t -> differentiating dynamics f")
+
         # derive models
-        # local f,f! = build(f,θ,t,x,u) do θ,t,ξ
-        #     local x,u = split(ξ)
-        # end
-        local f,f! = build(f,θ,t,x,u)
-        local fx,fx! = Jx(f,θ,t,x,u)
-        local fu,fu! = Ju(f,θ,t,x,u)
-        local fxx,fxx! = Jx(fx,θ,t,x,u)
-        local fxu,fxu! = Ju(fx,θ,t,x,u)
-        local fuu,fuu! = Ju(fu,θ,t,x,u)
+        local f,f! = build(θ,t,ξ) do θ,t,ξ
+            local x,u = split($T(),ξ)
+            ($(esc(:(f))))(θ,t,x,u)
+        end
+        # local f,f! = build(f,θ,t,x,u)
+        local fx,fx! = Jx(f,θ,t,ξ)
+        local fu,fu! = Ju(f,θ,t,ξ)
+        local fxx,fxx! = Jx(fx,θ,t,ξ)
+        local fxu,fxu! = Ju(fx,θ,t,ξ)
+        local fuu,fuu! = Ju(fu,θ,t,ξ)
+
+        # add definitions to PRONTO
+        PRONTO.f(M::$T,θ,t,ξ) = f(θ,t,ξ) # NX
+        PRONTO.fx(M::$T,θ,t,ξ) = fx(θ,t,ξ) # NX,NX
+        PRONTO.fu(M::$T,θ,t,ξ) = fu(θ,t,ξ) # NX,NU
+        PRONTO.fxx(M::$T,θ,t,ξ) = fxx(θ,t,ξ) # NX,NX,NX
+        PRONTO.fxu(M::$T,θ,t,ξ) = fxu(θ,t,ξ) # NX,NX,NU
+        PRONTO.fuu(M::$T,θ,t,ξ) = fuu(θ,t,ξ) # NX,NU,NU
+
+        println("\t -> differentiating stage cost l")
 
         local l,l! = build(l,θ,t,x,u)
         local lx,lx! = Jx(l,θ,t,x,u; force_dims=(nx($T()),))
@@ -276,9 +280,20 @@ macro derive(T)
         local lxu,lxu! = Ju(lx,θ,t,x,u)
         local luu,luu! = Ju(lu,θ,t,x,u)
 
+        PRONTO.l(M::$T,θ,t,x,u) = l(θ,t,x,u) # 1
+        PRONTO.lx(M::$T,θ,t,x,u) = lx(θ,t,x,u) # NX
+        PRONTO.lu(M::$T,θ,t,x,u) = lu(θ,t,x,u) # NU
+        PRONTO.lxx(M::$T,θ,t,x,u) = lxx(θ,t,x,u) # NX,NX
+        PRONTO.lxu(M::$T,θ,t,x,u) = lxu(θ,t,x,u) # NX,NU
+        PRONTO.luu(M::$T,θ,t,x,u) = luu(θ,t,x,u) # NU,NU
+
+        println("\t -> differentiating terminal cost p")
+
         local p,p! = build(p,θ,t,x,u)
         local px,px! = Jx(p,θ,t,x,u; force_dims=(nx($T()),))
         local pxx,pxx! = Jx(px,θ,t,x,u)
+
+        println("\t -> deriving regulator equations")
 
         #Kr = Rr\(Br'Pr)
         local Kr,Kr! = build(θ,t,α,μ,Pr) do θ,t,α,μ,Pr
@@ -289,12 +304,16 @@ macro derive(T)
             riccati(fx(θ,t,α,μ), Kr(θ,t,α,μ,Pr), @vec(Pr), Qr(θ,t,α,μ), Rr(θ,t,α,μ))
         end
 
+        println("\t -> deriving projection equations")
+
         local ξ_t,ξ_t! = build(θ,t,ξ,α,μ,Pr) do θ,t,ξ,α,μ,Pr
             local x,u = split($T(),ξ)
             vcat(f(θ,t,x,u)...,
                 (@vec(μ) - Kr(θ,t,α,μ,Pr)*(@vec(x) - @vec(α)) - @vec(u))...)
         end
         
+        println("\t -> deriving optimizer equations")
+
         #Ko = R\(S'+B'P)
         local Ko,Ko! = build(θ,t,x,u,P) do θ,t,x,u,P
             luu(θ,t,x,u)\(lxu(θ,t,x,u)' .+ fu(θ,t,x,u)'*@vec(P))
@@ -304,27 +323,12 @@ macro derive(T)
             riccati(fx(θ,t,x,u), Ko(θ,t,x,u,P), @vec(P), lxx(θ,t,x,u), luu(θ,t,x,u))
         end
 
-
-
         # add functions to PRONTO - only at this point do we care about dispatch on the first arg
         PRONTO.Rr(M::$T,θ,t,α,μ) = Rr(θ,t,α,μ)
         PRONTO.Qr(M::$T,θ,t,α,μ) = Qr(θ,t,α,μ)
         PRONTO.Kr(M::$T,θ,t,α,μ,Pr) = Kr(θ,t,α,μ,Pr) # NU,NX
         PRONTO.Ko(M::$T,θ,t,x,u,P) = Ko(θ,t,x,u,P) # NU,NX
 
-        PRONTO.f(M::$T,θ,t,x,u) = f(θ,t,x,u) # NX
-        PRONTO.fx(M::$T,θ,t,x,u) = fx(θ,t,x,u) # NX,NX
-        PRONTO.fu(M::$T,θ,t,x,u) = fu(θ,t,x,u) # NX,NU
-        PRONTO.fxx(M::$T,θ,t,x,u) = fxx(θ,t,x,u) # NX,NX,NX
-        PRONTO.fxu(M::$T,θ,t,x,u) = fxu(θ,t,x,u) # NX,NX,NU
-        PRONTO.fuu(M::$T,θ,t,x,u) = fuu(θ,t,x,u) # NX,NU,NU
-
-        PRONTO.l(M::$T,θ,t,x,u) = l(θ,t,x,u) # 1
-        PRONTO.lx(M::$T,θ,t,x,u) = lx(θ,t,x,u) # NX
-        PRONTO.lu(M::$T,θ,t,x,u) = lu(θ,t,x,u) # NU
-        PRONTO.lxx(M::$T,θ,t,x,u) = lxx(θ,t,x,u) # NX,NX
-        PRONTO.lxu(M::$T,θ,t,x,u) = lxu(θ,t,x,u) # NX,NU
-        PRONTO.luu(M::$T,θ,t,x,u) = luu(θ,t,x,u) # NU,NU
 
         PRONTO.p(M::$T,θ,t,x,u) = p(θ,t,x,u) # 1
         PRONTO.px(M::$T,θ,t,x,u) = px(θ,t,x,u) # NX
