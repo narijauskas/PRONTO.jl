@@ -357,8 +357,7 @@ function pronto(M::Model, θ, t0, tf, x0, u0, φ)
     # info("solving optimizer")
     # Pf = pxx(M,θ,tf,φ(tf)...)
     # P = Solution(ODEProblem(P_ode,Pf,(t0,tf),(M,ξ,θ)), nx(M), nx(M))
-
-    return(Pr,ξ)
+    return ξ
 end
 
 # Trajectory(M, ξ_ode, [x0;u0], (t0,tf), (M,θ,φ,Pr))
