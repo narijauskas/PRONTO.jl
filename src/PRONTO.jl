@@ -219,6 +219,12 @@ end
 
 # ----------------------------------- model derivation ----------------------------------- #
 
+# vectorization helper for autodiff -> wrap symbolic array variables
+# really, just shorter than typing collect :P
+macro vec(ex)
+    :(collect($ex))
+end
+
 split(M::Model, ξ) = (ξ[1:nx(M)], ξ[(nx(M)+1):end])
 
 #YO: #FUTURE: if pronto knows each function's argument signature
@@ -253,6 +259,9 @@ macro derive(T)
         Jx,Ju = Jacobian.([x,u])
 
         # derive models
+        # local f,f! = build(f,θ,t,x,u) do θ,t,ξ
+        #     local x,u = split(ξ)
+        # end
         local f,f! = build(f,θ,t,x,u)
         local fx,fx! = Jx(f,θ,t,x,u)
         local fu,fu! = Ju(f,θ,t,x,u)
@@ -273,48 +282,26 @@ macro derive(T)
 
         #Kr = Rr\(Br'Pr)
         local Kr,Kr! = build(θ,t,α,μ,Pr) do θ,t,α,μ,Pr
-            Rr(θ,t,α,μ)\(fu(θ,t,α,μ)'collect(Pr))
+            Rr(θ,t,α,μ)\(fu(θ,t,α,μ)'*@vec(Pr))
         end
 
         local Pr_t,Pr_t! = build(θ,t,α,μ,Pr) do θ,t,α,μ,Pr
-            riccati(fx(θ,t,α,μ), Kr(θ,t,α,μ,Pr), collect(Pr), Qr(θ,t,α,μ), Rr(θ,t,α,μ))
+            riccati(fx(θ,t,α,μ), Kr(θ,t,α,μ,Pr), @vec(Pr), Qr(θ,t,α,μ), Rr(θ,t,α,μ))
         end
 
         local ξ_t,ξ_t! = build(θ,t,ξ,α,μ,Pr) do θ,t,ξ,α,μ,Pr
             local x,u = split($T(),ξ)
-            vcat(
-                f(θ,t,x,u)...,
-                (collect(μ) - Kr(θ,t,α,μ,Pr)*(collect(x)-collect(α)) - collect(u))...
-            )
+            vcat(f(θ,t,x,u)...,
+                (@vec(μ) - Kr(θ,t,α,μ,Pr)*(@vec(x) - @vec(α)) - @vec(u))...)
+        end
+        
+        #Ko = R\(S'+B'P)
+        local Ko,Ko! = build(θ,t,x,u,P) do θ,t,x,u,P
+            luu(θ,t,x,u)\(lxu(θ,t,x,u)' .+ fu(θ,t,x,u)'*@vec(P))
         end
 
-        Ko_sym = (θ,t,x,u,P) -> luu(θ,t,x,u)\(lxu(θ,t,x,u)' .+ fu(θ,t,x,u)'collect(P))
-        #Ko = R\(S'+B'P)
-        # show(Ko_sym(θ,t,x,u,P))
-        # println()
-        # println()
-
-        local Ko,Ko! = build(Ko_sym,θ,t,x,u,P)# do θ,t,x,u,P
-            # Ko_sym
-            # luu(θ,t,x,u)\(lxu(θ,t,x,u)' .+ fu(θ,t,x,u)'collect(P))
-            # luu(θ,t,x,u)\(fu(θ,t,x,u)'collect(P))
-            # fu(θ,t,x,u)'collect(P)
-            # lxu(θ,t,x,u)'
-        # end
-        # show(Ko(θ,t,x,u,P))
-        # println()
-        # println()
-
-
-        # P_t_sym = (θ,t,x,u,P) -> riccati(fx(θ,t,x,u), Ko(θ,t,x,u,P), collect(P), lxx(θ,t,x,u), luu(θ,t,x,u))
-
-        # show(P_t_sym(θ,t,x,u,P))
-        # println()
-        # println()
-
-
         local P_t,P_t! = build(θ,t,x,u,P) do θ,t,x,u,P
-            riccati(fx(θ,t,x,u), Ko(θ,t,x,u,P), collect(P), lxx(θ,t,x,u), luu(θ,t,x,u))
+            riccati(fx(θ,t,x,u), Ko(θ,t,x,u,P), @vec(P), lxx(θ,t,x,u), luu(θ,t,x,u))
         end
 
 

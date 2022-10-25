@@ -15,7 +15,7 @@ NΘ = 0
 struct TwoSpin <: PRONTO.Model{NX,NU,NΘ}
 end
 
-# ----------------------------------- model definition ----------------------------------- ##
+## ----------------------------------- model definition ----------------------------------- ##
 
 let
     # model dynamics
@@ -56,8 +56,8 @@ u0 = [0.0]
 
 
 ##
-φ = PRONTO.guess_zi(M,θ,xf,u0,t0,tf)
-ξ = pronto(M,θ,t0,tf,x0,u0,φ)
+φ = PRONTO.guess_zi(M,θ,x0,u0,t0,tf)
+@time ξ = pronto(M,θ,t0,tf,x0,u0,φ)
 
 
 Kr_fn = (θ,t,x,u,P) -> (PRONTO.luu(M,θ,t,x,u)\(PRONTO.lxu(M,θ,t,x,u)' .+ PRONTO.fu(M,θ,t,x,u)'collect(P)))

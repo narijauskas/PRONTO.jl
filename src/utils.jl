@@ -109,9 +109,8 @@ function Base.show(io::IO, ξ::Trajectory)
     print(io, typeof(ξ))
     if !compact
         println()
-        print(preview(ξ))
+        print(io,preview(ξ))
     end
-    # nothing
 end
 #FUTURE: show size, length, time span, solver method?
 
