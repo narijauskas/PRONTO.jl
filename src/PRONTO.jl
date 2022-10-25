@@ -6,6 +6,8 @@ using FunctionWrappers: FunctionWrapper
 using StaticArrays
 using FastClosures
 using LinearAlgebra
+using UnicodePlots
+# default_size!(;width=80)
 
 using DifferentialEquations
 using Symbolics
@@ -18,7 +20,7 @@ export nx,nu,nθ
 export Buffer
 export Solution
 export Trajectory
-
+export preview
 
 # ----------------------------------- base definitions ----------------------------------- #
 
@@ -45,51 +47,15 @@ function Base.showerror(io::IO, e::ModelDefError)
 end
 
 
-f(M::Model,θ,t,x,u) = throw(ModelDefError(M,:f))
-fx(M::Model,θ,t,x,u) = throw(ModelDefError(M,:fx))
-fu(M::Model,θ,t,x,u) = throw(ModelDefError(M,:fu))
-fxx(M::Model,θ,t,x,u) = throw(ModelDefError(M,:fxx))
-fxu(M::Model,θ,t,x,u) = throw(ModelDefError(M,:fxu))
-fuu(M::Model,θ,t,x,u) = throw(ModelDefError(M,:fuu))
-
-# l(M::Model,θ,t,x,u) = throw(ModelDefError(M,:l))
-# lx(M::Model,θ,t,x,u) = throw(ModelDefError(M,:lx))
-# lu(M::Model,θ,t,x,u) = throw(ModelDefError(M,:lu))
-# lxx(M::Model,θ,t,x,u) = throw(ModelDefError(M,:lxx))
-# lxu(M::Model,θ,t,x,u) = throw(ModelDefError(M,:lxu))
-# luu(M::Model,θ,t,x,u) = throw(ModelDefError(M,:luu))
-
-p(M::Model,θ,t,x,u) = throw(ModelDefError(M,:p))
-px(M::Model,θ,t,x,u) = throw(ModelDefError(M,:px))
-pxx(M::Model,θ,t,x,u) = throw(ModelDefError(M,:pxx))
-
-Rr(M::Model,θ,t,α,μ) = throw(ModelDefError(M,:Rr))
-Qr(M::Model,θ,t,α,μ) = throw(ModelDefError(M,:Qr))
-Kr(M::Model,θ,t,α,μ,P) = throw(ModelDefError(M,:Kr))
-
-f!(M::Model,buf,θ,t,x,u) = throw(ModelDefError(M, :f!))
-
-Prt!(M::Model,buf,θ,t,α,μ,Pr) = throw(ModelDefError(M, :Prt!))
-Prt(M::Model,θ,t,α,μ,Pr) = throw(ModelDefError(M, :Prt))
-
-ξt!(M::Model,buf,θ,t,x,u,α,μ,P) = throw(ModelDefError(M, :ξt!))
-ξt(M::Model,θ,t,x,u,α,μ,P) = throw(ModelDefError(M, :ξt))
-
-
-# FUTURE: for each function and signature, macro-define:
-# - default function f(M,...) = @error
-# - default inplace f!(M,buf,...) = @error
-# - symbolic generator symbolic(M,f)
-
-
-riccati(A,K,P,Q,R) = -A'P - P*A + K'R*K - Q
-
-# @genfunc(:Kr,θ,t,α,μ,P)
-# ----------------------------------- symbolics & autodiff ----------------------------------- #
-
-macro symfunc(fn,args)
+# M not included in args
+macro genfunc(fn, args...)
     fn = esc(fn)
     return quote
+        # define a default fallback method
+        # function ($fn)(M::Model, $(args...))
+        #     throw(ModelDefError(M,nameof($fn)))
+        # end
+        # define a symbolic rendition
         function ($fn)(M::Model)
             @variables θ[1:nθ(M)]
             @variables t
@@ -103,38 +69,61 @@ macro symfunc(fn,args)
     end
 end
 
-# @symfunc Kr (M,x,u,t,θ,Pr)
-@symfunc f (M,θ,t,x,u)
-@symfunc fx (M,θ,t,x,u)
-@symfunc fu (M,θ,t,x,u)
-@symfunc fxx (M,θ,t,x,u)
-@symfunc fxu (M,θ,t,x,u)
-@symfunc fuu (M,θ,t,x,u)
-
-@symfunc Rr (M,θ,t,α,μ) 
-@symfunc Qr (M,θ,t,α,μ) 
-@symfunc Kr (M,θ,t,α,μ,Pr) 
-
-@symfunc Prt (M,θ,t,α,μ,Pr)
-@symfunc ξt (M,θ,t,x,u,α,μ,Pr)
+@genfunc f     (θ,t,x,u)
+@genfunc fx    (θ,t,x,u)
+@genfunc fu    (θ,t,x,u)
+@genfunc fxx   (θ,t,x,u)
+@genfunc fxu   (θ,t,x,u)
+@genfunc fuu   (θ,t,x,u)
+@genfunc Rr    (θ,t,α,μ) 
+@genfunc Qr    (θ,t,α,μ) 
+@genfunc Kr    (θ,t,α,μ,Pr) 
+@genfunc Prt   (θ,t,α,μ,Pr)
+@genfunc ξt    (θ,t,x,u,α,μ,Pr)
 
 
-macro genfunc(fn,args...)
-    fn = esc(fn)
-    return quote
-        function ($fn)(M::Model, $(args...))
-            throw(ModelDefError(M,nameof($fn)))
-        end
-        # function ($fn)(M::Model)
-        #     @variables x[1:nx(M)] 
-        #     @variables u[1:nu(M)] 
-        #     @variables t
-        #     @variables θ[1:nθ(M)]
-        #     @variables Pr[1:nx(M),1:nx(M)]
-        #     ($fn)($args...)
-        # end
-    end
-end
+f(M::Model,θ,t,x,u) = throw(ModelDefError(M,:f))
+fx(M::Model,θ,t,x,u) = throw(ModelDefError(M,:fx))
+fu(M::Model,θ,t,x,u) = throw(ModelDefError(M,:fu))
+fxx(M::Model,θ,t,x,u) = throw(ModelDefError(M,:fxx))
+fxu(M::Model,θ,t,x,u) = throw(ModelDefError(M,:fxu))
+fuu(M::Model,θ,t,x,u) = throw(ModelDefError(M,:fuu))
+
+l(M::Model,θ,t,x,u) = throw(ModelDefError(M,:l))
+lx(M::Model,θ,t,x,u) = throw(ModelDefError(M,:lx))
+lu(M::Model,θ,t,x,u) = throw(ModelDefError(M,:lu))
+lxx(M::Model,θ,t,x,u) = throw(ModelDefError(M,:lxx))
+lxu(M::Model,θ,t,x,u) = throw(ModelDefError(M,:lxu))
+luu(M::Model,θ,t,x,u) = throw(ModelDefError(M,:luu))
+
+p(M::Model,θ,t,x,u) = throw(ModelDefError(M,:p))
+px(M::Model,θ,t,x,u) = throw(ModelDefError(M,:px))
+pxx(M::Model,θ,t,x,u) = throw(ModelDefError(M,:pxx))
+
+Rr(M::Model,θ,t,α,μ) = throw(ModelDefError(M,:Rr))
+Qr(M::Model,θ,t,α,μ) = throw(ModelDefError(M,:Qr))
+Kr(M::Model,θ,t,α,μ,P) = throw(ModelDefError(M,:Kr))
+
+Prt(M::Model,θ,t,α,μ,Pr) = throw(ModelDefError(M, :Prt))
+ξt(M::Model,θ,t,x,u,α,μ,P) = throw(ModelDefError(M, :ξt))
+
+
+f!(M::Model,buf,θ,t,x,u) = throw(ModelDefError(M, :f!))
+Prt!(M::Model,buf,θ,t,α,μ,Pr) = throw(ModelDefError(M, :Prt!))
+ξt!(M::Model,buf,θ,t,x,u,α,μ,P) = throw(ModelDefError(M, :ξt!))
+
+
+# FUTURE: for each function and signature, macro-define:
+# - default function f(M,...) = @error
+# - default inplace f!(M,buf,...) = @error
+# - symbolic generator symbolic(M,f)
+
+
+riccati(A,K,P,Q,R) = -A'P - P*A + K'R*K - Q
+
+# @genfunc(:Kr,θ,t,α,μ,P)
+# ----------------------------------- symbolics & autodiff ----------------------------------- #
+
 
 
 function build(f, args...)
@@ -257,10 +246,9 @@ function Buffer(fn!, N::Vararg{Int})
     @assert length(N) >= 1
     T = MArray{Tuple{N...}, Float64, length(N), prod(N)}
     buf = T(undef)
-    fxn = FunctionWrapper{T, Tuple{Float64}}(t->(fn!(buf, t); return buf))
+    fxn = FunctionWrapper{T, Tuple{Float64}}(t->(fn!(buf, t); return copy(buf)))
     Buffer(fxn,buf,fn!)
 end
-
 
 
 # maps t->x::T
@@ -278,10 +266,11 @@ function Solution(prob, N::Vararg{Int})
     sln = solve(prob)
     T = MArray{Tuple{N...}, Float64, length(N), prod(N)}
     buf = T(undef)
-    fxn = FunctionWrapper{T, Tuple{Float64}}(t->(sln(buf, t); return buf))
+    fxn = FunctionWrapper{T, Tuple{Float64}}(t->(sln(buf, t); return copy(buf)))
     Solution(fxn,buf,sln)
 end
 
+Base.size(sln::Solution) = size(sln.buf)
 
 
 
@@ -302,14 +291,22 @@ function Trajectory(prob, NX::Int, NU::Int)
 
     TX = MArray{Tuple{NX...}, Float64, length(NX), prod(NX)}
     xbuf = TX(undef)
-    x = FunctionWrapper{TX, Tuple{Float64}}(t->(sln(xbuf,t;idxs=1:NX); return xbuf))
+    x = FunctionWrapper{TX, Tuple{Float64}}(t->(sln(xbuf,t;idxs=1:NX); return copy(xbuf)))
 
     TU = MArray{Tuple{NU...}, Float64, length(NU), prod(NU)}
     ubuf = TU(undef)
-    u = FunctionWrapper{TU, Tuple{Float64}}(t->(sln(ubuf,t;idxs=(NX+1):(NX+NU)); return ubuf))
+    u = FunctionWrapper{TU, Tuple{Float64}}(t->(sln(ubuf,t;idxs=(NX+1):(NX+NU)); return copy(ubuf)))
 
     Trajectory(x,u,xbuf,ubuf,sln)
 end
+
+
+function preview(ξ::Trajectory)
+    T = LinRange(extrema(ξ.sln.t)..., 1001)
+    x = [ξ.x(t)[i] for t in T, i in CartesianIndices(size(ξ.xbuf))]
+    lineplot(T,x; height=20, width=80)
+end
+
 
 
 Base.show(io::IO, buf::Buffer) = show(io,typeof(buf))
