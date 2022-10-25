@@ -17,9 +17,95 @@ export Buffer
 export Solution
 export Trajectory
 
+# generates symbolic variables for model M
+macro symvars(M)
+    return esc(quote
+        @variables x[1:nx($M)] 
+        @variables u[1:nu($M)] 
+        @variables t
+        @variables θ[1:nθ($M)]
+        @variables Pr[1:nx($M),1:nx($M)]
+    end)
+end
+
+# ----------------------------------- base definitions ----------------------------------- #
+
+
+abstract type Model{NX,NU,NΘ} end
+
+nx(::Model{NX,NU,NΘ}) where {NX,NU,NΘ} = NX
+nu(::Model{NX,NU,NΘ}) where {NX,NU,NΘ} = NU
+nθ(::Model{NX,NU,NΘ}) where {NX,NU,NΘ} = NΘ
+
+
+struct ModelDefError <: Exception
+    M::Model
+    fxn::Symbol
+end
+
+function Base.showerror(io::IO, e::ModelDefError)
+    T = typeof(e.M)
+    print(io, 
+        "PRONTO.$(e.fxn) is missing a method for the $T model.\n",
+        "Please check the $T model definition and then re-run: ",
+        "@derive $T\n"
+    )
+end
+
+
+f(M,x,u,t,θ) = @error "PRONTO.f is missing a method for the $(typeof(M)) model."
+fx(M,x,u,t,θ) = @error "PRONTO.fx is missing a method for the $(typeof(M)) model."
+fu(M,x,u,t,θ) = @error "PRONTO.fu is missing a method for the $(typeof(M)) model."
+fxx(M,x,u,t,θ) = @error "PRONTO.fxx is missing a method for the $(typeof(M)) model."
+
+# l(M,x,u,t,θ)
+# p(M,x,u,t,θ)
+
+Rr(M,x,u,t,θ) = @error "PRONTO.Rr is missing a method for the $(typeof(M)) model."
+Qr(M,x,u,t,θ) = @error "PRONTO.Qr is missing a method for the $(typeof(M)) model."
+Kr(M::Model,x,u,t,θ,P) = throw(ModelDefError(M, :Kr))
+
+
+
+f!(buf,M,x,u,t,θ) = @error "PRONTO.f! is missing a method for the $(typeof(M)) model."
+Kr!(buf,M,x,u,t,θ,P) = @error "PRONTO.Kr! is missing a method for the $(typeof(M)) model."
+dPr!(M,buf,x,u,t,θ,P) = nothing
+dPr(M,x,u,t,θ,P) = nothing
+
+#TODO: Kr
+#TODO: Pt
+
+ξt!(M::Model,buf,t,θ,x,u,α,μ,P) = throw(ModelDefError(M, :ξt!))
+
+
+# FUTURE: for each function and signature, macro-define:
+# - default function f(M,...) = @error
+# - default inplace f!(M,buf,...) = @error
+# - symbolic generator symbolic(M,f)
+
+
+riccati(A,K,P,Q,R) = -A'P - P*A + K'R*K - Q
 
 
 # ----------------------------------- symbolics & autodiff ----------------------------------- #
+
+macro symfunc(fn,args)
+    fn = esc(fn)
+    return quote
+        function ($fn)(M::Model)
+            @variables x[1:nx(M)] 
+            @variables u[1:nu(M)] 
+            @variables t
+            @variables θ[1:nθ(M)]
+            @variables Pr[1:nx(M),1:nx(M)]
+            ($fn)($args...)
+        end
+    end
+end
+
+@symfunc Kr (M,x,u,t,θ,Pr)
+
+
 
 function build(f, args...)
     f_sym = cat(Base.invokelatest(f, args...); dims=1)
@@ -48,51 +134,10 @@ struct Jacobian
     dx
 end
 (J::Jacobian)(f, args...) = jacobian(J.dx, f, args...)
-  
+
 
 # ----------------------------------- model derivation ----------------------------------- #
 
-
-abstract type Model{NX,NU,NΘ} end
-
-nx(::Model{NX,NU,NΘ}) where {NX,NU,NΘ} = NX
-nu(::Model{NX,NU,NΘ}) where {NX,NU,NΘ} = NU
-nθ(::Model{NX,NU,NΘ}) where {NX,NU,NΘ} = NΘ
-
-f(M,x,u,t,θ) = @error "PRONTO.f is missing a method for the $(typeof(M)) model."
-fx(M,x,u,t,θ) = @error "PRONTO.fx is missing a method for the $(typeof(M)) model."
-fu(M,x,u,t,θ) = @error "PRONTO.fu is missing a method for the $(typeof(M)) model."
-fxx(M,x,u,t,θ) = @error "PRONTO.fxx is missing a method for the $(typeof(M)) model."
-
-# l(M,x,u,t,θ)
-# p(M,x,u,t,θ)
-
-Rr(M,x,u,t,θ) = @error "PRONTO.Rr is missing a method for the $(typeof(M)) model."
-Qr(M,x,u,t,θ) = @error "PRONTO.Qr is missing a method for the $(typeof(M)) model."
-Kr(M,x,u,t,θ,P) = @error "PRONTO.Kr is missing a method for the $(typeof(M)) model."
-
-
-f!(buf,M,x,u,t,θ) = @error "PRONTO.f! is missing a method for the $(typeof(M)) model."
-Kr!(buf,M,x,u,t,θ,P) = @error "PRONTO.Kr! is missing a method for the $(typeof(M)) model."
-dPr!(M,buf,x,u,t,θ,P) = nothing
-dPr(M,x,u,t,θ,P) = nothing
-
-#TODO: Kr
-#TODO: Pt
-
-# ModelDefinitionError
-# $(typeof(M)) is missing a method definition for "PRONTO.fx"
-# "ensure `f(...)` is correctly defined and then run `@configure T`"
-# need to know: model type T, function name (eg. fx), function origin (eg. f)
-
-
-# FUTURE: for each function and signature, macro-define:
-# - default function f(M,...) = @error
-# - default inplace f!(buf,M,...) = @error
-# - symbolic generator symbolic(M,f)
-
-
-riccati(A,K,P,Q,R) = -A'P - P*A + K'R*K - Q
 
 
 # loads definitions for model M into pronto from autodiff based on current definitions in Main
@@ -110,6 +155,8 @@ macro derive(T)
         # define symbolics for derivation
         @variables x[1:nx($T())] 
         @variables u[1:nu($T())] 
+        @variables α[1:nx($T())] 
+        @variables μ[1:nu($T())] 
         @variables t
         @variables θ[1:nθ($T())]
         @variables Pr[1:nx($T()),1:nx($T())]
@@ -121,26 +168,23 @@ macro derive(T)
         local fu,fu! = Ju(f,x,u,t,θ)
         local fxx,fxx! = Jx(fx,x,u,t,θ)
 
-        # local fx = allocating(jacobian(x,f,x,u,t,θ; inplace=false))
-        # local fx = build(Jx(f,x,u,t,θ))
-        
-        # local _Kr = (x,u,t,θ,P) -> (Rr(x,u,t,θ)\(fu(x,u,t,θ)'*collect(P)))
-        # local Kr,Kr! = build(_Kr,x,u,t,θ,P)
+
         local Kr,Kr! = build(x,u,t,θ,Pr) do x,u,t,θ,Pr
             Rr(x,u,t,θ)\(fu(x,u,t,θ)'*collect(Pr))
         end
-
 
         local dPr,dPr! = build(x,u,t,θ,Pr) do x,u,t,θ,Pr
             riccati(fx(x,u,t,θ), Kr(x,u,t,θ,Pr), collect(Pr), Qr(x,u,t,θ), Rr(x,u,t,θ))
         end
 
-            # -fx(x,u,t,θ)'*collect(P) - collect(P)*fx(x,u,t,θ) + Kr(x,u,t,θ,P)'*Rr(x,u,t,θ)*Kr(x,u,t,θ,P) - Qr(x,u,t,θ)
-        # dPr! =  
-        # dP .= -Ar(t)'*P - P*Ar(t) + Kr'*Rr(t)*Kr - Qr(t)
-        # local Kr = inplace(x,u,t,θ,P; inplace=false) do (x,u,t,θ,P)
-        #     Rr(x,u,t,θ)\(fu(x,u,t,θ)'P)
-        # end
+        local ξt,ξt! = build(t,θ,x,u,α,μ,Pr) do t,θ,x,u,α,μ,Pr
+            vcat(
+                f(x,u,t,θ),
+                collect(μ) - Kr(x,u,t,θ,Pr)*(collect(x)-collect(α)) - collect(u)
+            )
+        end
+
+
 
 
         # add functions to PRONTO - only at this point do we care about dispatch on the first arg
@@ -156,6 +200,8 @@ macro derive(T)
         PRONTO.Kr!(buf,M::$T,x,u,t,θ,P) = Kr!(buf,x,u,t,θ,P) # NU,NX
         PRONTO.dPr!(M::$T,buf,x,u,t,θ,P) = dPr!(buf,x,u,t,θ,P) # NX,NX
         PRONTO.dPr(M::$T,x,u,t,θ,P) = dPr(x,u,t,θ,P) # NX,NX
+        PRONTO.ξt!(M::$T,t,θ,x,u,α,μ,P) = ξt!(t,θ,x,u,α,μ,P) # NX+NU
+        
 
         @info "$($T) model derivation complete!"
     end
@@ -234,11 +280,6 @@ function Trajectory(prob, NX::Int, NU::Int)
 
     Trajectory(x,u,xbuf,ubuf,sln)
 end
-
-
-# u(x,t)
-# u = μ(t) - Kr(α,μ,t,θ,Pr)*(x(t)-α(t))
-
 
 
 Base.show(io::IO, buf::Buffer) = show(io,typeof(buf))

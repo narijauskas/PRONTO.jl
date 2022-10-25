@@ -15,7 +15,6 @@ function dae!(dξ,ξ,(M,θ,μ,α,P),t)
 end
 
 
-
 massmatrix(M) = cat(diagm(ones(nx(M))), zeros(nu(M)); dims=(1,2))
 
 
