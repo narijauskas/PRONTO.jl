@@ -67,28 +67,28 @@ NΘ = 0
 struct TwoSpin <: PRONTO.Model{NX,NU,NΘ}
 end
 
-## ----------------------------------- model definition ----------------------------------- ##
+# ----------------------------------- model definition ----------------------------------- ##
 
 let
     # model dynamics
     H0 = [0 0 1 0;0 0 0 -1;-1 0 0 0;0 1 0 0]
     H1 = [0 -1 0 0;1 0 0 0;0 0 0 -1;0 0 1 0]
-    f = (x,u,t,θ) -> collect((H0 + u[1]*H1)*x)
+    f = (θ,t,x,u) -> collect((H0 + u[1]*H1)*x)
 
 
     # stage cost
     Ql = zeros(NX,NX)
     Rl = 0.01
-    l = (x,u,t,θ) -> 1/2*collect(x)'*Ql*collect(x) + 1/2*collect(u)'*Rl*collect(u)
+    l = (θ,t,x,u) -> 1/2*collect(x)'*Ql*collect(x) + 1/2*collect(u)'*Rl*collect(u)
 
     # terminal cost
     Pl = [0 0 0 0;0 1 0 0;0 0 0 0;0 0 0 1]
-    p = (x,u,t,θ) -> 1/2*collect(x)'*Pl*collect(x)
+    p = (θ,t,x,u) -> 1/2*collect(x)'*Pl*collect(x)
 
     # regulator
-    Rr = (x,u,t,θ) -> diagm([1])
-    Qr = (x,u,t,θ) -> diagm([1,1,1,1])
-    # Pr(x,u,t,θ)
+    Rr = (θ,t,x,u) -> diagm([1])
+    Qr = (θ,t,x,u) -> diagm([1,1,1,1])
+    # Pr(θ,t,x,u)
 
     @derive TwoSpin
 end
@@ -111,12 +111,12 @@ t = t0
 P = collect(I(NX))
 buf = similar(x)
 
-PRONTO.f(M,x,u,t,θ)
-PRONTO.fx(M,x,u,t,θ)
-PRONTO.Rr(M,x,u,t,θ)
-PRONTO.Kr(M,x,u,t,θ,P)
-PRONTO.f!(buf,M,x,u,t,θ)
+PRONTO.f(M,θ,t,x,u)
+PRONTO.fx(M,θ,t,x,u)
+PRONTO.Rr(M,θ,t,x,u)
+PRONTO.Kr(M,θ,t,x,u,P)
+PRONTO.f!(M,buf,θ,t,x,u)
 
 ##
-
-@buffer (nx(M),) t->zeros(nx(M))
+φg = PRONTO.guess_zi(M,θ,x0,u0,t0,tf)
+pronto(M,θ,t0,tf,x0,u0,φg)

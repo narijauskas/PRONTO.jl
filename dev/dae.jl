@@ -21,6 +21,7 @@ massmatrix(M) = cat(diagm(ones(nx(M))), zeros(nu(M)); dims=(1,2))
 prob = ODEProblem(ODEFunction(dae!,mass_matrix=massmatrix(M)),[x0;u0],(t0,tf),(M,θ,μ,α,P))
 sol = solve(prob)
 
+prob = ODEProblem(ODEFunction(PRONTO.zi_dyn!,mass_matrix=PRONTO.massmatrix(M)),[x0;u0],(t0,tf),(M,θ))
 
 # Wrapper{S...} = FunctionWrapper{BufferType(S...), Tuple{Float64}}
 

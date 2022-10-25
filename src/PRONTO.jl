@@ -5,28 +5,20 @@ using FunctionWrappers
 using FunctionWrappers: FunctionWrapper
 using StaticArrays
 using FastClosures
+using LinearAlgebra
 
 using DifferentialEquations
 using Symbolics
 using Symbolics: derivative
 
 export @derive
+export pronto
 export nx,nu,nθ
 
 export Buffer
 export Solution
 export Trajectory
 
-# generates symbolic variables for model M
-macro symvars(M)
-    return esc(quote
-        @variables x[1:nx($M)] 
-        @variables u[1:nu($M)] 
-        @variables t
-        @variables θ[1:nθ($M)]
-        @variables Pr[1:nx($M),1:nx($M)]
-    end)
-end
 
 # ----------------------------------- base definitions ----------------------------------- #
 
@@ -53,29 +45,35 @@ function Base.showerror(io::IO, e::ModelDefError)
 end
 
 
-f(M,x,u,t,θ) = @error "PRONTO.f is missing a method for the $(typeof(M)) model."
-fx(M,x,u,t,θ) = @error "PRONTO.fx is missing a method for the $(typeof(M)) model."
-fu(M,x,u,t,θ) = @error "PRONTO.fu is missing a method for the $(typeof(M)) model."
-fxx(M,x,u,t,θ) = @error "PRONTO.fxx is missing a method for the $(typeof(M)) model."
+f(M::Model,θ,t,x,u) = throw(ModelDefError(M,:f))
+fx(M::Model,θ,t,x,u) = throw(ModelDefError(M,:fx))
+fu(M::Model,θ,t,x,u) = throw(ModelDefError(M,:fu))
+fxx(M::Model,θ,t,x,u) = throw(ModelDefError(M,:fxx))
+fxu(M::Model,θ,t,x,u) = throw(ModelDefError(M,:fxu))
+fuu(M::Model,θ,t,x,u) = throw(ModelDefError(M,:fuu))
 
-# l(M,x,u,t,θ)
-# p(M,x,u,t,θ)
+# l(M::Model,θ,t,x,u) = throw(ModelDefError(M,:l))
+# lx(M::Model,θ,t,x,u) = throw(ModelDefError(M,:lx))
+# lu(M::Model,θ,t,x,u) = throw(ModelDefError(M,:lu))
+# lxx(M::Model,θ,t,x,u) = throw(ModelDefError(M,:lxx))
+# lxu(M::Model,θ,t,x,u) = throw(ModelDefError(M,:lxu))
+# luu(M::Model,θ,t,x,u) = throw(ModelDefError(M,:luu))
 
-Rr(M,x,u,t,θ) = @error "PRONTO.Rr is missing a method for the $(typeof(M)) model."
-Qr(M,x,u,t,θ) = @error "PRONTO.Qr is missing a method for the $(typeof(M)) model."
-Kr(M::Model,x,u,t,θ,P) = throw(ModelDefError(M, :Kr))
+p(M::Model,θ,t,x,u) = throw(ModelDefError(M,:p))
+px(M::Model,θ,t,x,u) = throw(ModelDefError(M,:px))
+pxx(M::Model,θ,t,x,u) = throw(ModelDefError(M,:pxx))
 
+Rr(M::Model,θ,t,α,μ) = throw(ModelDefError(M,:Rr))
+Qr(M::Model,θ,t,α,μ) = throw(ModelDefError(M,:Qr))
+Kr(M::Model,θ,t,α,μ,P) = throw(ModelDefError(M,:Kr))
 
+f!(M::Model,buf,θ,t,x,u) = throw(ModelDefError(M, :f!))
 
-f!(buf,M,x,u,t,θ) = @error "PRONTO.f! is missing a method for the $(typeof(M)) model."
-Kr!(buf,M,x,u,t,θ,P) = @error "PRONTO.Kr! is missing a method for the $(typeof(M)) model."
-dPr!(M,buf,x,u,t,θ,P) = nothing
-dPr(M,x,u,t,θ,P) = nothing
+Prt!(M::Model,buf,θ,t,α,μ,Pr) = throw(ModelDefError(M, :Prt!))
+Prt(M::Model,θ,t,α,μ,Pr) = throw(ModelDefError(M, :Prt))
 
-#TODO: Kr
-#TODO: Pt
-
-ξt!(M::Model,buf,t,θ,x,u,α,μ,P) = throw(ModelDefError(M, :ξt!))
+ξt!(M::Model,buf,θ,t,x,u,α,μ,P) = throw(ModelDefError(M, :ξt!))
+ξt(M::Model,θ,t,x,u,α,μ,P) = throw(ModelDefError(M, :ξt))
 
 
 # FUTURE: for each function and signature, macro-define:
@@ -86,25 +84,57 @@ dPr(M,x,u,t,θ,P) = nothing
 
 riccati(A,K,P,Q,R) = -A'P - P*A + K'R*K - Q
 
-
+# @genfunc(:Kr,θ,t,α,μ,P)
 # ----------------------------------- symbolics & autodiff ----------------------------------- #
 
 macro symfunc(fn,args)
     fn = esc(fn)
     return quote
         function ($fn)(M::Model)
-            @variables x[1:nx(M)] 
-            @variables u[1:nu(M)] 
-            @variables t
             @variables θ[1:nθ(M)]
+            @variables t
+            @variables x[1:nx(M)] 
+            @variables u[1:nu(M)]
+            @variables α[1:nx(M)] 
+            @variables μ[1:nu(M)] 
             @variables Pr[1:nx(M),1:nx(M)]
             ($fn)($args...)
         end
     end
 end
 
-@symfunc Kr (M,x,u,t,θ,Pr)
+# @symfunc Kr (M,x,u,t,θ,Pr)
+@symfunc f (M,θ,t,x,u)
+@symfunc fx (M,θ,t,x,u)
+@symfunc fu (M,θ,t,x,u)
+@symfunc fxx (M,θ,t,x,u)
+@symfunc fxu (M,θ,t,x,u)
+@symfunc fuu (M,θ,t,x,u)
 
+@symfunc Rr (M,θ,t,α,μ) 
+@symfunc Qr (M,θ,t,α,μ) 
+@symfunc Kr (M,θ,t,α,μ,Pr) 
+
+@symfunc Prt (M,θ,t,α,μ,Pr)
+@symfunc ξt (M,θ,t,x,u,α,μ,Pr)
+
+
+macro genfunc(fn,args...)
+    fn = esc(fn)
+    return quote
+        function ($fn)(M::Model, $(args...))
+            throw(ModelDefError(M,nameof($fn)))
+        end
+        # function ($fn)(M::Model)
+        #     @variables x[1:nx(M)] 
+        #     @variables u[1:nu(M)] 
+        #     @variables t
+        #     @variables θ[1:nθ(M)]
+        #     @variables Pr[1:nx(M),1:nx(M)]
+        #     ($fn)($args...)
+        # end
+    end
+end
 
 
 function build(f, args...)
@@ -153,34 +183,34 @@ macro derive(T)
         local p = $(esc(:(p)))
 
         # define symbolics for derivation
+        @variables θ[1:nθ($T())]
+        @variables t
         @variables x[1:nx($T())] 
-        @variables u[1:nu($T())] 
+        @variables u[1:nu($T())]
         @variables α[1:nx($T())] 
         @variables μ[1:nu($T())] 
-        @variables t
-        @variables θ[1:nθ($T())]
         @variables Pr[1:nx($T()),1:nx($T())]
+
         Jx,Ju = Jacobian.([x,u])
 
         # derive models
-        local f,f! = build(f,x,u,t,θ)
-        local fx,fx! = Jx(f,x,u,t,θ)
-        local fu,fu! = Ju(f,x,u,t,θ)
-        local fxx,fxx! = Jx(fx,x,u,t,θ)
+        local f,f! = build(f,θ,t,x,u)
+        local fx,fx! = Jx(f,θ,t,x,u)
+        local fu,fu! = Ju(f,θ,t,x,u)
+        local fxx,fxx! = Jx(fx,θ,t,x,u)
 
-
-        local Kr,Kr! = build(x,u,t,θ,Pr) do x,u,t,θ,Pr
-            Rr(x,u,t,θ)\(fu(x,u,t,θ)'*collect(Pr))
+        local Kr,Kr! = build(θ,t,α,μ,Pr) do θ,t,α,μ,Pr
+            Rr(θ,t,α,μ)\(fu(θ,t,α,μ)'*collect(Pr))
         end
 
-        local dPr,dPr! = build(x,u,t,θ,Pr) do x,u,t,θ,Pr
-            riccati(fx(x,u,t,θ), Kr(x,u,t,θ,Pr), collect(Pr), Qr(x,u,t,θ), Rr(x,u,t,θ))
+        local Prt,Prt! = build(θ,t,α,μ,Pr) do θ,t,α,μ,Pr
+            riccati(fx(θ,t,α,μ), Kr(θ,t,α,μ,Pr), collect(Pr), Qr(θ,t,α,μ), Rr(θ,t,α,μ))
         end
 
-        local ξt,ξt! = build(t,θ,x,u,α,μ,Pr) do t,θ,x,u,α,μ,Pr
+        local ξt,ξt! = build(θ,t,x,u,α,μ,Pr) do θ,t,x,u,α,μ,Pr
             vcat(
-                f(x,u,t,θ),
-                collect(μ) - Kr(x,u,t,θ,Pr)*(collect(x)-collect(α)) - collect(u)
+                f(θ,t,x,u)...,
+                (collect(μ) - Kr(θ,t,α,μ,Pr)*(collect(x)-collect(α)) - collect(u))...
             )
         end
 
@@ -188,29 +218,27 @@ macro derive(T)
 
 
         # add functions to PRONTO - only at this point do we care about dispatch on the first arg
-        PRONTO.Rr(M::$T,x,u,t,θ) = Rr(x,u,t,θ)
-        PRONTO.Qr(M::$T,x,u,t,θ) = Qr(x,u,t,θ)
-        PRONTO.f(M::$T,x,u,t,θ) = f(x,u,t,θ) # NX
-        PRONTO.f!(buf,M::$T,x,u,t,θ) = f!(buf,x,u,t,θ)
-        # PRONTO.f!(buf,M::$T,x,u,t,θ) = (f!(buf,x,u,t,θ); return buf) # NX
-        PRONTO.fx(M::$T,x,u,t,θ) = fx(x,u,t,θ) # NX,NX
-        PRONTO.fu(M::$T,x,u,t,θ) = fu(x,u,t,θ) # NX,NU
-        PRONTO.fxx(M::$T,x,u,t,θ) = fxx(x,u,t,θ) # NX,NX
-        PRONTO.Kr(M::$T,x,u,t,θ,P) = Kr(x,u,t,θ,P) # NU,NX
-        PRONTO.Kr!(buf,M::$T,x,u,t,θ,P) = Kr!(buf,x,u,t,θ,P) # NU,NX
-        PRONTO.dPr!(M::$T,buf,x,u,t,θ,P) = dPr!(buf,x,u,t,θ,P) # NX,NX
-        PRONTO.dPr(M::$T,x,u,t,θ,P) = dPr(x,u,t,θ,P) # NX,NX
-        PRONTO.ξt!(M::$T,t,θ,x,u,α,μ,P) = ξt!(t,θ,x,u,α,μ,P) # NX+NU
+        PRONTO.Rr(M::$T,θ,t,α,μ) = Rr(θ,t,α,μ)
+        PRONTO.Qr(M::$T,θ,t,α,μ) = Qr(θ,t,α,μ)
+        PRONTO.Kr(M::$T,θ,t,α,μ,P) = Kr(θ,t,α,μ,P) # NU,NX
+
+        PRONTO.f(M::$T,θ,t,x,u) = f(θ,t,x,u) # NX
+        PRONTO.fx(M::$T,θ,t,x,u) = fx(θ,t,x,u) # NX,NX
+        PRONTO.fu(M::$T,θ,t,x,u) = fu(θ,t,x,u) # NX,NU
+        PRONTO.fxx(M::$T,θ,t,x,u) = fxx(θ,t,x,u) # NX,NX
         
+        PRONTO.f!(M::$T,buf,θ,t,x,u) = f!(buf,θ,t,x,u) #NX
+
+        PRONTO.Prt(M::$T,θ,t,α,μ,Pr) = Prt(θ,t,α,μ,Pr) # NX,NX
+        PRONTO.Prt!(M::$T,buf,θ,t,α,μ,Pr) = Prt!(buf,θ,t,α,μ,Pr) # NX,NX    
+
+        PRONTO.ξt(M::$T,θ,t,x,u,α,μ,P) = ξt(θ,t,x,u,α,μ,P) # NX+NU
+        PRONTO.ξt!(M::$T,buf,θ,t,x,u,α,μ,P) = ξt!(buf,θ,t,x,u,α,μ,P) # NX+NU
 
         @info "$($T) model derivation complete!"
     end
 end
 
-# where φ=(α,μ)::Trajectory{NX,NU}
-function Pr_ode(dPr, Pr,(M,φ,θ), t)
-    dPr!(M,dPr,φ(t)...,t,θ,Pr)
-end
 
 # ----------------------------------- ode solution handling ----------------------------------- #
 
@@ -226,6 +254,7 @@ end
 (buf::Buffer)(t) = buf.fxn(t)
 
 function Buffer(fn!, N::Vararg{Int})
+    @assert length(N) >= 1
     T = MArray{Tuple{N...}, Float64, length(N), prod(N)}
     buf = T(undef)
     fxn = FunctionWrapper{T, Tuple{Float64}}(t->(fn!(buf, t); return buf))
@@ -245,6 +274,7 @@ end
 
 # T = BufferType(S...)
 function Solution(prob, N::Vararg{Int})
+    @assert length(N) >= 1
     sln = solve(prob)
     T = MArray{Tuple{N...}, Float64, length(N), prod(N)}
     buf = T(undef)
@@ -276,7 +306,7 @@ function Trajectory(prob, NX::Int, NU::Int)
 
     TU = MArray{Tuple{NU...}, Float64, length(NU), prod(NU)}
     ubuf = TU(undef)
-    u = FunctionWrapper{TU, Tuple{Float64}}(t->(sln(ubuf,t;idxs=NX+1:NU); return ubuf))
+    u = FunctionWrapper{TU, Tuple{Float64}}(t->(sln(ubuf,t;idxs=(NX+1):(NX+NU)); return ubuf))
 
     Trajectory(x,u,xbuf,ubuf,sln)
 end
@@ -300,8 +330,29 @@ end
 
 
 # ----------------------------------- main ----------------------------------- #
+# where φ=(α,μ)::Trajectory{NX,NU}
+function Pr_ode(dPr, Pr,(M,φ,θ), t)
+    Prt!(M,dPr,θ,t,φ(t)...,Pr)
+end
 
-# Pr = Solution(ODEProblem(Pr_ode, zeros(2), (0.0,2.0),(M,φ,θ)))
+
+function ξ_ode(dξ,ξ,(M,θ,φ,Pr),t)
+    x = @view ξ[1:nx(M)]
+    u = @view ξ[nx(M)+1:end]
+    ξt!(M,dξ,θ,t,x,u,φ(t)...,Pr(t))
+end
+
+
+function pronto(M::Model, θ, t0, tf, x0, u0, φ)
+    @info "solving Pr"
+    Prf = diagm(ones(nx(M)))
+    Pr = Solution(ODEProblem(Pr_ode,Prf,(t0,tf),(M,φ,θ)), nx(M), nx(M))
+    @info "solving ξ"
+    odefunc = ODEFunction(ξ_ode; mass_matrix=PRONTO.massmatrix(M))
+    Trajectory(ODEProblem(odefunc,[x0;u0],(t0,tf),(M,θ,φ,Pr)), nx(M), nu(M))
+end
+
+
 
 # function Pr_ode(dPr, Pr, (?), t)
 #     dPr!(dP,α,μ,t,θ)
@@ -335,7 +386,7 @@ end
 # # fallback: if type is given, creates an instance
 # pronto(T::DataType, args...) = pronto(T(), args...)
 
-include("utils.jl")
-
+# include("utils.jl")
+include("guess.jl")
 
 end # module
