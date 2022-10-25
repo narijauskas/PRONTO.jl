@@ -4,12 +4,13 @@ module PRONTO
 using FunctionWrappers
 using FunctionWrappers: FunctionWrapper
 using StaticArrays
+using FastClosures
 
 using DifferentialEquations
 using Symbolics
 using Symbolics: derivative
 
-
+export Buffer, @buffer
 export @derive
 export nx,nu,nθ
 export Solution
@@ -96,7 +97,7 @@ riccati(A,K,P,Q,R) = -A'P - P*A + K'R*K - Q
 macro derive(T)
     T = esc(T) # make sure we use the local context
     return quote
-
+        @info "starting $($T) model derivation"
         # load user definitions
         local Rr = $(esc(:(Rr)))
         local Qr = $(esc(:(Qr)))
@@ -153,6 +154,8 @@ macro derive(T)
         PRONTO.Kr!(buf,M::$T,x,u,t,θ,P) = Kr!(buf,x,u,t,θ,P) # NU,NX
         PRONTO.dPr!(M::$T,buf,x,u,t,θ,P) = dPr!(buf,x,u,t,θ,P) # NX,NX
         PRONTO.dPr(M::$T,x,u,t,θ,P) = dPr(x,u,t,θ,P) # NX,NX
+
+        @info "$($T) model derivation complete!"
     end
 end
 
@@ -165,7 +168,15 @@ end
 
 
 #MArray{S,T,N,L}
-BufferType(S...) = MArray{Tuple{S...}, Float64, length(S), prod(S)}
+Buffer(S...) = MArray{Tuple{S...}, Float64, length(S), prod(S)}
+
+macro buffer(S,f)
+    # S = esc(S)
+    # f = esc(f)
+    return quote
+        FunctionWrapper{Buffer($S...), Tuple{Float64}}(@closure t->Buffer($S...)($f(t)))
+    end
+end
 
 # maps t->v::T
 struct Solution{T}
@@ -219,7 +230,7 @@ Base.show(io::IO, sln::Solution) = show(io,typeof(sln))
 
 # this might be type piracy... but prevents the obscenely long error messages
 function Base.show(io::IO, fn::FunctionWrapper)
-    print(io, "$(typeof(fn)), $(fn.ptr), $(fn.objptr)")
+    print(io, "$(typeof(fn)) $(fn.ptr)")
 end
 
 

@@ -10,7 +10,7 @@ function symbolic(f::Function, M::Model)
     f(M,x,u,t,θ)
 end
 
-function symbolic(f::typeof(dPr), M::Model)
+function symbolic(f::typeof(Kr), M::Model)
     @variables α[1:nx(M)] 
     @variables μ[1:nu(M)] 
     @variables t

@@ -44,7 +44,7 @@ export guess, pronto
 # type ProntoModel{NX,NU}, pass buffer dimensions parametrically?
 # otherwise, model holds functions and parameters
 
-#=
+
 
 include("regulator.jl")
 include("projection.jl")
@@ -216,6 +216,6 @@ end
 
 _ms(tx) = "$(round(tx*1000; digits=2)) ms"
 
-=#
+
 
 end #module
