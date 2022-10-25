@@ -44,6 +44,14 @@ Base.size(sln::Solution) = size(sln.buf)
 
 
 
+function preview(ξ::Solution)
+    T = LinRange(extrema(ξ.sln.t)..., 1001)
+    x = [ξ(t)[i] for t in T, i in 1:length(ξ.buf)]
+    lineplot(T,x; height=20, width=80)
+end
+
+
+
 
 macro buffer(N)
     N = esc(N)
@@ -106,7 +114,7 @@ function Base.show(io::IO, ξ::Trajectory)
 end
 #FUTURE: show size, length, time span, solver method?
 
-# this might be type piracy... but prevents the obscenely long error messages
+# this might be type piracy... but prevents some obscenely long error messages
 function Base.show(io::IO, fn::FunctionWrapper{T,A}) where {T,A}
     print(io, "FunctionWrapper: $A -> $T $(fn.ptr)")
 end
