@@ -1,7 +1,13 @@
-macro buffer(N)
-    N = esc(N)
-    :(Tuple{$N...}, Float64, length($N), prod($N))
-end
+
+# export @buffer
+# # N should be a Tuple{}
+# macro buffer(N)
+#     N = esc(N)
+#     :($N, Float64, length($N), prod($N))
+# end
+
+ODEBuffer{N} = MArray{N, Float64}
+ODEBuffer{N}() where {N} = MArray{N, Float64}(undef)
 
 # T is a vararg of ints
 struct ODE{T}
@@ -13,39 +19,48 @@ end
 (ode::ODE)(t) = ode.fxn(t)
 
 
-function ODE(buf::T, fn, x0, ts, ode_pm; dae=false, ode_kw...) where {T}
-    ode_fn = ODEFunction(fn)
-    sln = solve(ODEProblem(ode_fn,x0,ts,ode_pm; ode_kw...))
-    buf = T(undef)
-    # buf = MArray{@buffer(nx(M))...}(undef)
-    function xfxn(t)
-        sln(buf,t)
-        copy(buf)
-    end
-    fxn = FunctionWrapper{T, Tuple{Float64}}(xfxn)
+# trajectories are DAEs, pass the mass matrix via the kwarg dae=M()
+dae(M)::Matrix{Float64} = mass_matrix(M)
+mass_matrix(M) = cat(diagm(ones(nx(M))), zeros(nu(M)); dims=(1,2))
 
+
+function ODE(fn, x0, ts, ode_pm, buf::T; dae=nothing, ode_kw...) where {T}
+    ode_fn = isnothing(dae) ? ODEFunction(fn) : ODEFunction(fn; mass_matrix=dae)
+    sln = solve(ODEProblem(ode_fn,x0,ts,ode_pm; ode_kw...))
+    fxn = FunctionWrapper{T, Tuple{Float64}}(t->copy(sln(buf,t)))
     ODE{T}(fxn,buf,sln)
 end
 
-
-
 Base.size(ode::ODE) = size(ode.buf)
 
-
-
-
-
 function preview(ode::ODE)
-    T = LinRange(extrema(ξ.sln.t)..., 1001)
+    T = LinRange(extrema(ode.sln.t)..., 1001)
     x = [ode(t)[i] for t in T, i in 1:length(ode.buf)]
-    lineplot(T,x; height=20, width=80)
+    lineplot(T, x; height=20, width=80)
 end
+
+function Base.show(io::IO, ode::ODE)
+    compact = get(io, :compact, false)
+    print(io, typeof(ode))
+    if !compact
+        println()
+        print(io,preview(ode))
+    end
+end
+#FUTURE: show size, length, time span, solver method?
+
+
+# this might be type piracy... but it prevents some obscenely long error messages
+function Base.show(io::IO, fn::FunctionWrapper{T,A}) where {T,A}
+    print(io, "FunctionWrapper: $A -> $T $(fn.ptr)")
+end
+
 
 # macro ODE(N,ex)
     
 # end
 
-
+#=
 
 
 # maps t->x::T
@@ -172,8 +187,5 @@ function Base.show(io::IO, ξ::Trajectory)
 end
 #FUTURE: show size, length, time span, solver method?
 
-# this might be type piracy... but prevents some obscenely long error messages
-function Base.show(io::IO, fn::FunctionWrapper{T,A}) where {T,A}
-    print(io, "FunctionWrapper: $A -> $T $(fn.ptr)")
-end
 
+=#
