@@ -1,5 +1,4 @@
 
-mass_matrix(M) = cat(diagm(ones(nx(M))), zeros(nu(M)); dims=(1,2))
 
 function guess_zi(M,θ,x0,u0,t0,tf)
     Trajectory(M, zi_dyn!,[x0;u0], (t0,tf), (M,θ))

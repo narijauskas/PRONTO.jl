@@ -3,10 +3,46 @@ macro buffer(N)
     :(Tuple{$N...}, Float64, length($N), prod($N))
 end
 
-# struct ODE{T}
-#     fxn::FunctionWrapper{T, Tuple{Float64}}
-#     buf::T
-#     sln::SciMLBase.AbstractODESolution
+# T is a vararg of ints
+struct ODE{T}
+    fxn::FunctionWrapper{T, Tuple{Float64}}
+    buf::T
+    sln::SciMLBase.AbstractODESolution
+end
+
+(ode::ODE)(t) = ode.fxn(t)
+
+
+function ODE(buf::T, fn, x0, ts, ode_pm; dae=false, ode_kw...) where {T}
+    ode_fn = ODEFunction(fn)
+    sln = solve(ODEProblem(ode_fn,x0,ts,ode_pm; ode_kw...))
+    buf = T(undef)
+    # buf = MArray{@buffer(nx(M))...}(undef)
+    function xfxn(t)
+        sln(buf,t)
+        copy(buf)
+    end
+    fxn = FunctionWrapper{T, Tuple{Float64}}(xfxn)
+
+    ODE{T}(fxn,buf,sln)
+end
+
+
+
+Base.size(ode::ODE) = size(ode.buf)
+
+
+
+
+
+function preview(ode::ODE)
+    T = LinRange(extrema(ξ.sln.t)..., 1001)
+    x = [ode(t)[i] for t in T, i in 1:length(ode.buf)]
+    lineplot(T,x; height=20, width=80)
+end
+
+# macro ODE(N,ex)
+    
 # end
 
 

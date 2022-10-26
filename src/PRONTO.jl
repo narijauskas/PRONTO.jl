@@ -47,6 +47,8 @@ info(i, str) = println(as_tag(crayon"magenta","PRONTO[$i]"), str)
 inv!(A) = LinearAlgebra.inv!(lu!(A)) # general
 # LinearAlgebra.inv!(choelsky!(A)) # if SPD
 
+# for DAEs
+mass_matrix(M) = cat(diagm(ones(nx(M))), zeros(nu(M)); dims=(1,2))
 
 
 riccati(A,K,P,Q,R) = -A'P - P*A + K'R*K - Q
@@ -310,16 +312,20 @@ include("odes.jl")
 
 # ----------------------------------- main loop ----------------------------------- #
 
-Pr_ode(dPr, Pr, (M,φ,θ), t) = Pr_t!(M, dPr, θ, t, φ(t), Pr)
-ξ_ode(dξ, ξ, (M,θ,φ,Pr), t) = ξ_t!(M, dξ, θ, t, ξ, φ(t), Pr(t))
-Po_ode(dPo, Po, (M,ξ,θ), t) = Po_t!(M, dPo, θ, t, ξ(t), Po)
+Pr_ode = ODEFunction( (dPr,Pr,(M,φ,θ),t) -> Pr_t!(M,dPr,θ,t,φ(t),Pr) )
+ξ_ode = ODEFunction( (dξ,ξ,(M,θ,φ,Pr),t) -> ξ_t!(M,dξ,θ,t,ξ,φ(t),Pr(t)); mass_matrix = mass_matrix(M) )
+Po_ode = ODEFunction( (dPo,Po,(M,ξ,θ),t) -> Po_t!(M,dPo,θ,t,ξ(t),Po) )
 
 
 function pronto(M::Model{NX,NU,NΘ}, θ, t0, tf, x0, u0, φ) where {NX,NU,NΘ}
     
     info("solving regulator")
     Pr_f = diagm(ones(NX))
-    Pr = Solution{MMatrix{4, 4, Float64, 16}}(Pr_ode, Pr_f, (tf,t0), (M,φ,θ))
+    
+
+    # Pr = @ODE (NX,NX) (Pr_ode, Pr_f, (tf,t0), (M,φ,θ))
+    ODE(MArray{Tuple{NX,NX}, Float64, length((NX,NX)), prod((NX,NX))}(undef), Pr_ode, Pr_f, (tf,t0), (M,φ,θ))
+    # Pr = Solution{MArray{Tuple{NX,NX}, Float64, length((NX,NX)), prod((NX,NX))}}(Pr_ode2, Pr_f, (tf,t0), (M,φ,θ))
 
     info("solving projection")
     ξ = Trajectory(M, ξ_ode, [x0;u0], (t0,tf), (M,θ,φ,Pr))
@@ -332,9 +338,6 @@ function pronto(M::Model{NX,NU,NΘ}, θ, t0, tf, x0, u0, φ) where {NX,NU,NΘ}
     # ro = Solution()
     return ξ
 end
-
-# Trajectory(M, ξ_ode, [x0;u0], (t0,tf), (M,θ,φ,Pr))
-
 
 
 # function Pr_ode(dPr, Pr, (?), t)
