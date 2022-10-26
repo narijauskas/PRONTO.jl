@@ -41,16 +41,20 @@ info(i, str) = println(as_tag(crayon"magenta","PRONTO[$i]"), str)
 
 
 # ----------------------------------- helper functions ----------------------------------- #
-# mapid!(dest, src) = map!(identity, dest, src)
-# same as: mapid!(dest, src) = map!(x->x, dest, src)
+
+
 
 inv!(A) = LinearAlgebra.inv!(lu!(A)) # general
 # LinearAlgebra.inv!(choelsky!(A)) # if SPD
 
 
 
-# ----------------------------------- base definitions ----------------------------------- #
+riccati(A,K,P,Q,R) = -A'P - P*A + K'R*K - Q
+costate(A,B,a,b,K,x) = -(A-B*K)'x - a + K'b
 
+
+
+# ----------------------------------- model definitions ----------------------------------- #
 
 abstract type Model{NX,NU,NΘ} end
 
@@ -58,92 +62,11 @@ nx(::Model{NX,NU,NΘ}) where {NX,NU,NΘ} = NX
 nu(::Model{NX,NU,NΘ}) where {NX,NU,NΘ} = NU
 nθ(::Model{NX,NU,NΘ}) where {NX,NU,NΘ} = NΘ
 
-
-struct ModelDefError <: Exception
-    M::Model
-    fxn::Symbol
-end
-
-function Base.showerror(io::IO, e::ModelDefError)
-    T = typeof(e.M)
-    print(io, 
-        "PRONTO.$(e.fxn) is missing a method for the $T model.\n",
-        "Please check the $T model definition and then re-run: ",
-        "@derive $T\n"
-    )
-end
-
-# M not included in args
-# @fndef
-# @argdef
-macro genfunc(fn, args)
-    fn = esc(fn)
-    return quote
-        # define a default fallback method
-        function ($fn)(M::Model, $(args.args...))
-            throw(ModelDefError(M,nameof($fn)))
-        end
-        # define a symbolic rendition
-        function ($fn)(M::Model)
-            @variables θ[1:nθ(M)]
-            @variables t
-            @variables x[1:nx(M)] 
-            @variables u[1:nu(M)]
-            ξ = vcat(x,u)
-            @variables α[1:nx(M)] 
-            @variables μ[1:nu(M)] 
-            @variables Pr[1:nx(M),1:nx(M)]
-            @variables P[1:nx(M),1:nx(M)]
-            ($fn)(M, $args...)
-        end
-    end
-end
-
-@genfunc f     (θ,t,ξ)
-@genfunc fx    (θ,t,ξ)
-@genfunc fu    (θ,t,ξ)
-@genfunc fxx   (θ,t,ξ)
-@genfunc fxu   (θ,t,ξ)
-@genfunc fuu   (θ,t,ξ)
-
-@genfunc l     (θ,t,ξ)
-@genfunc lx    (θ,t,ξ)
-@genfunc lu    (θ,t,ξ)
-@genfunc lxx   (θ,t,ξ)
-@genfunc lxu   (θ,t,ξ)
-@genfunc luu   (θ,t,ξ)
-
-@genfunc p     (θ,t,ξ)
-@genfunc px    (θ,t,ξ)
-@genfunc pxx   (θ,t,ξ)
-
-@genfunc Rr    (θ,t,φ)
-@genfunc Qr    (θ,t,φ) 
-@genfunc Kr    (θ,t,φ,Pr)
-@genfunc Ko    (θ,t,ξ,P) 
-
-@genfunc Pr_t  (θ,t,φ,Pr)
-@genfunc ξ_t   (θ,t,ξ,φ,Pr)
-@genfunc P_t   (θ,t,ξ,P)
+# auto-defines some useful methods for core model functions
+# a good place to look for a complete list of PRONTO's generated internal functions
+include("kernel.jl")
 
 
-f!(M::Model,buf,θ,t,ξ) = throw(ModelDefError(M, :f!))
-Pr_t!(M::Model,buf,θ,t,φ,Pr) = throw(ModelDefError(M, :Pr_t!))
-ξ_t!(M::Model,buf,θ,t,ξ,φ,P) = throw(ModelDefError(M, :ξ_t!))
-P_t!(M::Model,buf,θ,t,ξ,P) = throw(ModelDefError(M, :P_t!))
-
-
-# FUTURE: for each function and signature, macro-define:
-# - default function f(M,...) = @error
-# - default inplace f!(M,buf,...) = @error
-# - symbolic generator symbolic(M,f)
-
-
-riccati(A,K,P,Q,R) = -A'P - P*A + K'R*K - Q
-
-
-
-# @genfunc(:Kr,θ,t,α,μ,P)
 # ----------------------------------- symbolics & autodiff ----------------------------------- #
 
 
@@ -197,36 +120,40 @@ split(M::Model, ξ) = (ξ[1:nx(M)], ξ[(nx(M)+1):end])
 macro derive(T)
     # make sure we use the local context
     T = esc(T)
-    return quote
-        info("starting $($T) model derivation")
-        # load user definitions
-        # Rr = $(esc(:(Rr)))
-        # Qr = $(esc(:(Qr)))
-        # f = $(esc(:(f)))
-        # l = $(esc(:(l)))
-        # p = $(esc(:(p)))
+    # M = T()
+    user_Qr = esc(:Qr)
 
-        println("\t > defining symbolic variables and operators")
-        #MAYBE: pre-collect so user doesn't have to?
+    return quote
+        println()
+        info("deriving the $(as_bold("$($T)")) model:")
+        _t0_derivation = time_ns()
+        # define symbolic variables and operators
         @variables θ[1:nθ($T())]
-        @variables t[1:1]
-        @variables x[1:nx($T())]
+        @variables t
+        @variables x[1:nx($T())] 
         @variables u[1:nu($T())]
         ξ = vcat(x,u)
         @variables α[1:nx($T())] 
-        @variables μ[1:nu($T())] 
+        @variables μ[1:nu($T())]
         φ = vcat(α,μ)
+        @variables z[1:nx($T())] 
+        @variables v[1:nu($T())]
+        ζ = vcat(z,v)
         @variables Pr[1:nx($T()),1:nx($T())]
-        @variables P[1:nx($T()),1:nx($T())]
+        @variables Po[1:nx($T()),1:nx($T())]
+        @variables ro[1:nx($T())]
+        @variables λ[1:nx($T())]
 
         Jx,Ju = Jacobian.([x,u])
 
-        println("\t > processing regulator equations")
+        println("\t > regulator equations")
         
         # load user function, remap ξ<->(x,u)
         local Qr,Qr! = build(θ,t,ξ) do θ,t,ξ
             local x,u = split($T(),ξ)
+            # ($user_Qr)(θ,t,x,u)
             ($(esc(:(Qr))))(θ,t,x,u)
+
         end
 
         local Rr,Rr! = build(θ,t,ξ) do θ,t,ξ
@@ -237,7 +164,7 @@ macro derive(T)
         #add definitions to PRONTO
         PRONTO.Rr(M::$T,θ,t,φ) = Rr(θ,t,φ)
         PRONTO.Qr(M::$T,θ,t,φ) = Qr(θ,t,φ)
-        println("\t > differentiating dynamics f")
+        println("\t > dynamics derivatives")
 
         # load user function, remap ξ<->(x,u)
         local f,f! = build(θ,t,ξ) do θ,t,ξ
@@ -261,7 +188,7 @@ macro derive(T)
         PRONTO.fuu(M::$T,θ,t,ξ) = fuu(θ,t,ξ) # NX,NU,NU
         PRONTO.f!(M::$T,buf,θ,t,ξ) = f!(buf,θ,t,ξ) #NX
 
-        println("\t > differentiating stage cost l")
+        println("\t > stage cost derivatives")
 
         # load user function, remap ξ<->(x,u)
         local l,l! = build(θ,t,ξ) do θ,t,ξ
@@ -276,6 +203,7 @@ macro derive(T)
         local lxu,lxu! = Ju(lx,θ,t,ξ)
         local luu,luu! = Ju(lu,θ,t,ξ)
 
+        # add definitions to PRONTO
         PRONTO.l(M::$T,θ,t,ξ) = l(θ,t,ξ) # 1
         PRONTO.lx(M::$T,θ,t,ξ) = lx(θ,t,ξ) # NX
         PRONTO.lu(M::$T,θ,t,ξ) = lu(θ,t,ξ) # NU
@@ -283,7 +211,7 @@ macro derive(T)
         PRONTO.lxu(M::$T,θ,t,ξ) = lxu(θ,t,ξ) # NX,NU
         PRONTO.luu(M::$T,θ,t,ξ) = luu(θ,t,ξ) # NU,NU
 
-        println("\t > differentiating terminal cost p")
+        println("\t > terminal cost derivatives")
 
         # load user function, remap ξ<->(x,u)
         local p,p! = build(θ,t,ξ) do θ,t,ξ
@@ -295,11 +223,12 @@ macro derive(T)
         local px,px! = Jx(p,θ,t,ξ; force_dims=(nx($T()),))
         local pxx,pxx! = Jx(px,θ,t,ξ)
 
+        # add definitions to PRONTO
         PRONTO.p(M::$T,θ,t,ξ) = p(θ,t,ξ) # 1
         PRONTO.px(M::$T,θ,t,ξ) = px(θ,t,ξ) # NX
         PRONTO.pxx(M::$T,θ,t,ξ) = pxx(θ,t,ξ) # NX,NX
 
-        println("\t > deriving regulator equations")
+        println("\t > regulator solver")
 
         #Kr = Rr\(Br'Pr)
         local Kr,Kr! = build(θ,t,φ,Pr) do θ,t,φ,Pr
@@ -310,11 +239,12 @@ macro derive(T)
             riccati(fx(θ,t,φ), Kr(θ,t,φ,Pr), @vec(Pr), Qr(θ,t,φ), Rr(θ,t,φ))
         end
 
+        # add definitions to PRONTO
         PRONTO.Kr(M::$T,θ,t,φ,Pr) = Kr(θ,t,φ,Pr) # NU,NX
         PRONTO.Pr_t(M::$T,θ,t,φ,Pr) = Pr_t(θ,t,φ,Pr) # NX,NX
         PRONTO.Pr_t!(M::$T,buf,θ,t,φ,Pr) = Pr_t!(buf,θ,t,φ,Pr) # NX,NX    
 
-        println("\t > deriving projection equations")
+        println("\t > projection solver")
 
         local ξ_t,ξ_t! = build(θ,t,ξ,φ,Pr) do θ,t,ξ,φ,Pr
             local x,u = split($T(),ξ)
@@ -323,26 +253,53 @@ macro derive(T)
             vcat(f(θ,t,ξ)...,
                 (@vec(μ) - Kr(θ,t,φ,Pr)*(@vec(x) - @vec(α)) - @vec(u))...)
         end
-
-        PRONTO.ξ_t(M::$T,θ,t,ξ,φ,P) = ξ_t(θ,t,ξ,φ,P) # NX+NU
-        PRONTO.ξ_t!(M::$T,buf,θ,t,ξ,φ,P) = ξ_t!(buf,θ,t,ξ,φ,P) # NX+NU
+        # add definitions to PRONTO
+        PRONTO.ξ_t(M::$T,θ,t,ξ,φ,Pr) = ξ_t(θ,t,ξ,φ,Pr) # NX+NU
+        PRONTO.ξ_t!(M::$T,buf,θ,t,ξ,φ,Pr) = ξ_t!(buf,θ,t,ξ,φ,Pr) # NX+NU
         
-        println("\t > deriving optimizer equations")
+        println("\t > optimizer solver")
 
         #Ko = R\(S'+B'P)
-        local Ko,Ko! = build(θ,t,ξ,P) do θ,t,ξ,P
-            luu(θ,t,ξ)\(lxu(θ,t,ξ)' .+ fu(θ,t,ξ)'*@vec(P))
+        local Ko,Ko! = build(θ,t,ξ,Po) do θ,t,ξ,Po
+            luu(θ,t,ξ)\(lxu(θ,t,ξ)' .+ fu(θ,t,ξ)'*@vec(Po))
         end
+        PRONTO.Ko(M::$T,θ,t,ξ,Po) = Ko(θ,t,ξ,Po) # NU,NX
 
-        local P_t,P_t! = build(θ,t,ξ,P) do θ,t,ξ,P
-            riccati(fx(θ,t,ξ), Ko(θ,t,ξ,P), @vec(P), lxx(θ,t,ξ), luu(θ,t,ξ))
+        local Po_t,Po_t! = build(θ,t,ξ,Po) do θ,t,ξ,Po
+            riccati(fx(θ,t,ξ), Ko(θ,t,ξ,Po), @vec(Po), lxx(θ,t,ξ), luu(θ,t,ξ))
         end
+        PRONTO.Po_t(M::$T,θ,t,ξ,Po) = Po_t(θ,t,ξ,Po) # NX,NX
+        PRONTO.Po_t!(M::$T,buf,θ,t,ξ,Po) = Po_t!(buf,θ,t,ξ,Po) # NX,NX    
 
-        PRONTO.Ko(M::$T,θ,t,ξ,P) = Ko(θ,t,ξ,P) # NU,NX
-        PRONTO.P_t(M::$T,θ,t,ξ,P) = P_t(θ,t,ξ,P) # NX,NX
-        PRONTO.P_t!(M::$T,buf,θ,t,ξ,P) = P_t!(buf,θ,t,ξ,P) # NX,NX    
+        println("\t > optimizer costate solver")
 
-        info("$($T) model derivation complete!")
+        # size NX
+        local vo,vo! = build(θ,t,ξ,ro) do θ,t,ξ,ro
+            -luu(θ,t,ξ)\(fu(θ,t,ξ)'*@vec(ro) + lu(θ,t,ξ))
+        end
+        PRONTO.vo(M::$T,θ,t,ξ,ro) = vo(θ,t,ξ,ro) # NU,NX
+
+        local ro_t,ro_t! = build(θ,t,ξ,Po,ro) do θ,t,ξ,Po,ro
+            costate(fx(θ,t,ξ), fu(θ,t,ξ), lx(θ,t,ξ), lu(θ,t,ξ), Ko(θ,t,ξ,Po), @vec(ro))
+        end
+        PRONTO.ro_t(M::$T,θ,t,ξ,Po,ro) = ro_t(θ,t,ξ,Po,ro) # NX,NX
+        PRONTO.ro_t!(M::$T,buf,θ,t,ξ,Po,ro) = ro_t!(buf,θ,t,ξ,Po,ro) # NX,NX 
+
+        println("\t > lagrangian/costate solver")
+
+        # size NX
+        local λ_t,λ_t! = build(θ,t,ξ,φ,Pr,λ) do θ,t,ξ,φ,Pr,λ
+            costate(fx(θ,t,ξ), fu(θ,t,ξ), lx(θ,t,ξ), lu(θ,t,ξ), Kr(θ,t,φ,Pr), @vec(λ))
+        end
+        PRONTO.λ_t(M::$T,θ,t,ξ,φ,Pr,λ) = λ_t(θ,t,ξ,φ,Pr,λ)
+        PRONTO.λ_t!(M::$T,buf,θ,t,ξ,φ,Pr,λ) = λ_t!(buf,θ,t,ξ,φ,Pr,λ)
+
+
+        println("\t > search direction solver")
+
+        _t_derivation = round((time_ns() - _t0_derivation)/1e9; digits=4)
+        println()
+        info("model derivation completed in $_t_derivation seconds")
     end
 end
 
@@ -354,23 +311,26 @@ include("utils.jl")
 
 Pr_ode(dPr, Pr, (M,φ,θ), t) = Pr_t!(M, dPr, θ, t, φ(t), Pr)
 ξ_ode(dξ, ξ, (M,θ,φ,Pr), t) = ξ_t!(M, dξ, θ, t, ξ, φ(t), Pr(t))
-P_ode(dP, P, (M,ξ,θ), t) = P_t!(M, dP, θ, t, ξ(t), P)
+Po_ode(dPo, Po, (M,ξ,θ), t) = Po_t!(M, dPo, θ, t, ξ(t), Po)
 
 
-function pronto(M::Model, θ, t0, tf, x0, u0, φ)
+function pronto(M::Model{NX,NU,NΘ}, θ, t0, tf, x0, u0, φ) where {NX,NU,NΘ}
     
     info("solving regulator")
-    Prf = diagm(ones(nx(M)))
-    Pr = Solution(ODEProblem(Pr_ode,Prf,(tf,t0),(M,φ,θ)), nx(M), nx(M))
+    Pr_f = diagm(ones(NX))
+    Pr = Solution(ODEProblem(Pr_ode,Pr_f,(tf,t0),(M,φ,θ)), NX, NX)
     # Pr = Solution(M, Pr_ode, Prf, (t0,tf), (M,φ,θ))
 
     info("solving projection")
     ξ = Trajectory(M, ξ_ode, [x0;u0], (t0,tf), (M,θ,φ,Pr))
-
+    
     info("solving optimizer")
-    Pf = pxx(M,θ,tf,φ(tf))
-    P = Solution(ODEProblem(P_ode,Pf,(tf,t0),(M,ξ,θ)), nx(M), nx(M))
-    return ξ
+    Po_f = pxx(M,θ,tf,φ(tf))
+    Po = Solution(ODEProblem(Po_ode,Po_f,(tf,t0),(M,ξ,θ)), NX, NX)
+
+    # ro_f
+    # ro = Solution()
+    return (Pr,ξ,Po)
 end
 
 # Trajectory(M, ξ_ode, [x0;u0], (t0,tf), (M,θ,φ,Pr))

@@ -15,7 +15,7 @@ NΘ = 0
 struct TwoSpin <: PRONTO.Model{NX,NU,NΘ}
 end
 
-## ----------------------------------- model definition ----------------------------------- ##
+# ----------------------------------- model definition ----------------------------------- ##
 
 let
     # model dynamics
@@ -41,7 +41,7 @@ let
     @derive TwoSpin
 end
 
-PRONTO.Ko(M)
+# PRONTO.Ko(M)
 # PRONTO.ξ_t(M)
 
 ## ----------------------------------- tests ----------------------------------- ##
