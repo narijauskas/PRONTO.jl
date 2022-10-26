@@ -108,7 +108,8 @@ end
 # vectorization helper for autodiff -> wrap symbolic array variables
 # really, just shorter than typing collect :P
 macro vec(ex)
-    :(collect($ex))
+    eex = esc(ex)
+    :(collect($eex))
 end
 
 split(M::Model, ξ) = (ξ[1:nx(M)], ξ[(nx(M)+1):end])
@@ -232,7 +233,7 @@ macro derive(T)
 
         #Kr = Rr\(Br'Pr)
         local Kr,Kr! = build(θ,t,φ,Pr) do θ,t,φ,Pr
-            Rr(θ,t,φ)\(fu(θ,t,φ)'*@vec(Pr))
+            inv(Rr(θ,t,φ))*(fu(θ,t,φ)'*@vec(Pr))
         end
 
         local Pr_t,Pr_t! = build(θ,t,φ,Pr) do θ,t,φ,Pr
@@ -261,7 +262,7 @@ macro derive(T)
 
         #Ko = R\(S'+B'P)
         local Ko,Ko! = build(θ,t,ξ,Po) do θ,t,ξ,Po
-            luu(θ,t,ξ)\(lxu(θ,t,ξ)' .+ fu(θ,t,ξ)'*@vec(Po))
+            inv(luu(θ,t,ξ))*(lxu(θ,t,ξ)' .+ fu(θ,t,ξ)'*@vec(Po))
         end
         PRONTO.Ko(M::$T,θ,t,ξ,Po) = Ko(θ,t,ξ,Po) # NU,NX
 
@@ -275,7 +276,7 @@ macro derive(T)
 
         # size NX
         local vo,vo! = build(θ,t,ξ,ro) do θ,t,ξ,ro
-            -luu(θ,t,ξ)\(fu(θ,t,ξ)'*@vec(ro) + lu(θ,t,ξ))
+            inv(-luu(θ,t,ξ))*(fu(θ,t,ξ)'*@vec(ro) + lu(θ,t,ξ))
         end
         PRONTO.vo(M::$T,θ,t,ξ,ro) = vo(θ,t,ξ,ro) # NU,NX
 
@@ -305,7 +306,7 @@ end
 
 
 # ----------------------------------- ode solution handling ----------------------------------- #
-include("utils.jl")
+include("odes.jl")
 
 # ----------------------------------- main loop ----------------------------------- #
 
@@ -318,19 +319,18 @@ function pronto(M::Model{NX,NU,NΘ}, θ, t0, tf, x0, u0, φ) where {NX,NU,NΘ}
     
     info("solving regulator")
     Pr_f = diagm(ones(NX))
-    Pr = Solution(ODEProblem(Pr_ode,Pr_f,(tf,t0),(M,φ,θ)), NX, NX)
-    # Pr = Solution(M, Pr_ode, Prf, (t0,tf), (M,φ,θ))
+    Pr = Solution{MMatrix{4, 4, Float64, 16}}(Pr_ode, Pr_f, (tf,t0), (M,φ,θ))
 
     info("solving projection")
     ξ = Trajectory(M, ξ_ode, [x0;u0], (t0,tf), (M,θ,φ,Pr))
     
     info("solving optimizer")
-    Po_f = pxx(M,θ,tf,φ(tf))
-    Po = Solution(ODEProblem(Po_ode,Po_f,(tf,t0),(M,ξ,θ)), NX, NX)
+    # Po_f = pxx(M,θ,tf,φ(tf))
+    # Po = Solution{MArray{@buffer(nx(M),nx(M))...}}(Po_ode, Po_f, (tf,t0), (M,ξ,θ))
 
     # ro_f
     # ro = Solution()
-    return (Pr,ξ,Po)
+    return ξ
 end
 
 # Trajectory(M, ξ_ode, [x0;u0], (t0,tf), (M,θ,φ,Pr))

@@ -15,6 +15,9 @@ NΘ = 0
 struct TwoSpin <: PRONTO.Model{NX,NU,NΘ}
 end
 
+struct TwoSpinP <: PRONTO.Model{NX,NU,1}
+end
+
 # ----------------------------------- model definition ----------------------------------- ##
 
 let
@@ -34,11 +37,11 @@ let
     p = (θ,t,x,u) -> 1/2*collect(x)'*Pl*collect(x)
 
     # regulator
-    Rr = (θ,t,x,u) -> diagm([1])
+    Rr = (θ,t,x,u) -> diagm([1])*θ[1]
     Qr = (θ,t,x,u) -> diagm([1,1,1,1])
     # Pr(θ,t,x,u)
 
-    @derive TwoSpin
+    @derive TwoSpinP
 end
 
 # PRONTO.Ko(M)
@@ -55,9 +58,6 @@ xf = [1.0;0.0;0.0;0.0]
 u0 = [0.0]
 
 
-##
-φ = PRONTO.guess_zi(M,θ,x0,u0,t0,tf)
-@time ξ = pronto(M,θ,t0,tf,xf,u0,φ)
-
-
-Kr_fn = (θ,t,x,u,P) -> (PRONTO.luu(M,θ,t,x,u)\(PRONTO.lxu(M,θ,t,x,u)' .+ PRONTO.fu(M,θ,t,x,u)'collect(P)))
+#
+φ = PRONTO.guess_zi(M,θ,xf,u0,t0,tf)
+@time ξ = pronto(M,θ,t0,tf,x0,u0,φ)

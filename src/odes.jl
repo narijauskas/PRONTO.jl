@@ -1,24 +1,15 @@
-
-# ----------------------------------- ode solution handling ----------------------------------- #
-
-#TODO: abstract type AbstractBuffer{T}
-
-# maps t->x::T
-struct Buffer{T}
-    fxn::FunctionWrapper{T, Tuple{Float64}}
-    buf::T
-    fn!::Function
+macro buffer(N)
+    N = esc(N)
+    :(Tuple{$N...}, Float64, length($N), prod($N))
 end
 
-(buf::Buffer)(t) = buf.fxn(t)
+# struct ODE{T}
+#     fxn::FunctionWrapper{T, Tuple{Float64}}
+#     buf::T
+#     sln::SciMLBase.AbstractODESolution
+# end
 
-function Buffer(fn!, N::Vararg{Int})
-    @assert length(N) >= 1
-    T = MArray{Tuple{N...}, Float64, length(N), prod(N)}
-    buf = T(undef)
-    fxn = FunctionWrapper{T, Tuple{Float64}}(t->(fn!(buf, t); return copy(buf)))
-    Buffer(fxn,buf,fn!)
-end
+
 
 
 # maps t->x::T
@@ -30,20 +21,9 @@ end
 
 (sln::Solution)(t) = sln.fxn(t)
 
-# # T = BufferType(S...)
-# function Solution(prob, N::Vararg{Int})
-#     @assert length(N) >= 1
-#     sln = solve(prob)
-#     T = MArray{Tuple{N...}, Float64, length(N), prod(N)}
-#     buf = T(undef)
-#     fxn = FunctionWrapper{T, Tuple{Float64}}(t->(sln(buf, t); return copy(buf)))
-#     Solution(fxn,buf,sln)
-# end
+Solution(args...) = @error "please specify a buffer type, eg. Solution{@buffer(NX,NX)...}(args...)"
 
-
-Solution(args...) = @error "please specify a buffer size, eg. Solution{@buffer(NX,NX)...}(args...)"
-
-function Solution{T}(ode_fn,x0,ts,ode_pm; ode_kw...) where {T<:MArray}
+function Solution{T}(ode_fn,x0,ts,ode_pm; ode_kw...) where {T}
     fn = ODEFunction(ode_fn)
     sln = solve(ODEProblem(fn,x0,ts,ode_pm; ode_kw...))
     buf = T(undef)
@@ -56,6 +36,7 @@ function Solution{T}(ode_fn,x0,ts,ode_pm; ode_kw...) where {T<:MArray}
 
     Solution{T}(fxn,buf,sln)
 end
+
 
 
 Base.size(sln::Solution) = size(sln.buf)
@@ -71,10 +52,33 @@ end
 
 
 
-macro buffer(N...)
-    N = collect(esc.(N))
-    :(Tuple{$(N...)}, Float64, length($N), prod([$(N...)]))
-end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # maps t->ξ=(x,u)::(TX,TU)
 struct Trajectory{TX,TU}
@@ -119,7 +123,7 @@ function preview(ξ::Trajectory)
     lineplot(T,x; height=20, width=80)
 end
 
-Base.show(io::IO, buf::Buffer) = show(io,typeof(buf))
+# Base.show(io::IO, buf::Buffer) = show(io,typeof(buf))
 Base.show(io::IO, sln::Solution) = show(io,typeof(sln))
 #FUTURE: show size, length, time span, solver method?
 function Base.show(io::IO, ξ::Trajectory)
