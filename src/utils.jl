@@ -67,7 +67,7 @@ struct Trajectory{TX,TU}
     sln::SciMLBase.AbstractODESolution
 end
 
-(ξ::Trajectory)(t) = (ξ.x(t), ξ.u(t))
+(ξ::Trajectory)(t) = vcat(ξ.x(t), ξ.u(t))
 
 
 #eg. Trajectory(M, ξ_ode, [x0;u0], (t0,tf), (M,θ,φ,Pr))

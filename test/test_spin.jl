@@ -57,7 +57,7 @@ u0 = [0.0]
 
 ##
 φ = PRONTO.guess_zi(M,θ,x0,u0,t0,tf)
-@time ξ = pronto(M,θ,t0,tf,x0,u0,φ)
+@time ξ = pronto(M,θ,t0,tf,xf,u0,φ)
 
 
 Kr_fn = (θ,t,x,u,P) -> (PRONTO.luu(M,θ,t,x,u)\(PRONTO.lxu(M,θ,t,x,u)' .+ PRONTO.fu(M,θ,t,x,u)'collect(P)))
