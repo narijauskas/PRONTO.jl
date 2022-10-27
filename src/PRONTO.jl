@@ -342,7 +342,6 @@ function _search_direction(T)::Expr
 
         local ζ_t,ζ_t! = build(θ,t,ξ,ζ,Po,ro) do θ,t,ξ,ζ,Po,ro
             local z,v = split($T(),ζ)
-            # $Ko
             vcat(($A*$z + $B*$v)...,
                 ($vo - $Ko*$z - $v)...)
         end
@@ -370,41 +369,31 @@ macro derive(T)
 
         # generate symbolic variables for derivation
         iinfo("preparing symbolics ... "); @tick
-        $(_symbolics(T))
-        @tock; println(@clock)
+        $(_symbolics(T)); @tock; println(@clock)
 
         iinfo("dynamics derivatives ... "); @tick
-        $(_dynamics(T))
-        @tock; println(@clock)
+        $(_dynamics(T)); @tock; println(@clock)
 
         iinfo("stage cost derivatives ... "); @tick
-        $(_stage_cost(T))
-        @tock; println(@clock)
+        $(_stage_cost(T)); @tock; println(@clock)
         
         iinfo("terminal cost derivatives ... "); @tick
-        $(_terminal_cost(T))
-        @tock; println(@clock)
+        $(_terminal_cost(T)); @tock; println(@clock)
 
         iinfo("regulator solver ... "); @tick
-        $(_regulator(T))
-        @tock; println(@clock)
+        $(_regulator(T)); @tock; println(@clock)
 
         iinfo("projection solver ... "); @tick
-        $(_projection(T))
-        @tock; println(@clock)
+        $(_projection(T)); @tock; println(@clock)
         
         iinfo("optimizer solver ... "); @tick
-        $(_optimizer(T))
-        @tock; println(@clock)
+        $(_optimizer(T)); @tock; println(@clock)
         
         iinfo("lagrangian/costate solver ... "); @tick
-        $(_lagrangian(T))
-        @tock; println(@clock)
-
+        $(_lagrangian(T)); @tock; println(@clock)
 
         iinfo("search direction solver ... "); @tick
-        $(_search_direction(T))
-        @tock; println(@clock)
+        $(_search_direction(T)); @tock; println(@clock)
 
 
 
@@ -447,14 +436,14 @@ function pronto(M::Model{NX,NU,NΘ}, θ, t0, tf, x0, u0, φ) where {NX,NU,NΘ}
     Pr = ODE(Pr_ode, Pr_f, (tf,t0), (M,θ,φ), ODEBuffer{Tuple{NX,NX}}())
     
     @tock; println(@clock)
-    println(preview(Pr))
+    # println(preview(Pr))
 
 
     iinfo("projection ... "); @tick
     # ξ = Trajectory(M, ξ_ode, [x0;u0], (t0,tf), (M,θ,φ,Pr))
     ξ = ODE(ξ_ode, [x0;u0], (t0,tf), (M,θ,φ,Pr), ODEBuffer{Tuple{NX+NU}}(); dae=dae(M))
     @tock; println(@clock)
-    println(preview(ξ))
+    # println(preview(ξ))
 
 
     iinfo("optimizer ... "); @tick
@@ -472,7 +461,7 @@ function pronto(M::Model{NX,NU,NΘ}, θ, t0, tf, x0, u0, φ) where {NX,NU,NΘ}
     λ_f = px(M,θ,tf,φ(tf))
     λ = ODE(λ_ode, λ_f, (tf,t0), (M,θ,ξ,φ,Pr), ODEBuffer{Tuple{NX}}())
     @tock; println(@clock)
-    println(preview(λ))
+    # println(preview(λ))
     
 
     iinfo("search direction ... "); @tick
