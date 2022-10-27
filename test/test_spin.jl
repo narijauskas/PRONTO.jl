@@ -63,38 +63,30 @@ u0 = [0.0]
 @time ξ = pronto(M,θ,t0,tf,x0,u0,φ)
 
 
-#Time sampling
-# macro lets you define a pair of timepoints
-@tick name # samples name_tik = @time_ns()
-@tock name # samples name_tok = @time_ns()
-@ticktock name # (name_tik - name_tok)
-@μs name # (name_tik - name_tok)/1e3
-@ms name # (name_tik - name_tok)/1e6
+# #Time sampling
+# # macro lets you define a pair of timepoints
+# @tick name # samples name_tik = @time_ns()
+# @tock name # samples name_tok = @time_ns()
+# @clock name # (name_tik - name_tok)
+# @μs name # (name_tik - name_tok)/1e3
+# @ms name # (name_tik - name_tok)/1e6
 
 
-function append_tick(name)::Expr
-    _tick = esc(Symbol(String(name)*"_tick"))
-    # return quote
-    #     _tick = time_ns()
-    # end
-end
 
-_tick(name) = esc(Symbol(String(name)*"_tick"))
-_tock(name) = esc(Symbol(String(name)*"_tock"))
+# tick(name) = esc(Symbol(String(name)*"_tick"))
+# tock(name) = esc(Symbol(String(name)*"_tock"))
 
-macro tick(name)
-    :($(_tick(name)) = time_ns())
-end
+# macro tick(name)
+#     :($(_tick(name)) = time_ns())
+# end
 
-macro tock(name)
-    :($(_tock(name)) = time_ns())
-end
+# macro tock(name)
+#     :($(_tock(name)) = time_ns())
+# end
 
-macro μs(name)
-    tick = _tick(name)
-    tock = _tock(name)
-    ex = :(($tock - $tick)/1e3)
-    :(round($ex; digits=2))
-end
-
-"finished in $@ab seconds"
+# macro clock(name)
+#     tick = _tick(name)
+#     tock = _tock(name)
+#     ms = :(($tock - $tick)/1e6)
+#     :("$($:(round($ms; digits=3))) ms")
+# end
