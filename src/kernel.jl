@@ -40,7 +40,7 @@ macro fndef(fn, args)
             # @variables Po[1:nx(M),1:nx(M)]
             # @variables ro[1:nx(M)]
             # @variables λ[1:nx(M)]
-            $(symbolics(M))
+            $(_symbolics(M))
             ($fn)(M, $args...)
         end
     end

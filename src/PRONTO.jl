@@ -137,6 +137,7 @@ split(M::Model, ξ) = (ξ[1:nx(M)], ξ[(nx(M)+1):end])
 
 function _symbolics(T)::Expr
     return quote
+        # create symbolic variables
         @variables θ[1:nθ($T())]
         @variables t
         @variables x[1:nx($T())] 
@@ -152,36 +153,20 @@ function _symbolics(T)::Expr
         @variables Po[1:nx($T()),1:nx($T())]
         @variables ro[1:nx($T())]
         @variables λ[1:nx($T())]
-        # Jacobian operators
+
+        # create Jacobian operators
         Jx,Ju = Jacobian.([x,u])
     end
 end
 
-function _regulator(T)
-end
-
-macro derive(T)
-    # make sure we use the local context
-    T = esc(T)
-    # M = T()
-    user_Qr = esc(:Qr)
-
+function _dynamics(T)::Expr
+    user_f = esc(:f)
     return quote
-        println()
-        info("deriving the $(as_bold("$($T)")) model:")
-        @tick derive_time
-
-        # generate symbolic variables for derivation
-        iinfo("preparing symbolics"); @tick
-        $(_symbolics(T))
-        @tock; println(" ... ", @clock)
-
-        iinfo("dynamics derivatives"); @tick
-
         # load user function, remap ξ<->(x,u)
         local f,f! = build(θ,t,ξ) do θ,t,ξ
             local x,u = split($T(),ξ)
-            ($(esc(:(f))))(θ,t,x,u)
+            # ($(esc(:(f))))(θ,t,x,u)
+            ($user_f)(θ,t,x,u)
         end
 
         # derive models
@@ -199,12 +184,11 @@ macro derive(T)
         PRONTO.fxu(M::$T,θ,t,ξ) = fxu(θ,t,ξ) # NX,NX,NU
         PRONTO.fuu(M::$T,θ,t,ξ) = fuu(θ,t,ξ) # NX,NU,NU
         PRONTO.f!(M::$T,buf,θ,t,ξ) = f!(buf,θ,t,ξ) #NX
+    end
+end
 
-        @tock
-        println(" ... ", @clock)
-        iinfo("stage cost derivatives")
-        @tick
-
+function _stage_cost(T)::Expr
+    return quote
         # load user function, remap ξ<->(x,u)
         local l,l! = build(θ,t,ξ) do θ,t,ξ
             local x,u = split($T(),ξ)
@@ -225,12 +209,11 @@ macro derive(T)
         PRONTO.lxx(M::$T,θ,t,ξ) = lxx(θ,t,ξ) # NX,NX
         PRONTO.lxu(M::$T,θ,t,ξ) = lxu(θ,t,ξ) # NX,NU
         PRONTO.luu(M::$T,θ,t,ξ) = luu(θ,t,ξ) # NU,NU
+    end
+end
 
-        @tock
-        println(" ... ", @clock)
-        iinfo("terminal cost derivatives")
-        @tick
-
+function _terminal_cost(T)::Expr
+    return quote
         # load user function, remap ξ<->(x,u)
         local p,p! = build(θ,t,ξ) do θ,t,ξ
             local x,u = split($T(),ξ)
@@ -245,20 +228,18 @@ macro derive(T)
         PRONTO.p(M::$T,θ,t,ξ) = p(θ,t,ξ) # 1
         PRONTO.px(M::$T,θ,t,ξ) = px(θ,t,ξ) # NX
         PRONTO.pxx(M::$T,θ,t,ξ) = pxx(θ,t,ξ) # NX,NX
+    end
+end
 
-        @tock
-        println(" ... ", @clock)
-        iinfo("regulator equations")
-        @tick
-
-        # load user function, remap ξ<->(x,u)
+function _regulator(T)::Expr
+    return quote
+        # load user functions remapping (x,u)->ξ
         local Qr,Qr! = build(θ,t,ξ) do θ,t,ξ
             local x,u = split($T(),ξ)
             # ($user_Qr)(θ,t,x,u)
             ($(esc(:(Qr))))(θ,t,x,u)
 
         end
-
         local Rr,Rr! = build(θ,t,ξ) do θ,t,ξ
             local x,u = split($T(),ξ)
             ($(esc(:(Rr))))(θ,t,x,u)
@@ -273,17 +254,18 @@ macro derive(T)
             riccati(fx(θ,t,φ), Kr(θ,t,φ,Pr), @vec(Pr), Qr(θ,t,φ), Rr(θ,t,φ))
         end
 
+        # add definitions to PRONTO
         PRONTO.Rr(M::$T,θ,t,φ) = Rr(θ,t,φ)
         PRONTO.Qr(M::$T,θ,t,φ) = Qr(θ,t,φ)
         PRONTO.Kr(M::$T,θ,t,φ,Pr) = Kr(θ,t,φ,Pr) # NU,NX
         PRONTO.Pr_t(M::$T,θ,t,φ,Pr) = Pr_t(θ,t,φ,Pr) # NX,NX
         PRONTO.Pr_t!(M::$T,buf,θ,t,φ,Pr) = Pr_t!(buf,θ,t,φ,Pr) # NX,NX    
+    end    
+end
 
-        @tock
-        println(" ... ", @clock)
-        iinfo("projection solver")
-        @tick
-
+function _projection(T)::Expr
+    return quote
+        # build dae to solve for dξ/dt
         local ξ_t,ξ_t! = build(θ,t,ξ,φ,Pr) do θ,t,ξ,φ,Pr
             local x,u = split($T(),ξ)
             local α,μ = split($T(),φ)
@@ -291,15 +273,15 @@ macro derive(T)
             vcat(f(θ,t,ξ)...,
                 (@vec(μ) - Kr(θ,t,φ,Pr)*(@vec(x) - @vec(α)) - @vec(u))...)
         end
+
         # add definitions to PRONTO
         PRONTO.ξ_t(M::$T,θ,t,ξ,φ,Pr) = ξ_t(θ,t,ξ,φ,Pr) # NX+NU
         PRONTO.ξ_t!(M::$T,buf,θ,t,ξ,φ,Pr) = ξ_t!(buf,θ,t,ξ,φ,Pr) # NX+NU
-        
-        @tock
-        println(" ... ", @clock)
-        iinfo("optimizer solver")
-        @tick
+    end    
+end
 
+function _optimizer(T)::Expr
+    return quote
         #Ko = Ro\(S'+B'Po)
         local Ko,Ko! = build(θ,t,ξ,Po) do θ,t,ξ,Po
             inv(luu(θ,t,ξ))*(lxu(θ,t,ξ)' .+ fu(θ,t,ξ)'*@vec(Po))
@@ -310,43 +292,99 @@ macro derive(T)
         local Po_t,Po_t! = build(θ,t,ξ,Po) do θ,t,ξ,Po
             riccati(fx(θ,t,ξ), Ko(θ,t,ξ,Po), @vec(Po), lxx(θ,t,ξ), luu(θ,t,ξ))
         end
+
+        # add definitions to PRONTO
         PRONTO.Po_t(M::$T,θ,t,ξ,Po) = Po_t(θ,t,ξ,Po) # NX,NX
-        PRONTO.Po_t!(M::$T,buf,θ,t,ξ,Po) = Po_t!(buf,θ,t,ξ,Po) # NX,NX    
-
-        @tock
-        println(" ... ", @clock)
-        iinfo("optimizer costate solver")
-        @tick
-
+        PRONTO.Po_t!(M::$T,buf,θ,t,ξ,Po) = Po_t!(buf,θ,t,ξ,Po) # NX,NX
+        
+        # costate
         local vo,vo! = build(θ,t,ξ,ro) do θ,t,ξ,ro
             inv(-luu(θ,t,ξ))*(fu(θ,t,ξ)'*@vec(ro) + lu(θ,t,ξ))
         end
-        PRONTO.vo(M::$T,θ,t,ξ,ro) = vo(θ,t,ξ,ro) # NU,NX
-
+        
         local ro_t,ro_t! = build(θ,t,ξ,Po,ro) do θ,t,ξ,Po,ro
             costate(fx(θ,t,ξ), fu(θ,t,ξ), lx(θ,t,ξ), lu(θ,t,ξ), Ko(θ,t,ξ,Po), @vec(ro))
         end
+        PRONTO.vo(M::$T,θ,t,ξ,ro) = vo(θ,t,ξ,ro) # NU,NX
+
+        # add definitions to PRONTO
         PRONTO.ro_t(M::$T,θ,t,ξ,Po,ro) = ro_t(θ,t,ξ,Po,ro) # NX
         PRONTO.ro_t!(M::$T,buf,θ,t,ξ,Po,ro) = ro_t!(buf,θ,t,ξ,Po,ro) # NX
+    end    
+end
 
-        @tock
-        println(" ... ", @clock)
-        iinfo("lagrangian/costate solver")
-        @tick
-
+function _lagrangian(T)::Expr
+    return quote
         local λ_t,λ_t! = build(θ,t,ξ,φ,Pr,λ) do θ,t,ξ,φ,Pr,λ
             costate(fx(θ,t,ξ), fu(θ,t,ξ), lx(θ,t,ξ), lu(θ,t,ξ), Kr(θ,t,φ,Pr), @vec(λ))
         end
+
+        # add definitions to PRONTO
         PRONTO.λ_t(M::$T,θ,t,ξ,φ,Pr,λ) = λ_t(θ,t,ξ,φ,Pr,λ) #NX
         PRONTO.λ_t!(M::$T,buf,θ,t,ξ,φ,Pr,λ) = λ_t!(buf,θ,t,ξ,φ,Pr,λ) #NX
+    end
+end
 
-        @tock
-        println(" ... ", @clock)
-        iinfo("search direction solver")
-        @tick
+macro derive(T)
+    # make sure we use the local context
+    T = esc(T)
+    # M = T()
+    user_Qr = esc(:Qr)
 
-        
+    return quote
+        println()
+        info("deriving the $(as_bold("$($T)")) model:")
+        @tick derive_time
+
+        # generate symbolic variables for derivation
+        iinfo("preparing symbolics"); @tick
+        $(_symbolics(T))
         @tock; println(" ... ", @clock)
+
+        iinfo("dynamics derivatives"); @tick
+        $(_dynamics(T))
+        @tock; println(" ... ", @clock)
+
+        iinfo("stage cost derivatives"); @tick
+        $(_stage_cost(T))
+        @tock; println(" ... ", @clock)
+        
+        iinfo("terminal cost derivatives"); @tick
+        $(_terminal_cost(T))
+        @tock; println(" ... ", @clock)
+
+        iinfo("regulator solver"); @tick
+        $(_regulator(T))
+        @tock; println(" ... ", @clock)
+
+        iinfo("projection solver"); @tick
+        $(_projection(T))
+        @tock; println(" ... ", @clock)
+        
+        iinfo("optimizer solver"); @tick
+        $(_optimizer(T))
+        @tock; println(" ... ", @clock)
+        
+        iinfo("lagrangian/costate solver"); @tick
+        $(_lagrangian(T))
+        @tock; println(" ... ", @clock)
+
+
+        iinfo("search direction solver"); @tick
+
+        @tock; println(" ... ", @clock)
+
+
+
+
+
+
+
+
+
+
+
+
         @tock derive_time
         info("model derivation completed in $(@clock derive_time)\n")
     end
@@ -362,7 +400,7 @@ Pr_ode(dPr,Pr,(M,θ,φ),t) = Pr_t!(M,dPr,θ,t,φ(t),Pr)
 ξ_ode(dξ,ξ,(M,θ,φ,Pr),t) = ξ_t!(M,dξ,θ,t,ξ,φ(t),Pr(t))
 Po_ode(dPo,Po,(M,θ,ξ),t) = Po_t!(M,dPo,θ,t,ξ(t),Po)
 ro_ode(dro,ro,(M,θ,ξ,Po),t) = ro_t!(M,dro,θ,t,ξ(t),Po(t),ro)
-# λ_ode()
+λ_ode(dλ,λ,(M,θ,ξ,φ,Pr),t) = λ_t!(M,dλ,θ,t,ξ(t),φ(t),Pr(t),λ)
 # ζ_ode()
 # y_ode()
 
@@ -371,30 +409,44 @@ function pronto(M::Model{NX,NU,NΘ}, θ, t0, tf, x0, u0, φ) where {NX,NU,NΘ}
     info(as_bold(string(nameof(typeof(M))))*" model iteration 1:")
 
 
-    iinfo("regulator"); @tick
+    iinfo("regulator ... "); @tick
+
     Pr_f = diagm(ones(NX))
     Pr = ODE(Pr_ode, Pr_f, (tf,t0), (M,θ,φ), ODEBuffer{Tuple{NX,NX}}())
-    @tock; println(" ... ", @clock)
+    
+    @tock; println(@clock)
     println(preview(Pr))
 
 
-    iinfo("projection"); @tick
+    iinfo("projection ... "); @tick
     # ξ = Trajectory(M, ξ_ode, [x0;u0], (t0,tf), (M,θ,φ,Pr))
     ξ = ODE(ξ_ode, [x0;u0], (t0,tf), (M,θ,φ,Pr), ODEBuffer{Tuple{NX+NU}}(); dae=dae(M))
-    @tock; println(" ... ", @clock)
+    @tock; println(@clock)
     println(preview(ξ))
 
 
-    iinfo("optimizer"); @tick
+    iinfo("optimizer ... "); @tick
     Po_f = pxx(M,θ,tf,φ(tf))
     Po = ODE(Po_ode, Po_f, (tf,t0), (M,θ,ξ), ODEBuffer{Tuple{NX,NX}}())
+
     ro_f = px(M,θ,tf,φ(tf))
     ro = ODE(ro_ode, ro_f, (tf,t0), (M,θ,ξ,Po), ODEBuffer{Tuple{NX}}())
-    @tock; println(" ... ", @clock)
+    @tock; println(@clock)
     # println(preview(Po))
     # println(preview(ro))
 
-    return ro
+
+    iinfo("lagrangian ... "); @tick
+    λ_f = px(M,θ,tf,φ(tf))
+    λ = ODE(λ_ode, λ_f, (tf,t0), (M,θ,ξ,φ,Pr), ODEBuffer{Tuple{NX}}())
+    @tock; println(@clock)
+    println(preview(λ))
+    
+
+    iinfo("search direction ... "); @tick
+    @tock; println(@clock)
+
+    return ξ
 end
 
 #MAYBE:
