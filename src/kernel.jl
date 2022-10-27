@@ -85,6 +85,8 @@ end
 
 @fndef y_t  (θ,t,ξ,ζ)
 
+@fndef h_t  (θ,t,ξ)
+@fndef φ̂_t  (θ,t,ξ,φ,ζ,φ̂,γ,Pr)
 # cost derivatives...
 # @fndef y_t
 
@@ -97,7 +99,8 @@ Po_t!(M::Model,buf,θ,t,ξ,P) = throw(ModelDefError(M, :Po_t!))
 ro_t!(M::Model,buf,θ,t,ξ,Po) = throw(ModelDefError(M, :ro_t!))
 ζ_t!(M::Model,buf,θ,t,ξ,ζ,Po,ro) = throw(ModelDefError(M, :ζ_t!))
 y_t!(M::Model,buf,θ,t,ξ,ζ) = throw(ModelDefError(M, :y_t!))
-
+h_t!(M::Model,buf,θ,t,ξ) = throw(ModelDefError(M, :h_t!))
+φ̂_t!(buf,θ,t,ξ,φ,ζ,φ̂,γ,Pr) = throw(ModelDefError(M, :φ̂_t!))
 
 # FUTURE: for each function and signature, macro-define:
 # - default function f(M,...) = @error

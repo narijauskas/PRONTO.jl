@@ -155,11 +155,15 @@ function _symbolics(T)::Expr
         @variables z[1:nx($T())] 
         @variables v[1:nu($T())]
         ζ = vcat(z,v)
+        @variables α̂[1:nx($T())] 
+        @variables μ̂[1:nu($T())]
+        φ̂ = vcat(α̂,μ̂)
         @variables Pr[1:nx($T()),1:nx($T())]
         @variables Po[1:nx($T()),1:nx($T())]
         @variables ro[1:nx($T())]
         @variables λ[1:nx($T())]
         @variables γ
+        @variables h
 
         # create Jacobian operators
         Jx,Ju = Jacobian.([x,u])
@@ -420,31 +424,41 @@ function _cost_derivatives(T)::Expr
 end
 
 function _armijo(T)::Expr
-    # Kr = Kr(θ,t,ξ+γζ,Pr)
+    Kr = :(Kr(θ,t,φ,Pr))
+    u = :(collect(u)) 
+    v = :(collect(v)) 
+    μ̂ = :(collect(μ̂))   
+    x = :(collect(x)) 
+    z = :(collect(z)) 
+    α̂ = :(collect(α̂)) 
     return quote
-
+        
         # φ̂ = ξ+γζ
 
         # # projection with respect to γ
-        # local φ_t, φ_t! = build(θ,t,ξ,φ,γ) do θ,t,ξ,φ,γ
+        local φ̂_t, φ̂_t! = build(θ,t,ξ,φ,ζ,φ̂,γ,Pr) do θ,t,ξ,φ,ζ,φ̂,γ,Pr
             
-        #     # local x,u = split($T(),ξ)
-        #     # local α,μ = split($T(),φ)
-        #     return vcat(
-        #         f,
-        #         μ -Kr*(x-α) - u
-        #     )
-        #     #     f(θ,t,ξ)...,
-        #     #     (@vec(μ) - Kr(θ,t,φ,Pr)*(@vec(x) - @vec(α)) - @vec(u))...
-        #     # )
+            local α, μ = split($T(),φ)
+            local x, u = split($T(),ξ)
+            local z, v = split($T(),ζ)
+            local α̂, μ̂ = split($T(),φ̂)
 
-        # end
-         
-        # # cost function ode
-        # local J_t, J_t! = build(θ,t,ξ) do θ,t,ξ,γ,h
+            return vcat(
+                f(θ,t,φ̂)...,
+                ($u + γ*$v) - ($Kr)*(($α̂) - ($x + γ*$z)) - ($μ̂)...
+            )
+        end
+        PRONTO.φ̂_t(M::$T,θ,t,ξ,φ,ζ,φ̂,γ,Pr) = φ̂_t(θ,t,ξ,φ,ζ,φ̂,γ,Pr)
+        PRONTO.φ̂_t!(M::$T,buf,θ,t,ξ,φ,ζ,φ̂,γ,Pr) = φ̂_t!(buf,θ,t,ξ,φ,ζ,φ̂,γ,Pr)
+ 
 
-        #     l(θ,t,ξ)
-        # end
+        # cost function ode
+        local h_t, h_t! = build(θ,t,ξ,h) do θ,t,ξ,h
+
+            l(θ,t,ξ)
+        end
+        PRONTO.h_t(M::$T,θ,t,ξ) = h_t(θ,t,ξ)
+        PRONTO.h_t!(M::$T,buf,θ,t,ξ) = h_t!(buf,θ,t,ξ)
     end
 end
 
@@ -490,8 +504,8 @@ macro derive(T)
         iinfo("cost derivative solver ... "); @tick
         $(_cost_derivatives(T)); @tock; println(@clock)
         
-        # iinfo("armijo rule ... "); @tick
-        # $(_cost_derivatives(T)); @tock; println(@clock)
+        iinfo("armijo rule ... "); @tick
+        $(_armijo(T)); @tock; println(@clock)
 
         @tock derive_time
         info("model derivation completed in $(@clock derive_time)\n")
@@ -511,7 +525,7 @@ ro_ode(dro,ro,(M,θ,ξ,Po),t) = ro_t!(M,dro,θ,t,ξ(t),Po(t),ro)
 λ_ode(dλ,λ,(M,θ,ξ,φ,Pr),t) = λ_t!(M,dλ,θ,t,ξ(t),φ(t),Pr(t),λ)
 ζ_ode(dζ,ζ,(M,θ,ξ,Po,ro),t) = ζ_t!(M,dζ,θ,t,ξ(t),ζ,Po(t),ro(t))
 y_ode(dy,y,(M,θ,ξ,ζ),t) = y_t!(M,dy,θ,t,ξ(t),ζ(t))
-# φ_ode(dφ,φ,(M,θ,ξ,γ),t)
+φ̂_ode(dφ̂,φ̂,(M,θ,ξ,φ,ζ,γ,Pr),t) = φ̂_t!(M,dφ̂,θ,t,ξ(t),φ(t),ζ(t),φ̂,γ,Pr(t))
 
 function pronto(M::Model{NX,NU,NΘ}, θ, t0, tf, x0, u0, φ) where {NX,NU,NΘ}
     
@@ -539,8 +553,7 @@ function pronto(M::Model{NX,NU,NΘ}, θ, t0, tf, x0, u0, φ) where {NX,NU,NΘ}
     ro_f = px(M,θ,tf,φ(tf))
     ro = ODE(ro_ode, ro_f, (tf,t0), (M,θ,ξ,Po), ODEBuffer{Tuple{NX}}())
     @tock; println(@clock)
-    # println(preview(Po))
-    # println(preview(ro))
+
 
 
     iinfo("lagrangian ... "); @tick
@@ -560,7 +573,13 @@ function pronto(M::Model{NX,NU,NΘ}, θ, t0, tf, x0, u0, φ) where {NX,NU,NΘ}
     y0 = [0;0]
     y = ODE(y_ode, y0, (t0,tf), (M,θ,ξ,ζ), ODEBuffer{Tuple{2}}())
     @tock; println(@clock)
-    return ζ
+
+    iinfo("armijo rule ... "); @tick
+    γ = 1
+    φ̂ = ODE(φ̂_ode, [x0;u0], (t0,tf), (M,θ,ξ,φ,ζ,γ,Pr), ODEBuffer{Tuple{NX+NU}}(); dae=dae(M))
+    @tock; println(@clock)
+
+    return φ̂
 end
 
 #MAYBE:
