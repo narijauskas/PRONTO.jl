@@ -112,21 +112,14 @@ end
 
 split(M::Model, ξ) = (ξ[1:nx(M)], ξ[(nx(M)+1):end])
 
-#YO: #FUTURE: if pronto knows each function's argument signature
-# can it create a representation that expands them, eg. @Rr->Rr(θ,t,α,μ) in the @derive macro
-
 # loads definitions for model M into pronto from autodiff based on current definitions in Main
-macro derive(T)
-    # make sure we use the local context
-    T = esc(T)
-    # M = T()
-    user_Qr = esc(:Qr)
+#FUTURE: break into sections:
+    # 1. global macro is spliced from expressions, functions generate these expressions from T
+    # 2. global macro simply expands to sub-macros, sub-macros evaluate from T
+    # 3. ¿Por que no los dos?
 
+function symbolics(T)::Expr
     return quote
-        println()
-        info("deriving the $(as_bold("$($T)")) model:")
-        _t0_derivation = time_ns()
-        # define symbolic variables and operators
         @variables θ[1:nθ($T())]
         @variables t
         @variables x[1:nx($T())] 
@@ -142,8 +135,44 @@ macro derive(T)
         @variables Po[1:nx($T()),1:nx($T())]
         @variables ro[1:nx($T())]
         @variables λ[1:nx($T())]
-
+        # Jacobian operators
         Jx,Ju = Jacobian.([x,u])
+    end
+end
+
+macro symbolics(T)
+    symbolics(esc(T))
+end
+
+macro derive(T)
+    # make sure we use the local context
+    T = esc(T)
+    # M = T()
+    user_Qr = esc(:Qr)
+
+    return quote
+        println()
+        info("deriving the $(as_bold("$($T)")) model:")
+        _t0_derivation = time_ns()
+        # define symbolic variables and operators
+        # @variables θ[1:nθ($T())]
+        # @variables t
+        # @variables x[1:nx($T())] 
+        # @variables u[1:nu($T())]
+        # ξ = vcat(x,u)
+        # @variables α[1:nx($T())] 
+        # @variables μ[1:nu($T())]
+        # φ = vcat(α,μ)
+        # @variables z[1:nx($T())] 
+        # @variables v[1:nu($T())]
+        # ζ = vcat(z,v)
+        # @variables Pr[1:nx($T()),1:nx($T())]
+        # @variables Po[1:nx($T()),1:nx($T())]
+        # @variables ro[1:nx($T())]
+        # @variables λ[1:nx($T())]
+
+        # Jx,Ju = Jacobian.([x,u])
+        $(symbolics(T))
 
         println("\t > regulator equations")
         
@@ -258,12 +287,13 @@ macro derive(T)
         
         println("\t > optimizer solver")
 
-        #Ko = R\(S'+B'P)
+        #Ko = Ro\(S'+B'Po)
         local Ko,Ko! = build(θ,t,ξ,Po) do θ,t,ξ,Po
             inv(luu(θ,t,ξ))*(lxu(θ,t,ξ)' .+ fu(θ,t,ξ)'*@vec(Po))
         end
         PRONTO.Ko(M::$T,θ,t,ξ,Po) = Ko(θ,t,ξ,Po) # NU,NX
 
+        #dPo_dt = -A'Po - Po*A + Ko'Ro*Ko - Qo
         local Po_t,Po_t! = build(θ,t,ξ,Po) do θ,t,ξ,Po
             riccati(fx(θ,t,ξ), Ko(θ,t,ξ,Po), @vec(Po), lxx(θ,t,ξ), luu(θ,t,ξ))
         end
@@ -272,7 +302,6 @@ macro derive(T)
 
         println("\t > optimizer costate solver")
 
-        # size NX
         local vo,vo! = build(θ,t,ξ,ro) do θ,t,ξ,ro
             inv(-luu(θ,t,ξ))*(fu(θ,t,ξ)'*@vec(ro) + lu(θ,t,ξ))
         end
@@ -281,17 +310,16 @@ macro derive(T)
         local ro_t,ro_t! = build(θ,t,ξ,Po,ro) do θ,t,ξ,Po,ro
             costate(fx(θ,t,ξ), fu(θ,t,ξ), lx(θ,t,ξ), lu(θ,t,ξ), Ko(θ,t,ξ,Po), @vec(ro))
         end
-        PRONTO.ro_t(M::$T,θ,t,ξ,Po,ro) = ro_t(θ,t,ξ,Po,ro) # NX,NX
-        PRONTO.ro_t!(M::$T,buf,θ,t,ξ,Po,ro) = ro_t!(buf,θ,t,ξ,Po,ro) # NX,NX 
+        PRONTO.ro_t(M::$T,θ,t,ξ,Po,ro) = ro_t(θ,t,ξ,Po,ro) # NX
+        PRONTO.ro_t!(M::$T,buf,θ,t,ξ,Po,ro) = ro_t!(buf,θ,t,ξ,Po,ro) # NX
 
         println("\t > lagrangian/costate solver")
 
-        # size NX
         local λ_t,λ_t! = build(θ,t,ξ,φ,Pr,λ) do θ,t,ξ,φ,Pr,λ
             costate(fx(θ,t,ξ), fu(θ,t,ξ), lx(θ,t,ξ), lu(θ,t,ξ), Kr(θ,t,φ,Pr), @vec(λ))
         end
-        PRONTO.λ_t(M::$T,θ,t,ξ,φ,Pr,λ) = λ_t(θ,t,ξ,φ,Pr,λ)
-        PRONTO.λ_t!(M::$T,buf,θ,t,ξ,φ,Pr,λ) = λ_t!(buf,θ,t,ξ,φ,Pr,λ)
+        PRONTO.λ_t(M::$T,θ,t,ξ,φ,Pr,λ) = λ_t(θ,t,ξ,φ,Pr,λ) #NX
+        PRONTO.λ_t!(M::$T,buf,θ,t,ξ,φ,Pr,λ) = λ_t!(buf,θ,t,ξ,φ,Pr,λ) #NX
 
 
         println("\t > search direction solver")
@@ -308,34 +336,34 @@ include("odes.jl")
 
 # ----------------------------------- main loop ----------------------------------- #
 
-Pr_ode(dPr,Pr,(M,φ,θ),t) = Pr_t!(M,dPr,θ,t,φ(t),Pr)
+Pr_ode(dPr,Pr,(M,θ,φ),t) = Pr_t!(M,dPr,θ,t,φ(t),Pr)
 ξ_ode(dξ,ξ,(M,θ,φ,Pr),t) = ξ_t!(M,dξ,θ,t,ξ,φ(t),Pr(t))
-Po_ode(dPo,Po,(M,ξ,θ),t) = Po_t!(M,dPo,θ,t,ξ(t),Po)
-
+Po_ode(dPo,Po,(M,θ,ξ),t) = Po_t!(M,dPo,θ,t,ξ(t),Po)
+ro_ode(dro,ro,(M,θ,ξ,Po),t) = ro_t!(M,dro,θ,t,ξ,Po,ro)
+# λ_ode()
+# ζ_ode()
+# y_ode()
 
 function pronto(M::Model{NX,NU,NΘ}, θ, t0, tf, x0, u0, φ) where {NX,NU,NΘ}
     
     info("solving regulator")
     Pr_f = diagm(ones(NX))
-    
-
-    Pr = ODE(Pr_ode, Pr_f, (tf,t0), (M,φ,θ), ODEBuffer{Tuple{NX,NX}}())
-    # Pr = @ODE (NX,NX) (Pr_ode, Pr_f, (tf,t0), (M,φ,θ))
-    # ODE(MArray{Tuple{NX,NX}, Float64, length((NX,NX)), prod((NX,NX))}(undef), Pr_ode, Pr_f, (tf,t0), (M,φ,θ))
-    # Pr = Solution{MArray{Tuple{NX,NX}, Float64, length((NX,NX)), prod((NX,NX))}}(Pr_ode2, Pr_f, (tf,t0), (M,φ,θ))
+    Pr = ODE(Pr_ode, Pr_f, (tf,t0), (M,θ,φ), ODEBuffer{Tuple{NX,NX}}())
 
     info("solving projection")
     ξ = ODE(ξ_ode, [x0;u0], (t0,tf), (M,θ,φ,Pr), ODEBuffer{Tuple{NX+NU}}(); dae=dae(M))
     
     info("solving optimizer")
-    # Po_f = pxx(M,θ,tf,φ(tf))
-    # Po = Solution{MArray{@buffer(nx(M),nx(M))...}}(Po_ode, Po_f, (tf,t0), (M,ξ,θ))
+    Po_f = pxx(M,θ,tf,φ(tf))
+    Po = ODE(Po_ode, Po_f, (tf,t0), (M,θ,ξ), ODEBuffer{Tuple{NX,NX}}())
 
     # ro_f
-    # ro = Solution()
+    # ro = ODE(ro_ode, ro_f, (tf,t0), (M,θ,ξ,Po), ODEBuffer{}())
     return ξ
 end
 
+#MAYBE:
+# info(M, "message") -> [PRONTO-TwoSpin: message
 
 # function Pr_ode(dPr, Pr, (?), t)
 #     dPr!(dP,α,μ,t,θ)

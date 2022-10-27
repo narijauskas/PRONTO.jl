@@ -25,21 +25,22 @@ macro fndef(fn, args)
         end
         # define a symbolic rendition
         function ($fn)(M::Model)
-            @variables θ[1:nθ(M)]
-            @variables t
-            @variables x[1:nx(M)] 
-            @variables u[1:nu(M)]
-            ξ = vcat(x,u)
-            @variables α[1:nx(M)] 
-            @variables μ[1:nu(M)]
-            φ = vcat(α,μ)
-            @variables z[1:nx(M)] 
-            @variables v[1:nu(M)]
-            ζ = vcat(z,v)
-            @variables Pr[1:nx(M),1:nx(M)]
-            @variables Po[1:nx(M),1:nx(M)]
-            @variables ro[1:nx(M)]
-            @variables λ[1:nx(M)]
+            # @variables θ[1:nθ(M)]
+            # @variables t
+            # @variables x[1:nx(M)] 
+            # @variables u[1:nu(M)]
+            # ξ = vcat(x,u)
+            # @variables α[1:nx(M)] 
+            # @variables μ[1:nu(M)]
+            # φ = vcat(α,μ)
+            # @variables z[1:nx(M)] 
+            # @variables v[1:nu(M)]
+            # ζ = vcat(z,v)
+            # @variables Pr[1:nx(M),1:nx(M)]
+            # @variables Po[1:nx(M),1:nx(M)]
+            # @variables ro[1:nx(M)]
+            # @variables λ[1:nx(M)]
+            $(symbolics(M))
             ($fn)(M, $args...)
         end
     end

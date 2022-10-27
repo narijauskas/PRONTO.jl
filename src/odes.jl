@@ -44,7 +44,7 @@ function Base.show(io::IO, ode::ODE)
     print(io, typeof(ode))
     if !compact
         println()
-        print(io,preview(ode))
+        print(io, preview(ode))
     end
 end
 #FUTURE: show size, length, time span, solver method?
