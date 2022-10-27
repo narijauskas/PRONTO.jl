@@ -544,6 +544,8 @@ y_ode(dy,y,(M,θ,ξ,ζ),t) = y_t!(M,dy,θ,t,ξ(t),ζ(t))
 h_ode(dh,h,(M,θ,ξ),t) = h_t!(M,dh,θ,t,ξ(t))
 φ̂_ode(dφ̂,φ̂,(M,θ,ξ,φ,ζ,γ,Pr),t) = φ̂_t!(M,dφ̂,θ,t,ξ(t),φ(t),ζ(t),φ̂,γ,Pr(t))
 
+# for debug:
+wait_for_key() = (print(stdout, "press a key..."); read(stdin, 1); nothing)
 
 function pronto(M::Model{NX,NU,NΘ}, θ, t0, tf, x0, u0, φ) where {NX,NU,NΘ}
     #parameters
@@ -559,14 +561,13 @@ function pronto(M::Model{NX,NU,NΘ}, θ, t0, tf, x0, u0, φ) where {NX,NU,NΘ}
     Pr_f = diagm(ones(NX))
     Pr = ODE(Pr_ode, Pr_f, (tf,t0), (M,θ,φ), ODEBuffer{Tuple{NX,NX}}())
     @tock; println(@clock)
-    # println(preview(Pr))
 
 
     iinfo("projection ... "); @tick
     # ξ = Trajectory(M, ξ_ode, [x0;u0], (t0,tf), (M,θ,φ,Pr))
     ξ = ODE(ξ_ode, [x0;u0], (t0,tf), (M,θ,φ,Pr), ODEBuffer{Tuple{NX+NU}}(); dae=dae(M))
     @tock; println(@clock)
-    # println(preview(ξ))
+    # println(preview(ξ)); sleep(0.001); wait_for_key()
 
 
     iinfo("optimizer ... "); @tick
@@ -576,6 +577,7 @@ function pronto(M::Model{NX,NU,NΘ}, θ, t0, tf, x0, u0, φ) where {NX,NU,NΘ}
     ro_f = px(M,θ,tf,φ(tf))
     ro = ODE(ro_ode, ro_f, (tf,t0), (M,θ,ξ,Po), ODEBuffer{Tuple{NX}}())
     @tock; println(@clock)
+    # println(preview(ro)); sleep(0.001); wait_for_key()
 
 
     iinfo("lagrangian ... "); @tick
@@ -586,9 +588,10 @@ function pronto(M::Model{NX,NU,NΘ}, θ, t0, tf, x0, u0, φ) where {NX,NU,NΘ}
     
 
     iinfo("search direction ... "); @tick
-    ζ0 = [zeros(NX); 0]
+    ζ0 = [zeros(NX); zeros(NU)] # TODO: is v(0) = 0 valid?
     ζ = ODE(ζ_ode, ζ0, (t0,tf), (M,θ,ξ,Po,ro), ODEBuffer{Tuple{NX+NU}}(); dae=dae(M))
     @tock; println(@clock)
+    # println(preview(ζ)); sleep(0.001); wait_for_key()
 
 
     iinfo("cost derivatives ... "); @tick
@@ -599,7 +602,8 @@ function pronto(M::Model{NX,NU,NΘ}, θ, t0, tf, x0, u0, φ) where {NX,NU,NΘ}
     iinfo(as_bold("Dh = $(Dh)\n"))
     Dh > 0 && (@warn "increased cost - quitting"; (return φ))
     -Dh < tol && (info(as_bold("PRONTO converged")); (return φ))
-    
+    # println(preview(y)); sleep(0.001); wait_for_key()
+
 
     iinfo("armijo backstep ... \n"); @tick
 
@@ -615,18 +619,20 @@ function pronto(M::Model{NX,NU,NΘ}, θ, t0, tf, x0, u0, φ) where {NX,NU,NΘ}
     
         # compute cost
         gf = p(M,θ,tf,φ̂(tf))[]
-        g = ODE(h_ode, [0.0], (t0,tf), (M,θ,ξ), ODEBuffer{Tuple{1}}())(tf)[] + gf
+        g = ODE(h_ode, [0.0], (t0,tf), (M,θ,φ̂), ODEBuffer{Tuple{1}}())(tf)[] + gf
         
         # check armijo rule
-        iinfo("γ = $γ   h - g = $(h-g)\n")
+        iinfo("γ = $γ   h - g = $(h-g) g = $g\n")
         h-g >= -α*γ*Dh ? break : (γ *= β)
     end
     φ = φ̂
     @tock; println(@clock)
 
+    # println(preview(φ))
+
     end
-    # return (φ,ξ,ζ,φ̂,y)
     return φ
+    # return φ
 end
 
 #MAYBE:

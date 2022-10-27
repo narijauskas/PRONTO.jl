@@ -11,9 +11,9 @@ end
 
 (ode::ODE)(t) = ode.fxn(t)
 
-# trajectories are DAEs, pass the mass matrix via the kwarg dae=M()
+# trajectories are DAEs, pass the mass matrix via the kwarg dae=()
 dae(M)::Matrix{Float64} = mass_matrix(M)
-mass_matrix(M) = cat(diagm(ones(nx(M))), zeros(nu(M)); dims=(1,2))
+mass_matrix(M) = cat(diagm(ones(nx(M))), diagm(zeros(nu(M))); dims=(1,2))
 
 # constructor basically wraps ODEProblem
 function ODE(fn, x0, ts, ode_pm, buf::T; dae=nothing, ode_kw...) where {T}
