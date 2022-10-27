@@ -24,7 +24,7 @@ macro fndef(fn, args)
             throw(ModelDefError(M,nameof($fn)))
         end
         # define a symbolic rendition
-        function ($fn)(M::Model)
+        function ($fn)(M::T) where {T<:Model}
             # @variables θ[1:nθ(M)]
             # @variables t
             # @variables x[1:nx(M)] 
@@ -40,7 +40,7 @@ macro fndef(fn, args)
             # @variables Po[1:nx(M),1:nx(M)]
             # @variables ro[1:nx(M)]
             # @variables λ[1:nx(M)]
-            $(_symbolics(M))
+            $(_symbolics(:T))
             ($fn)(M, $args...)
         end
     end
@@ -80,8 +80,8 @@ end
 @fndef ro_t  (θ,t,ξ,Po,ro)
 @fndef vo   (θ,t,ξ,ro)
 
-@fndef ζ_t  (θ,t,ξ,Po,ro)
-@fndef _v   (θ,t,ξ,Po,ro)
+@fndef ζ_t  (θ,t,ξ,ζ,Po,ro)
+@fndef _v   (θ,t,ξ,ζ,Po,ro)
 
 # cost derivatives...
 # @fndef y_t
@@ -93,6 +93,7 @@ Pr_t!(M::Model,buf,θ,t,φ,Pr) = throw(ModelDefError(M, :Pr_t!))
 λ_t!(M::Model,buf,θ,t,ξ,φ,Pr) = throw(ModelDefError(M, :λ_t!))
 Po_t!(M::Model,buf,θ,t,ξ,P) = throw(ModelDefError(M, :Po_t!))
 ro_t!(M::Model,buf,θ,t,ξ,Po) = throw(ModelDefError(M, :ro_t!))
+ζ_t!(M::Model,buf,θ,t,ξ,ζ,Po,ro) = throw(ModelDefError(M, :ζ_t!))
 
 # FUTURE: for each function and signature, macro-define:
 # - default function f(M,...) = @error

@@ -62,31 +62,3 @@ u0 = [0.0]
 φ = PRONTO.guess_zi(M,θ,xf,u0,t0,tf)
 @time ξ = pronto(M,θ,t0,tf,x0,u0,φ)
 
-
-# #Time sampling
-# # macro lets you define a pair of timepoints
-# @tick name # samples name_tik = @time_ns()
-# @tock name # samples name_tok = @time_ns()
-# @clock name # (name_tik - name_tok)
-# @μs name # (name_tik - name_tok)/1e3
-# @ms name # (name_tik - name_tok)/1e6
-
-
-
-# tick(name) = esc(Symbol(String(name)*"_tick"))
-# tock(name) = esc(Symbol(String(name)*"_tock"))
-
-# macro tick(name)
-#     :($(_tick(name)) = time_ns())
-# end
-
-# macro tock(name)
-#     :($(_tock(name)) = time_ns())
-# end
-
-# macro clock(name)
-#     tick = _tick(name)
-#     tock = _tock(name)
-#     ms = :(($tock - $tick)/1e6)
-#     :("$($:(round($ms; digits=3))) ms")
-# end

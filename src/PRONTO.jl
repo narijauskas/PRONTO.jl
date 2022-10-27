@@ -79,7 +79,6 @@ nθ(::Model{NX,NU,NΘ}) where {NX,NU,NΘ} = NΘ
 
 # auto-defines some useful methods for core model functions
 # a good place to look for a complete list of PRONTO's generated internal functions
-include("kernel.jl")
 
 
 # ----------------------------------- symbolics & autodiff ----------------------------------- #
@@ -134,6 +133,8 @@ split(M::Model, ξ) = (ξ[1:nx(M)], ξ[(nx(M)+1):end])
     # 1. global macro is spliced from expressions, functions generate these expressions from T
     # 2. global macro simply expands to sub-macros, sub-macros evaluate from T
     # 3. ¿Por qué no los dos?
+
+# _symbolics(::T) where {T<:Model} = _symbolics(T)
 
 function _symbolics(T)::Expr
     return quote
@@ -281,10 +282,15 @@ function _projection(T)::Expr
 end
 
 function _optimizer(T)::Expr
+    B = :(fu(θ,t,ξ))
     return quote
+
+        # ideally:
+        # @build Ko (θ,t,ξ,Po) -> inv(Ro)\(S'+B'Po)
+
         #Ko = Ro\(S'+B'Po)
         local Ko,Ko! = build(θ,t,ξ,Po) do θ,t,ξ,Po
-            inv(luu(θ,t,ξ))*(lxu(θ,t,ξ)' .+ fu(θ,t,ξ)'*@vec(Po))
+            inv(luu(θ,t,ξ))*(lxu(θ,t,ξ)' .+ ($B)'*@vec(Po))
         end
         PRONTO.Ko(M::$T,θ,t,ξ,Po) = Ko(θ,t,ξ,Po) # NU,NX
 
@@ -305,9 +311,9 @@ function _optimizer(T)::Expr
         local ro_t,ro_t! = build(θ,t,ξ,Po,ro) do θ,t,ξ,Po,ro
             costate(fx(θ,t,ξ), fu(θ,t,ξ), lx(θ,t,ξ), lu(θ,t,ξ), Ko(θ,t,ξ,Po), @vec(ro))
         end
-        PRONTO.vo(M::$T,θ,t,ξ,ro) = vo(θ,t,ξ,ro) # NU,NX
-
+        
         # add definitions to PRONTO
+        PRONTO.vo(M::$T,θ,t,ξ,ro) = vo(θ,t,ξ,ro) # NU,NX
         PRONTO.ro_t(M::$T,θ,t,ξ,Po,ro) = ro_t(θ,t,ξ,Po,ro) # NX
         PRONTO.ro_t!(M::$T,buf,θ,t,ξ,Po,ro) = ro_t!(buf,θ,t,ξ,Po,ro) # NX
     end    
@@ -325,6 +331,32 @@ function _lagrangian(T)::Expr
     end
 end
 
+function _search_direction(T)::Expr
+    Ko = :(Ko(θ,t,ξ,Po))
+    vo = :(vo(θ,t,ξ,ro))
+    A = :(fx(θ,t,ξ))
+    B = :(fu(θ,t,ξ))
+    v = :(collect(v))
+    z = :(collect(z))
+    return quote
+
+        local ζ_t,ζ_t! = build(θ,t,ξ,ζ,Po,ro) do θ,t,ξ,ζ,Po,ro
+            local z,v = split($T(),ζ)
+            # $Ko
+            vcat(($A*$z + $B*$v)...,
+                ($vo - $Ko*$z - $v)...)
+        end
+        local _v,_v! = build(θ,t,ξ,ζ,Po,ro) do θ,t,ξ,ζ,Po,ro
+            local z,v = split($T(),ζ)
+            $vo - $Ko*$z
+        end
+        # add definitions to PRONTO
+        PRONTO._v(M::$T,θ,t,ξ,ζ,Po,ro) = _v(θ,t,ξ,ζ,Po,ro)
+        PRONTO.ζ_t(M::$T,θ,t,ξ,ζ,Po,ro) = ζ_t(θ,t,ξ,ζ,Po,ro)
+        PRONTO.ζ_t!(M::$T,buf,θ,t,ξ,ζ,Po,ro) = ζ_t!(buf,θ,t,ξ,ζ,Po,ro)
+    end
+end
+
 macro derive(T)
     # make sure we use the local context
     T = esc(T)
@@ -337,42 +369,42 @@ macro derive(T)
         @tick derive_time
 
         # generate symbolic variables for derivation
-        iinfo("preparing symbolics"); @tick
+        iinfo("preparing symbolics ... "); @tick
         $(_symbolics(T))
-        @tock; println(" ... ", @clock)
+        @tock; println(@clock)
 
-        iinfo("dynamics derivatives"); @tick
+        iinfo("dynamics derivatives ... "); @tick
         $(_dynamics(T))
-        @tock; println(" ... ", @clock)
+        @tock; println(@clock)
 
-        iinfo("stage cost derivatives"); @tick
+        iinfo("stage cost derivatives ... "); @tick
         $(_stage_cost(T))
-        @tock; println(" ... ", @clock)
+        @tock; println(@clock)
         
-        iinfo("terminal cost derivatives"); @tick
+        iinfo("terminal cost derivatives ... "); @tick
         $(_terminal_cost(T))
-        @tock; println(" ... ", @clock)
+        @tock; println(@clock)
 
-        iinfo("regulator solver"); @tick
+        iinfo("regulator solver ... "); @tick
         $(_regulator(T))
-        @tock; println(" ... ", @clock)
+        @tock; println(@clock)
 
-        iinfo("projection solver"); @tick
+        iinfo("projection solver ... "); @tick
         $(_projection(T))
-        @tock; println(" ... ", @clock)
+        @tock; println(@clock)
         
-        iinfo("optimizer solver"); @tick
+        iinfo("optimizer solver ... "); @tick
         $(_optimizer(T))
-        @tock; println(" ... ", @clock)
+        @tock; println(@clock)
         
-        iinfo("lagrangian/costate solver"); @tick
+        iinfo("lagrangian/costate solver ... "); @tick
         $(_lagrangian(T))
-        @tock; println(" ... ", @clock)
+        @tock; println(@clock)
 
 
-        iinfo("search direction solver"); @tick
-
-        @tock; println(" ... ", @clock)
+        iinfo("search direction solver ... "); @tick
+        $(_search_direction(T))
+        @tock; println(@clock)
 
 
 
@@ -401,7 +433,7 @@ Pr_ode(dPr,Pr,(M,θ,φ),t) = Pr_t!(M,dPr,θ,t,φ(t),Pr)
 Po_ode(dPo,Po,(M,θ,ξ),t) = Po_t!(M,dPo,θ,t,ξ(t),Po)
 ro_ode(dro,ro,(M,θ,ξ,Po),t) = ro_t!(M,dro,θ,t,ξ(t),Po(t),ro)
 λ_ode(dλ,λ,(M,θ,ξ,φ,Pr),t) = λ_t!(M,dλ,θ,t,ξ(t),φ(t),Pr(t),λ)
-# ζ_ode()
+ζ_ode(dζ,ζ,(M,θ,ξ,Po,ro),t) = ζ_t!(M,dζ,θ,t,ξ(t),ζ,Po(t),ro(t))
 # y_ode()
 
 function pronto(M::Model{NX,NU,NΘ}, θ, t0, tf, x0, u0, φ) where {NX,NU,NΘ}
@@ -444,15 +476,17 @@ function pronto(M::Model{NX,NU,NΘ}, θ, t0, tf, x0, u0, φ) where {NX,NU,NΘ}
     
 
     iinfo("search direction ... "); @tick
+    ζ0 = [zeros(NX); 0]
+    ζ = ODE(ζ_ode, ζ0, (t0,tf), (M,θ,ξ,Po,ro), ODEBuffer{Tuple{NX+NU}}(); dae=dae(M))
     @tock; println(@clock)
 
-    return ξ
+    return ζ
 end
 
 #MAYBE:
 # info(M, "message") -> [PRONTO-TwoSpin: message
 
-
+include("kernel.jl")
 # helpers for finding guess trajectories
 include("guess.jl")
 
