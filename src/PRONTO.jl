@@ -159,6 +159,7 @@ function _symbolics(T)::Expr
         @variables Po[1:nx($T()),1:nx($T())]
         @variables ro[1:nx($T())]
         @variables λ[1:nx($T())]
+        @variables γ
 
         # create Jacobian operators
         Jx,Ju = Jacobian.([x,u])
@@ -317,7 +318,6 @@ function _optimizer(T)::Expr
         local Ko,Ko! = build(θ,t,ξ,Po) do θ,t,ξ,Po
             inv(luu(θ,t,ξ))*(lxu(θ,t,ξ)' .+ ($B)'*@vec(Po))
         end
-        PRONTO.Ko(M::$T,θ,t,ξ,Po) = Ko(θ,t,ξ,Po) # NU,NX
 
         #dPo_dt = -A'Po - Po*A + Ko'Ro*Ko - Qo
         local Po_t,Po_t! = build(θ,t,ξ,Po) do θ,t,ξ,Po
@@ -325,6 +325,7 @@ function _optimizer(T)::Expr
         end
 
         # add definitions to PRONTO
+        PRONTO.Ko(M::$T,θ,t,ξ,Po) = Ko(θ,t,ξ,Po) # NU,NX
         PRONTO.Po_t(M::$T,θ,t,ξ,Po) = Po_t(θ,t,ξ,Po) # NX,NX
         PRONTO.Po_t!(M::$T,buf,θ,t,ξ,Po) = Po_t!(buf,θ,t,ξ,Po) # NX,NX
         
@@ -402,9 +403,10 @@ function _cost_derivatives(T)::Expr
     return quote
 
         # simply need dy/dt
-        # local y_t, y_t! = build(θ,t,ξ,ζ)  do θ,t,ξ,ζ
-        @build y_t (θ,t,ξ,ζ) begin
-
+        # @build y_t (θ,t,ξ,ζ) begin
+        #YO: can these be solved separately? If so, should they be?
+        local y_t, y_t! = build(θ,t,ξ,ζ) do θ,t,ξ,ζ
+        
             local z, v = split($T(),ζ)
             vcat(
 
@@ -412,7 +414,8 @@ function _cost_derivatives(T)::Expr
                 ($z)'*($Qo)*($z) + 2*($z)'*($So)*($v) + ($v)'*($Ro)*($v)
             )
         end
-        #YO: can these be solved separately? If so, should they?
+        PRONTO.y_t(M::$T,θ,t,ξ,ζ) = y_t(θ,t,ξ,ζ)
+        PRONTO.y_t!(M::$T,buf,θ,t,ξ,ζ) = y_t!(buf,θ,t,ξ,ζ)
     end
 end
 
@@ -420,25 +423,28 @@ function _armijo(T)::Expr
     # Kr = Kr(θ,t,ξ+γζ,Pr)
     return quote
 
-        # projection with respect to γ
-        local φ_t, φ_t! = build() do θ,t,ξ,φ,γ
+        # φ̂ = ξ+γζ
+
+        # # projection with respect to γ
+        # local φ_t, φ_t! = build(θ,t,ξ,φ,γ) do θ,t,ξ,φ,γ
             
-            # local x,u = split($T(),ξ)
-            # local α,μ = split($T(),φ)
-            # return vcat(
+        #     # local x,u = split($T(),ξ)
+        #     # local α,μ = split($T(),φ)
+        #     return vcat(
+        #         f,
+        #         μ -Kr*(x-α) - u
+        #     )
+        #     #     f(θ,t,ξ)...,
+        #     #     (@vec(μ) - Kr(θ,t,φ,Pr)*(@vec(x) - @vec(α)) - @vec(u))...
+        #     # )
 
-            #     f(θ,t,ξ)...,
-            #     (@vec(μ) - Kr(θ,t,φ,Pr)*(@vec(x) - @vec(α)) - @vec(u))...
-            # )
-
-
-        end
+        # end
          
-        # cost function ode
-        local h_t, h_t! = build(θ,t,ξ) do θ,t,ξ,γ,h
+        # # cost function ode
+        # local J_t, J_t! = build(θ,t,ξ) do θ,t,ξ,γ,h
 
-            l(θ,t,ξ)
-        end
+        #     l(θ,t,ξ)
+        # end
     end
 end
 
@@ -504,7 +510,7 @@ Po_ode(dPo,Po,(M,θ,ξ),t) = Po_t!(M,dPo,θ,t,ξ(t),Po)
 ro_ode(dro,ro,(M,θ,ξ,Po),t) = ro_t!(M,dro,θ,t,ξ(t),Po(t),ro)
 λ_ode(dλ,λ,(M,θ,ξ,φ,Pr),t) = λ_t!(M,dλ,θ,t,ξ(t),φ(t),Pr(t),λ)
 ζ_ode(dζ,ζ,(M,θ,ξ,Po,ro),t) = ζ_t!(M,dζ,θ,t,ξ(t),ζ,Po(t),ro(t))
-# y_ode(dy,y,(M,θ,ξ),t)
+y_ode(dy,y,(M,θ,ξ,ζ),t) = y_t!(M,dy,θ,t,ξ(t),ζ(t))
 # φ_ode(dφ,φ,(M,θ,ξ,γ),t)
 
 function pronto(M::Model{NX,NU,NΘ}, θ, t0, tf, x0, u0, φ) where {NX,NU,NΘ}
@@ -549,6 +555,11 @@ function pronto(M::Model{NX,NU,NΘ}, θ, t0, tf, x0, u0, φ) where {NX,NU,NΘ}
     ζ = ODE(ζ_ode, ζ0, (t0,tf), (M,θ,ξ,Po,ro), ODEBuffer{Tuple{NX+NU}}(); dae=dae(M))
     @tock; println(@clock)
 
+
+    iinfo("cost derivatives ... "); @tick
+    y0 = [0;0]
+    y = ODE(y_ode, y0, (t0,tf), (M,θ,ξ,ζ), ODEBuffer{Tuple{2}}())
+    @tock; println(@clock)
     return ζ
 end
 
