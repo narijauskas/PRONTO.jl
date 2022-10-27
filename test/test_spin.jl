@@ -60,5 +60,9 @@ u0 = [0.0]
 φ = PRONTO.guess_zi(M,θ,xf,u0,t0,tf)
 @time ξ = pronto(M,θ,t0,tf,x0,u0,φ)
 
-(φ,ξ,ζ,φ̂,y,Pr,Po,ro) = pronto(M,θ,t0,tf,x0,u0,φ)
+T = 0:0.001:10
+uopt = [ξ.(t)[5] for t in T]
 
+file = matopen("Uopt.mat", "w")
+write(file, "Uopt", uopt)
+close(file)
