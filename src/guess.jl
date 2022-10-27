@@ -28,3 +28,8 @@ function guess_φ(M::Model{NX,NU,NΘ},θ,ξ0,t0,tf,φg) where {NX,NU,NΘ}
     return φ
 end
 
+
+
+# for validation
+# run an OL dynamic response with μ provided by PRONTO
+# plot a custom function on the resultant trajectory

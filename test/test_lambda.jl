@@ -94,6 +94,12 @@ u0 = [0.0;0.0;0.0;0.0]
 
 # φ = PRONTO.guess_zi(M,θ,xf,u0,t0,tf)
 φ = guess_φ(M,θ,ξ0,t0,tf,φg)
-ξ = pronto(M,θ,t0,tf,x0,u0,φ)
+@time ξ = pronto(M,θ,t0,tf,x0,u0,φ)
 
+
+fig = Figure()
+ax = Axis(fig[1,1])
+foreach(1:10) do i
+    lines!(ax, T, [ξ(t)[i] for t in T])
+end
 
