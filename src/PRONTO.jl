@@ -567,7 +567,7 @@ function pronto(M::Model{NX,NU,NΘ}, θ, t0, tf, x0, u0, φ) where {NX,NU,NΘ}
     # ξ = Trajectory(M, ξ_ode, [x0;u0], (t0,tf), (M,θ,φ,Pr))
     ξ = ODE(ξ_ode, [x0;u0], (t0,tf), (M,θ,φ,Pr), ODEBuffer{Tuple{NX+NU}}(); dae=dae(M))
     @tock; println(@clock)
-    # println(preview(ξ)); sleep(0.001); wait_for_key()
+    println(preview(ξ)); sleep(0.001);
 
 
     iinfo("optimizer ... "); @tick

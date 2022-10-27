@@ -87,10 +87,13 @@ tf = 10.0
 x0 = [1.0;0.0;0.0;0.0;0.0;0.0]
 # xf = [1.0;0.0;0.0;0.0]
 u0 = [0.0;0.0;0.0;0.0]
-
+ξ0 = vcat(x0,u0)
 
 ##
-φ = PRONTO.guess_zi(M,θ,xf,u0,t0,tf)
+φg = @closure t->[smooth(t,x0,xf,tf); 0.1*ones(nu(M))]
+
+# φ = PRONTO.guess_zi(M,θ,xf,u0,t0,tf)
+φ = guess_φ(M,θ,ξ0,t0,tf,φg)
 ξ = pronto(M,θ,t0,tf,x0,u0,φ)
 
 
