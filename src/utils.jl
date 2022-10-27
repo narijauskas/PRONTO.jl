@@ -30,15 +30,33 @@ end
 
 (sln::Solution)(t) = sln.fxn(t)
 
-# T = BufferType(S...)
-function Solution(prob, N::Vararg{Int})
-    @assert length(N) >= 1
-    sln = solve(prob)
-    T = MArray{Tuple{N...}, Float64, length(N), prod(N)}
+# # T = BufferType(S...)
+# function Solution(prob, N::Vararg{Int})
+#     @assert length(N) >= 1
+#     sln = solve(prob)
+#     T = MArray{Tuple{N...}, Float64, length(N), prod(N)}
+#     buf = T(undef)
+#     fxn = FunctionWrapper{T, Tuple{Float64}}(t->(sln(buf, t); return copy(buf)))
+#     Solution(fxn,buf,sln)
+# end
+
+
+Solution(args...) = @error "please specify a buffer size, eg. Solution{@buffer(NX,NX)...}(args...)"
+
+function Solution{T}(ode_fn,x0,ts,ode_pm; ode_kw...) where {T<:MArray}
+    fn = ODEFunction(ode_fn)
+    sln = solve(ODEProblem(fn,x0,ts,ode_pm; ode_kw...))
     buf = T(undef)
-    fxn = FunctionWrapper{T, Tuple{Float64}}(t->(sln(buf, t); return copy(buf)))
-    Solution(fxn,buf,sln)
+    # buf = MArray{@buffer(nx(M))...}(undef)
+    function xfxn(t)
+        sln(buf,t)
+        copy(buf)
+    end
+    fxn = FunctionWrapper{T, Tuple{Float64}}(xfxn)
+
+    Solution{T}(fxn,buf,sln)
 end
+
 
 Base.size(sln::Solution) = size(sln.buf)
 
@@ -53,9 +71,9 @@ end
 
 
 
-macro buffer(N)
-    N = esc(N)
-    :(Tuple{$N...}, Float64, length($N), prod($N))
+macro buffer(N...)
+    N = collect(esc.(N))
+    :(Tuple{$(N...)}, Float64, length($N), prod([$(N...)]))
 end
 
 # maps t->ξ=(x,u)::(TX,TU)
@@ -67,7 +85,7 @@ struct Trajectory{TX,TU}
     sln::SciMLBase.AbstractODESolution
 end
 
-(ξ::Trajectory)(t) = (ξ.x(t), ξ.u(t))
+(ξ::Trajectory)(t) = vcat(ξ.x(t), ξ.u(t))
 
 
 #eg. Trajectory(M, ξ_ode, [x0;u0], (t0,tf), (M,θ,φ,Pr))
@@ -109,7 +127,7 @@ function Base.show(io::IO, ξ::Trajectory)
     print(io, typeof(ξ))
     if !compact
         println()
-        display(preview(ξ))
+        print(io,preview(ξ))
     end
 end
 #FUTURE: show size, length, time span, solver method?

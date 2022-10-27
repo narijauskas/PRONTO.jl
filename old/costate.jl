@@ -2,7 +2,7 @@
 
 # dλ = (A-B*Kr)'λ + a - Kr'b
 
-function lagrange(x,u,Kr,rT,model)
+ function lagrange(x,u,Kr,rT,model)
     NX = model.NX; NU = model.NU; T = model.T;     
     fx! = model.fx!; _A = Buffer{Tuple{NX,NX}}()
     A = @closure (t)->(fx!(_A,x(t),u(t)); return _A)
