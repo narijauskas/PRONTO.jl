@@ -445,7 +445,7 @@ function _armijo(T)::Expr
 
             return vcat(
                 f(θ,t,φ̂)...,
-                ($u + γ*$v) - ($Kr)*(($α̂) - ($x + γ*$z)) - ($μ̂)...
+                ($u + γ*$v) - ($Kr)*($α̂ - ($x + γ*$z)) - $μ̂...
             )
         end
         PRONTO.φ̂_t(M::$T,θ,t,ξ,φ,ζ,φ̂,γ,Pr) = φ̂_t(θ,t,ξ,φ,ζ,φ̂,γ,Pr)
@@ -453,7 +453,7 @@ function _armijo(T)::Expr
  
 
         # cost function ode
-        local h_t, h_t! = build(θ,t,ξ,h) do θ,t,ξ,h
+        local h_t, h_t! = build(θ,t,ξ) do θ,t,ξ
 
             l(θ,t,ξ)
         end
@@ -525,6 +525,7 @@ ro_ode(dro,ro,(M,θ,ξ,Po),t) = ro_t!(M,dro,θ,t,ξ(t),Po(t),ro)
 λ_ode(dλ,λ,(M,θ,ξ,φ,Pr),t) = λ_t!(M,dλ,θ,t,ξ(t),φ(t),Pr(t),λ)
 ζ_ode(dζ,ζ,(M,θ,ξ,Po,ro),t) = ζ_t!(M,dζ,θ,t,ξ(t),ζ,Po(t),ro(t))
 y_ode(dy,y,(M,θ,ξ,ζ),t) = y_t!(M,dy,θ,t,ξ(t),ζ(t))
+h_ode(dh,h,(M,θ,ξ),t) = h_t!(M,dh,θ,t,ξ(t))
 φ̂_ode(dφ̂,φ̂,(M,θ,ξ,φ,ζ,γ,Pr),t) = φ̂_t!(M,dφ̂,θ,t,ξ(t),φ(t),ζ(t),φ̂,γ,Pr(t))
 
 function pronto(M::Model{NX,NU,NΘ}, θ, t0, tf, x0, u0, φ) where {NX,NU,NΘ}
@@ -555,7 +556,6 @@ function pronto(M::Model{NX,NU,NΘ}, θ, t0, tf, x0, u0, φ) where {NX,NU,NΘ}
     @tock; println(@clock)
 
 
-
     iinfo("lagrangian ... "); @tick
     λ_f = px(M,θ,tf,φ(tf))
     λ = ODE(λ_ode, λ_f, (tf,t0), (M,θ,ξ,φ,Pr), ODEBuffer{Tuple{NX}}())
@@ -572,12 +572,24 @@ function pronto(M::Model{NX,NU,NΘ}, θ, t0, tf, x0, u0, φ) where {NX,NU,NΘ}
     iinfo("cost derivatives ... "); @tick
     y0 = [0;0]
     y = ODE(y_ode, y0, (t0,tf), (M,θ,ξ,ζ), ODEBuffer{Tuple{2}}())
+    #TODO:
+    # Dh = y(T)[1] + rT'*z(T) # rT = px(φ)
+    # D2g = y(T)[2] + z(T)'*PT*z(T) # PT = pxx(φ)
     @tock; println(@clock)
 
-    iinfo("armijo rule ... "); @tick
+
+    iinfo("armijo backstep ... "); @tick
+
+    # compute cost
+    hf = p(M,θ,tf,ξ(tf))
+    h = ODE(h_ode, hf, (t0,tf), (M,θ,ξ), ODEBuffer{Tuple{1}}())(tf)[]
     γ = 1
     φ̂ = ODE(φ̂_ode, [x0;u0], (t0,tf), (M,θ,ξ,φ,ζ,γ,Pr), ODEBuffer{Tuple{NX+NU}}(); dae=dae(M))
+    gf = p(M,θ,tf,φ̂(tf))
+    g = ODE(h_ode, gf, (t0,tf), (M,θ,ξ), ODEBuffer{Tuple{1}}())(tf)[]
     @tock; println(@clock)
+
+    iinfo("h-g = $(h-g)\n")
 
     return φ̂
 end

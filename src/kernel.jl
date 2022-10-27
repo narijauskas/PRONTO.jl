@@ -100,7 +100,7 @@ ro_t!(M::Model,buf,θ,t,ξ,Po) = throw(ModelDefError(M, :ro_t!))
 ζ_t!(M::Model,buf,θ,t,ξ,ζ,Po,ro) = throw(ModelDefError(M, :ζ_t!))
 y_t!(M::Model,buf,θ,t,ξ,ζ) = throw(ModelDefError(M, :y_t!))
 h_t!(M::Model,buf,θ,t,ξ) = throw(ModelDefError(M, :h_t!))
-φ̂_t!(buf,θ,t,ξ,φ,ζ,φ̂,γ,Pr) = throw(ModelDefError(M, :φ̂_t!))
+φ̂_t!(M::Model,buf,θ,t,ξ,φ,ζ,φ̂,γ,Pr) = throw(ModelDefError(M, :φ̂_t!))
 
 # FUTURE: for each function and signature, macro-define:
 # - default function f(M,...) = @error
