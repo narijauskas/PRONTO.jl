@@ -163,7 +163,8 @@ function _symbolics(T)::Expr
         @variables ro[1:nx($T())]
         @variables λ[1:nx($T())]
         @variables γ
-        @variables h
+        @variables y[1:2]
+        @variables h #MAYBE: rename j or J?
 
         # create Jacobian operators
         Jx,Ju = Jacobian.([x,u])
@@ -420,6 +421,21 @@ function _cost_derivatives(T)::Expr
         end
         PRONTO.y_t(M::$T,θ,t,ξ,ζ) = y_t(θ,t,ξ,ζ)
         PRONTO.y_t!(M::$T,buf,θ,t,ξ,ζ) = y_t!(buf,θ,t,ξ,ζ)
+
+
+        local Dh, Dh! = build(θ,t,φ,ζ,y) do θ,t,φ,ζ,y
+
+            local z, v = split($T(),ζ)
+            y[1] + (px(θ,t,φ))'*($z)
+        end
+        PRONTO._Dh(M::$T,θ,t,φ,ζ,y) = Dh(θ,t,φ,ζ,y)
+
+        local D2g, D2g! = build(θ,t,φ,ζ,y) do θ,t,φ,ζ,y
+
+            local z, v = split($T(),ζ)
+            y[2] + ($z)'*pxx(θ,t,φ)*($z)
+        end
+        PRONTO._D2g(M::$T,θ,t,φ,ζ,y) = D2g(θ,t,φ,ζ,y)
     end
 end
 
@@ -430,7 +446,7 @@ function _armijo(T)::Expr
     μ̂ = :(collect(μ̂))   
     x = :(collect(x)) 
     z = :(collect(z)) 
-    α̂ = :(collect(α̂)) 
+    α̂ = :(collect(α̂))
     return quote
         
         # φ̂ = ξ+γζ
@@ -528,9 +544,15 @@ y_ode(dy,y,(M,θ,ξ,ζ),t) = y_t!(M,dy,θ,t,ξ(t),ζ(t))
 h_ode(dh,h,(M,θ,ξ),t) = h_t!(M,dh,θ,t,ξ(t))
 φ̂_ode(dφ̂,φ̂,(M,θ,ξ,φ,ζ,γ,Pr),t) = φ̂_t!(M,dφ̂,θ,t,ξ(t),φ(t),ζ(t),φ̂,γ,Pr(t))
 
+
 function pronto(M::Model{NX,NU,NΘ}, θ, t0, tf, x0, u0, φ) where {NX,NU,NΘ}
+    #parameters
+    # debug/verbose
+    tol = 1e-5
+    maxiters = 10
     
-    info(as_bold(string(nameof(typeof(M))))*" model iteration 1:")
+    for i in 1:maxiters
+    info(as_bold(string(nameof(typeof(M))))*" model iteration $i:")
 
 
     iinfo("regulator ... "); @tick
@@ -572,26 +594,39 @@ function pronto(M::Model{NX,NU,NΘ}, θ, t0, tf, x0, u0, φ) where {NX,NU,NΘ}
     iinfo("cost derivatives ... "); @tick
     y0 = [0;0]
     y = ODE(y_ode, y0, (t0,tf), (M,θ,ξ,ζ), ODEBuffer{Tuple{2}}())
-    #TODO:
-    # Dh = y(T)[1] + rT'*z(T) # rT = px(φ)
-    # D2g = y(T)[2] + z(T)'*PT*z(T) # PT = pxx(φ)
+    Dh = _Dh(M,θ,tf,φ(tf),ζ(tf),y(tf))[]
     @tock; println(@clock)
+    iinfo(as_bold("Dh = $(Dh)\n"))
+    Dh > 0 && (@warn "increased cost - quitting"; (return φ))
+    -Dh < tol && (info(as_bold("PRONTO converged")); (return φ))
+    
 
-
-    iinfo("armijo backstep ... "); @tick
+    iinfo("armijo backstep ... \n"); @tick
 
     # compute cost
-    hf = p(M,θ,tf,ξ(tf))
-    h = ODE(h_ode, hf, (t0,tf), (M,θ,ξ), ODEBuffer{Tuple{1}}())(tf)[]
-    γ = 1
-    φ̂ = ODE(φ̂_ode, [x0;u0], (t0,tf), (M,θ,ξ,φ,ζ,γ,Pr), ODEBuffer{Tuple{NX+NU}}(); dae=dae(M))
-    gf = p(M,θ,tf,φ̂(tf))
-    g = ODE(h_ode, gf, (t0,tf), (M,θ,ξ), ODEBuffer{Tuple{1}}())(tf)[]
+    hf = p(M,θ,tf,ξ(tf))[]
+    h = ODE(h_ode, [0.0], (t0,tf), (M,θ,ξ), ODEBuffer{Tuple{1}}())(tf)[] + hf
+
+    local φ̂
+    γ = 1; α=0.4; β=0.7
+    while γ > β^12
+
+        φ̂ = ODE(φ̂_ode, [x0;u0], (t0,tf), (M,θ,ξ,φ,ζ,γ,Pr), ODEBuffer{Tuple{NX+NU}}(); dae=dae(M))
+    
+        # compute cost
+        gf = p(M,θ,tf,φ̂(tf))[]
+        g = ODE(h_ode, [0.0], (t0,tf), (M,θ,ξ), ODEBuffer{Tuple{1}}())(tf)[] + gf
+        
+        # check armijo rule
+        iinfo("γ = $γ   h - g = $(h-g)\n")
+        h-g >= -α*γ*Dh ? break : (γ *= β)
+    end
+    φ = φ̂
     @tock; println(@clock)
 
-    iinfo("h-g = $(h-g)\n")
-
-    return φ̂
+    end
+    # return (φ,ξ,ζ,φ̂,y)
+    return φ
 end
 
 #MAYBE:

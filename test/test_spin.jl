@@ -59,6 +59,6 @@ u0 = [0.0]
 
 
 #
-φ = PRONTO.guess_zi(M,θ,xf,u0,t0,tf)
-@time ξ = pronto(M,θ,t0,tf,x0,u0,φ)
+φ = PRONTO.guess_zi(M,θ,x0,u0,t0,tf)
+@time ξ = pronto(M,θ,t0,tf,xf,u0,φ)
 

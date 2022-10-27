@@ -84,6 +84,8 @@ end
 @fndef _v   (θ,t,ξ,ζ,Po,ro)
 
 @fndef y_t  (θ,t,ξ,ζ)
+@fndef _Dh  (θ,t,φ,ζ,y)
+@fndef _D2g (θ,t,φ,ζ,y)
 
 @fndef h_t  (θ,t,ξ)
 @fndef φ̂_t  (θ,t,ξ,φ,ζ,φ̂,γ,Pr)
