@@ -314,16 +314,18 @@ end
 
 function _optimizer(T)::Expr
     B = :(fu(θ,t,ξ))
+    # So/Ro/Qo can be newton or gradient
     return quote
 
         # ideally:
         # @build Ko (θ,t,ξ,Po) -> inv(Ro)\(S'+B'Po)
 
-        #Ko = Ro\(S'+B'Po)
+        #Ko = Ro\(So'+B'Po)
         local Ko,Ko! = build(θ,t,ξ,Po) do θ,t,ξ,Po
             inv(luu(θ,t,ξ))*(lxu(θ,t,ξ)' .+ ($B)'*@vec(Po))
         end
 
+        #NOTE: this is where second order may break
         #dPo_dt = -A'Po - Po*A + Ko'Ro*Ko - Qo
         local Po_t,Po_t! = build(θ,t,ξ,Po) do θ,t,ξ,Po
             riccati(fx(θ,t,ξ), Ko(θ,t,ξ,Po), @vec(Po), lxx(θ,t,ξ), luu(θ,t,ξ))
@@ -351,12 +353,19 @@ function _optimizer(T)::Expr
 end
 
 function _lagrangian(T)::Expr
+    # A = :(fx(θ,t,ξ))
+    # B = :(fu(θ,t,ξ))
+    # a = :(lx(θ,t,ξ))
+    # b = :(lu(θ,t,ξ))
+    # K = :(Kr(θ,t,φ,Pr))
+    # λ = :(collect(λ))
 
     return quote
 
         local λ_t,λ_t! = build(θ,t,ξ,φ,Pr,λ) do θ,t,ξ,φ,Pr,λ
 
             costate(fx(θ,t,ξ), fu(θ,t,ξ), lx(θ,t,ξ), lu(θ,t,ξ), Kr(θ,t,φ,Pr), @vec(λ))
+            # -(A-B*K)'x - a + K'b
         end
         # add definitions to PRONTO
         PRONTO.λ_t(M::$T,θ,t,ξ,φ,Pr,λ) = λ_t(θ,t,ξ,φ,Pr,λ) #NX
@@ -405,11 +414,11 @@ function _cost_derivatives(T)::Expr
     Qo = :(lxx(θ,t,ξ))
     Ro = :(luu(θ,t,ξ))
     So = :(lxu(θ,t,ξ))
+    #TODO: always use sum(λ[k]*PRONTO.fxx(M)[:,:,k] for k in 1:4)
     return quote
 
         # simply need dy/dt
         # @build y_t (θ,t,ξ,ζ) begin
-        #YO: can these be solved separately? If so, should they be?
         local y_t, y_t! = build(θ,t,ξ,ζ) do θ,t,ξ,ζ
         
             local z, v = split($T(),ζ)
@@ -552,81 +561,77 @@ function pronto(M::Model{NX,NU,NΘ}, θ, t0, tf, x0, u0, φ) where {NX,NU,NΘ}
     # debug/verbose
     tol = 1e-5
     maxiters = 10
-    
+
     for i in 1:maxiters
-    info(as_bold(string(nameof(typeof(M))))*" model iteration $i:")
+
+        info(as_bold(string(nameof(typeof(M))))*" model iteration $i:")
 
 
-    iinfo("regulator ... "); @tick
-    Pr_f = diagm(ones(NX))
-    Pr = ODE(Pr_ode, Pr_f, (tf,t0), (M,θ,φ), ODEBuffer{Tuple{NX,NX}}())
-    @tock; println(@clock)
+        iinfo("regulator ... "); @tick
+        Pr_f = diagm(ones(NX))
+        Pr = ODE(Pr_ode, Pr_f, (tf,t0), (M,θ,φ), ODEBuffer{Tuple{NX,NX}}())
+        @tock; println(@clock)
 
 
-    iinfo("projection ... "); @tick
-    # ξ = Trajectory(M, ξ_ode, [x0;u0], (t0,tf), (M,θ,φ,Pr))
-    ξ = ODE(ξ_ode, [x0;u0], (t0,tf), (M,θ,φ,Pr), ODEBuffer{Tuple{NX+NU}}(); dae=dae(M))
-    @tock; println(@clock)
-    # println(preview(ξ)); sleep(0.001);
+        iinfo("projection ... "); @tick
+        # ξ = Trajectory(M, ξ_ode, [x0;u0], (t0,tf), (M,θ,φ,Pr))
+        ξ = ODE(ξ_ode, [x0;u0], (t0,tf), (M,θ,φ,Pr), ODEBuffer{Tuple{NX+NU}}(); dae=dae(M))
+        @tock; println(@clock)
+        # custom_plot(M, ξ)
 
+        iinfo("optimizer ... "); @tick
+        Po_f = pxx(M,θ,tf,φ(tf))
+        Po = ODE(Po_ode, Po_f, (tf,t0), (M,θ,ξ), ODEBuffer{Tuple{NX,NX}}())
 
-    iinfo("optimizer ... "); @tick
-    Po_f = pxx(M,θ,tf,φ(tf))
-    Po = ODE(Po_ode, Po_f, (tf,t0), (M,θ,ξ), ODEBuffer{Tuple{NX,NX}}())
-
-    ro_f = px(M,θ,tf,φ(tf))
-    ro = ODE(ro_ode, ro_f, (tf,t0), (M,θ,ξ,Po), ODEBuffer{Tuple{NX}}())
-    @tock; println(@clock)
-    # println(preview(ro)); sleep(0.001); wait_for_key()
-
-
-    iinfo("lagrangian ... "); @tick
-    λ_f = px(M,θ,tf,φ(tf))
-    λ = ODE(λ_ode, λ_f, (tf,t0), (M,θ,ξ,φ,Pr), ODEBuffer{Tuple{NX}}())
-    @tock; println(@clock)
-    # println(preview(λ))
-    
-
-    iinfo("search direction ... "); @tick
-    ζ0 = [zeros(NX); zeros(NU)] # TODO: is v(0) = 0 valid?
-    ζ = ODE(ζ_ode, ζ0, (t0,tf), (M,θ,ξ,Po,ro), ODEBuffer{Tuple{NX+NU}}(); dae=dae(M))
-    @tock; println(@clock)
-    # println(preview(ζ)); sleep(0.001); wait_for_key()
-
-
-    iinfo("cost derivatives ... "); @tick
-    y0 = [0;0]
-    y = ODE(y_ode, y0, (t0,tf), (M,θ,ξ,ζ), ODEBuffer{Tuple{2}}())
-    Dh = _Dh(M,θ,tf,φ(tf),ζ(tf),y(tf))[]
-    @tock; println(@clock)
-    iinfo(as_bold("Dh = $(Dh)\n"))
-    Dh > 0 && (@warn "increased cost - quitting"; (return φ))
-    -Dh < tol && (info(as_bold("PRONTO converged")); (return φ))
-    # println(preview(y)); sleep(0.001); wait_for_key()
-
-
-    iinfo("armijo backstep ... \n"); @tick
-
-    # compute cost
-    hf = p(M,θ,tf,ξ(tf))[]
-    h = ODE(h_ode, [0.0], (t0,tf), (M,θ,ξ), ODEBuffer{Tuple{1}}())(tf)[] + hf
-
-    local φ̂
-    γ = 1; α=0.4; β=0.7
-    while γ > β^12
-
-        φ̂ = ODE(φ̂_ode, [x0;u0], (t0,tf), (M,θ,ξ,φ,ζ,γ,Pr), ODEBuffer{Tuple{NX+NU}}(); dae=dae(M))
-    
-        # compute cost
-        gf = p(M,θ,tf,φ̂(tf))[]
-        g = ODE(h_ode, [0.0], (t0,tf), (M,θ,φ̂), ODEBuffer{Tuple{1}}())(tf)[] + gf
+        ro_f = px(M,θ,tf,φ(tf))
+        ro = ODE(ro_ode, ro_f, (tf,t0), (M,θ,ξ,Po), ODEBuffer{Tuple{NX}}())
+        @tock; println(@clock)
         
-        # check armijo rule
-        iinfo("γ = $γ   h - g = $(h-g) g = $g\n")
-        h-g >= -α*γ*Dh ? break : (γ *= β)
-    end
-    φ = φ̂
-    @tock; println(@clock)
+
+        iinfo("lagrangian ... "); @tick
+        λ_f = px(M,θ,tf,φ(tf))
+        λ = ODE(λ_ode, λ_f, (tf,t0), (M,θ,ξ,φ,Pr), ODEBuffer{Tuple{NX}}())
+        @tock; println(@clock)
+        
+
+        iinfo("search direction ... "); @tick
+        ζ0 = [zeros(NX); zeros(NU)] # TODO: v(0) = vo(0)
+        ζ = ODE(ζ_ode, ζ0, (t0,tf), (M,θ,ξ,Po,ro), ODEBuffer{Tuple{NX+NU}}(); dae=dae(M))
+        @tock; println(@clock)
+
+
+        iinfo("cost derivatives ... "); @tick
+        y0 = [0;0]
+        y = ODE(y_ode, y0, (t0,tf), (M,θ,ξ,ζ), ODEBuffer{Tuple{2}}())
+        Dh = _Dh(M,θ,tf,φ(tf),ζ(tf),y(tf))[]
+        @tock; println(@clock)
+        iinfo(as_bold("Dh = $(Dh)\n"))
+        Dh > 0 && (@warn "increased cost - quitting"; (return φ))
+        -Dh < tol && (info(as_bold("PRONTO converged")); (return φ))
+
+
+        iinfo("armijo backstep ... \n"); @tick
+
+        # compute cost
+        hf = p(M,θ,tf,ξ(tf))[]
+        h = ODE(h_ode, [0.0], (t0,tf), (M,θ,ξ), ODEBuffer{Tuple{1}}())(tf)[] + hf
+
+        local φ̂
+        γ = 1.0; α=0.4; β=0.7
+        while γ > β^12
+
+            φ̂ = ODE(φ̂_ode, [x0;u0], (t0,tf), (M,θ,ξ,φ,ζ,γ,Pr), ODEBuffer{Tuple{NX+NU}}(); dae=dae(M))
+        
+            # compute cost
+            gf = p(M,θ,tf,φ̂(tf))[]
+            g = ODE(h_ode, [0.0], (t0,tf), (M,θ,φ̂), ODEBuffer{Tuple{1}}())(tf)[] + gf
+            
+            # check armijo rule
+            iinfo("γ = $γ   h - g = $(h-g) g = $g\n")
+            h-g >= -α*γ*Dh ? break : (γ *= β)
+        end
+        φ = φ̂
+        @tock; println(@clock)
 
     end
     return φ

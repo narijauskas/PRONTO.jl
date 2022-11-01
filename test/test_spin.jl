@@ -44,11 +44,14 @@ let
     @derive TwoSpinP
 end
 
+# function PRONTO.preview(M::TwoSpin, ξ)
+# end
+
 
 ## ----------------------------------- tests ----------------------------------- ##
 
 M = TwoSpinP()
-θ = 1
+θ = [1.0]
 t0 = 0.0
 tf = 10.0
 x0 = [0.0;1.0;0.0;0.0]
@@ -56,9 +59,9 @@ xf = [1.0;0.0;0.0;0.0]
 u0 = [0.0]
 
 
-#
+##
 φ = PRONTO.guess_zi(M,θ,xf,u0,t0,tf)
 @time ξ = pronto(M,θ,t0,tf,x0,u0,φ)
 
-(φ,ξ,ζ,φ̂,y,Pr,Po,ro) = pronto(M,θ,t0,tf,x0,u0,φ)
+# (φ,ξ,ζ,φ̂,y,Pr,Po,ro) = pronto(M,θ,t0,tf,x0,u0,φ)
 

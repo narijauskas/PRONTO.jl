@@ -45,3 +45,9 @@ end
 function Base.show(io::IO, fn::FunctionWrapper{T,A}) where {T,A}
     print(io, "FunctionWrapper: $A -> $T $(fn.ptr)")
 end
+
+# for convenience more than anything
+function Base.getindex(ode::ODE, i)
+    T = LinRange(extrema(ode.sln.t)..., 1000)
+    [ode(t)[ix] for t in T, ix in i]
+end
