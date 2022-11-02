@@ -314,6 +314,10 @@ end
 
 function _optimizer(T)::Expr
     B = :(fu(θ,t,ξ))
+    Qo1 = :(lxx(θ,t,ξ))
+    Ro1 = :(luu(θ,t,ξ))
+    So1 = :(lxu(θ,t,ξ))
+    Po1 = :(collect(Po))
     # So/Ro/Qo can be newton or gradient
     return quote
 
@@ -411,15 +415,18 @@ function _cost_derivatives(T)::Expr
     b = :(lu(θ,t,ξ))
     v = :(collect(v))
     z = :(collect(z))
-    Qo = :(lxx(θ,t,ξ))
-    Ro = :(luu(θ,t,ξ))
-    So = :(lxu(θ,t,ξ))
+    # Qo = :(lxx(θ,t,ξ))
+    # Ro = :(luu(θ,t,ξ))
+    # So = :(lxu(θ,t,ξ))
+    Qo = :(lxx(θ,t,ξ) + sum(λ[k]*fxx(θ,t,ξ)[k,:,:] for k in 1:nx($T())))
+    Ro = :(luu(θ,t,ξ) + sum(λ[k]*fuu(θ,t,ξ)[k,:,:] for k in 1:nx($T())))
+    So = :(lxu(θ,t,ξ) + sum(λ[k]*fxu(θ,t,ξ)[k,:,:] for k in 1:nx($T())))
     #TODO: always use sum(λ[k]*PRONTO.fxx(M)[:,:,k] for k in 1:4)
     return quote
 
         # simply need dy/dt
         # @build y_t (θ,t,ξ,ζ) begin
-        local y_t, y_t! = build(θ,t,ξ,ζ) do θ,t,ξ,ζ
+        local y_t, y_t! = build(θ,t,ξ,ζ,λ) do θ,t,ξ,ζ,λ
         
             local z, v = split($T(),ζ)
             vcat(
@@ -428,8 +435,8 @@ function _cost_derivatives(T)::Expr
                 ($z)'*($Qo)*($z) + 2*($z)'*($So)*($v) + ($v)'*($Ro)*($v)
             )
         end
-        PRONTO.y_t(M::$T,θ,t,ξ,ζ) = y_t(θ,t,ξ,ζ)
-        PRONTO.y_t!(M::$T,buf,θ,t,ξ,ζ) = y_t!(buf,θ,t,ξ,ζ)
+        PRONTO.y_t(M::$T,θ,t,ξ,ζ,λ) = y_t(θ,t,ξ,ζ,λ)
+        PRONTO.y_t!(M::$T,buf,θ,t,ξ,ζ,λ) = y_t!(buf,θ,t,ξ,ζ,λ)
 
 
         local Dh, Dh! = build(θ,t,φ,ζ,y) do θ,t,φ,ζ,y
@@ -549,7 +556,7 @@ Po_ode(dPo,Po,(M,θ,ξ),t) = Po_t!(M,dPo,θ,t,ξ(t),Po)
 ro_ode(dro,ro,(M,θ,ξ,Po),t) = ro_t!(M,dro,θ,t,ξ(t),Po(t),ro)
 λ_ode(dλ,λ,(M,θ,ξ,φ,Pr),t) = λ_t!(M,dλ,θ,t,ξ(t),φ(t),Pr(t),λ)
 ζ_ode(dζ,ζ,(M,θ,ξ,Po,ro),t) = ζ_t!(M,dζ,θ,t,ξ(t),ζ,Po(t),ro(t))
-y_ode(dy,y,(M,θ,ξ,ζ),t) = y_t!(M,dy,θ,t,ξ(t),ζ(t))
+y_ode(dy,y,(M,θ,ξ,ζ,λ),t) = y_t!(M,dy,θ,t,ξ(t),ζ(t),λ(t))
 h_ode(dh,h,(M,θ,ξ),t) = h_t!(M,dh,θ,t,ξ(t))
 φ̂_ode(dφ̂,φ̂,(M,θ,ξ,φ,ζ,γ,Pr),t) = φ̂_t!(M,dφ̂,θ,t,ξ(t),φ(t),ζ(t),φ̂,γ,Pr(t))
 
@@ -602,7 +609,7 @@ function pronto(M::Model{NX,NU,NΘ}, θ, t0, tf, x0, u0, φ) where {NX,NU,NΘ}
 
         iinfo("cost derivatives ... "); @tick
         y0 = [0;0]
-        y = ODE(y_ode, y0, (t0,tf), (M,θ,ξ,ζ), ODEBuffer{Tuple{2}}())
+        y = ODE(y_ode, y0, (t0,tf), (M,θ,ξ,ζ,λ), ODEBuffer{Tuple{2}}())
         Dh = _Dh(M,θ,tf,φ(tf),ζ(tf),y(tf))[]
         @tock; println(@clock)
         iinfo(as_bold("Dh = $(Dh)\n"))
