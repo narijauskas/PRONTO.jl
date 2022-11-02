@@ -7,6 +7,7 @@ using StaticArrays
 using FastClosures
 using LinearAlgebra
 using UnicodePlots
+using MacroTools
 # default_size!(;width=80)
 
 using DifferentialEquations
@@ -312,33 +313,51 @@ function _projection(T)::Expr
     end    
 end
 
+# @define $T Ko (θ,t,ξ,Po)->inv($Ro)*(($So)'+($B)'($Po))
+# function define(T, ex)
+#     @capture(ex, name_(args__)=body_)
+#     name! = Symbol(String(name)*"!")
+#     return quote
+#         local $name,$name! = build($(args...)) do $(args...)
+#             $body
+#         end
+#         PRONTO.$name(M::$T,$(args...)) = ($name)($(args...))
+#         PRONTO.$name!(M::$T,buf,$(args...)) = ($name!)(buf,$(args...))
+#     end
+# end
+
 function _optimizer(T)::Expr
+    A = :(fx(θ,t,ξ))
     B = :(fu(θ,t,ξ))
     Qo1 = :(lxx(θ,t,ξ))
     Ro1 = :(luu(θ,t,ξ))
     So1 = :(lxu(θ,t,ξ))
-    Po1 = :(collect(Po))
+    Qo2 = :(lxx(θ,t,ξ) + sum(λ[k]*fxx(θ,t,ξ)[k,:,:] for k in 1:nx($T())))
+    Ro2 = :(luu(θ,t,ξ) + sum(λ[k]*fuu(θ,t,ξ)[k,:,:] for k in 1:nx($T())))
+    So2 = :(lxu(θ,t,ξ) + sum(λ[k]*fxu(θ,t,ξ)[k,:,:] for k in 1:nx($T())))
+    Po = :(collect(Po))
+    # Ko = define(T, :(Ko(θ,t,ξ,Po) = inv($Ro)*(($So)'+($B)'*($Po))))
     # So/Ro/Qo can be newton or gradient
     return quote
 
         # ideally:
-        # @build Ko (θ,t,ξ,Po) -> inv(Ro)\(S'+B'Po)
-
-        #Ko = Ro\(So'+B'Po)
-        local Ko,Ko! = build(θ,t,ξ,Po) do θ,t,ξ,Po
-            inv(luu(θ,t,ξ))*(lxu(θ,t,ξ)' .+ ($B)'*@vec(Po))
+        # @build Ko (θ,t,ξ,Po) -> inv(Ro)(S'+B'Po)
+        # @define $T Ko(θ,t,ξ,Po) = inv($Ro)*(($So)'+($B)'($Po))
+        # #Ko = Ro\(So'+B'Po)
+        local Ko1,Ko1! = build(θ,t,ξ,Po) do θ,t,ξ,Po
+            inv($Ro1)*(($So1)'.+($B)'*($Po))
         end
 
         #NOTE: this is where second order may break
         #dPo_dt = -A'Po - Po*A + Ko'Ro*Ko - Qo
-        local Po_t,Po_t! = build(θ,t,ξ,Po) do θ,t,ξ,Po
-            riccati(fx(θ,t,ξ), Ko(θ,t,ξ,Po), @vec(Po), lxx(θ,t,ξ), luu(θ,t,ξ))
+        local Po1_t,Po1_t! = build(θ,t,ξ,Po) do θ,t,ξ,Po
+            riccati($A, Ko(θ,t,ξ,Po), $Po, $Qo1, $Ro1)
         end
 
         # add definitions to PRONTO
-        PRONTO.Ko(M::$T,θ,t,ξ,Po) = Ko(θ,t,ξ,Po) # NU,NX
-        PRONTO.Po_t(M::$T,θ,t,ξ,Po) = Po_t(θ,t,ξ,Po) # NX,NX
-        PRONTO.Po_t!(M::$T,buf,θ,t,ξ,Po) = Po_t!(buf,θ,t,ξ,Po) # NX,NX
+        PRONTO.Ko1(M::$T,θ,t,ξ,Po) = Ko1(θ,t,ξ,Po) # NU,NX
+        PRONTO.Po1_t(M::$T,θ,t,ξ,Po) = Po1_t(θ,t,ξ,Po) # NX,NX
+        PRONTO.Po1_t!(M::$T,buf,θ,t,ξ,Po) = Po1_t!(buf,θ,t,ξ,Po) # NX,NX
         
         # costate
         local vo,vo! = build(θ,t,ξ,ro) do θ,t,ξ,ro
@@ -410,19 +429,19 @@ function _search_direction(T)::Expr
     end
 end
 
+
+
 function _cost_derivatives(T)::Expr
     a = :(lx(θ,t,ξ))
     b = :(lu(θ,t,ξ))
     v = :(collect(v))
     z = :(collect(z))
-    # Qo = :(lxx(θ,t,ξ))
-    # Ro = :(luu(θ,t,ξ))
-    # So = :(lxu(θ,t,ξ))
     Qo = :(lxx(θ,t,ξ) + sum(λ[k]*fxx(θ,t,ξ)[k,:,:] for k in 1:nx($T())))
     Ro = :(luu(θ,t,ξ) + sum(λ[k]*fuu(θ,t,ξ)[k,:,:] for k in 1:nx($T())))
     So = :(lxu(θ,t,ξ) + sum(λ[k]*fxu(θ,t,ξ)[k,:,:] for k in 1:nx($T())))
-    #TODO: always use sum(λ[k]*PRONTO.fxx(M)[:,:,k] for k in 1:4)
+
     return quote
+ 
 
         # simply need dy/dt
         # @build y_t (θ,t,ξ,ζ) begin
@@ -552,16 +571,21 @@ include("odes.jl")
 
 Pr_ode(dPr,Pr,(M,θ,φ),t) = Pr_t!(M,dPr,θ,t,φ(t),Pr)
 ξ_ode(dξ,ξ,(M,θ,φ,Pr),t) = ξ_t!(M,dξ,θ,t,ξ,φ(t),Pr(t))
-Po_ode(dPo,Po,(M,θ,ξ),t) = Po_t!(M,dPo,θ,t,ξ(t),Po)
+Po1_ode(dPo,Po,(M,θ,ξ),t) = Po1_t!(M,dPo,θ,t,ξ(t),Po)
+Po2_ode(dPo,Po,(M,θ,ξ,λ),t) = Po2_t!(M,dPo,θ,t,ξ(t),λ(t),Po)
 ro_ode(dro,ro,(M,θ,ξ,Po),t) = ro_t!(M,dro,θ,t,ξ(t),Po(t),ro)
 λ_ode(dλ,λ,(M,θ,ξ,φ,Pr),t) = λ_t!(M,dλ,θ,t,ξ(t),φ(t),Pr(t),λ)
 ζ_ode(dζ,ζ,(M,θ,ξ,Po,ro),t) = ζ_t!(M,dζ,θ,t,ξ(t),ζ,Po(t),ro(t))
+#MAYBE: split y into ω and Ω
 y_ode(dy,y,(M,θ,ξ,ζ,λ),t) = y_t!(M,dy,θ,t,ξ(t),ζ(t),λ(t))
 h_ode(dh,h,(M,θ,ξ),t) = h_t!(M,dh,θ,t,ξ(t))
 φ̂_ode(dφ̂,φ̂,(M,θ,ξ,φ,ζ,γ,Pr),t) = φ̂_t!(M,dφ̂,θ,t,ξ(t),φ(t),ζ(t),φ̂,γ,Pr(t))
 
 # for debug:
 wait_for_key() = (print(stdout, "press a key..."); read(stdin, 1); nothing)
+
+struct InstabilityError <: Exception
+end
 
 function pronto(M::Model{NX,NU,NΘ}, θ, t0, tf, x0, u0, φ) where {NX,NU,NΘ}
     #parameters
@@ -584,22 +608,31 @@ function pronto(M::Model{NX,NU,NΘ}, θ, t0, tf, x0, u0, φ) where {NX,NU,NΘ}
         # ξ = Trajectory(M, ξ_ode, [x0;u0], (t0,tf), (M,θ,φ,Pr))
         ξ = ODE(ξ_ode, [x0;u0], (t0,tf), (M,θ,φ,Pr), ODEBuffer{Tuple{NX+NU}}(); dae=dae(M))
         @tock; println(@clock)
-        # custom_plot(M, ξ)
+
+        
+        iinfo("lagrangian ... "); @tick
+        λ_f = px(M,θ,tf,φ(tf))
+        λ = ODE(λ_ode, λ_f, (tf,t0), (M,θ,ξ,φ,Pr), ODEBuffer{Tuple{NX}}())
+        @tock; println(@clock)
+
 
         iinfo("optimizer ... "); @tick
         Po_f = pxx(M,θ,tf,φ(tf))
-        Po = ODE(Po_ode, Po_f, (tf,t0), (M,θ,ξ), ODEBuffer{Tuple{NX,NX}}())
+        Po = try
+            ODE(Po2_ode, Po_f, (tf,t0), (M,θ,ξ,λ), ODEBuffer{Tuple{NX,NX}}())
+        catch e
+            if e isa InstabilityError
+                ODE(Po1_ode, Po_f, (tf,t0), (M,θ,ξ), ODEBuffer{Tuple{NX,NX}}())
+            else
+                rethrow(e)
+            end
+        end
 
         ro_f = px(M,θ,tf,φ(tf))
         ro = ODE(ro_ode, ro_f, (tf,t0), (M,θ,ξ,Po), ODEBuffer{Tuple{NX}}())
         @tock; println(@clock)
         
 
-        iinfo("lagrangian ... "); @tick
-        λ_f = px(M,θ,tf,φ(tf))
-        λ = ODE(λ_ode, λ_f, (tf,t0), (M,θ,ξ,φ,Pr), ODEBuffer{Tuple{NX}}())
-        @tock; println(@clock)
-        
 
         iinfo("search direction ... "); @tick
         ζ0 = [zeros(NX); zeros(NU)] # TODO: v(0) = vo(0)
