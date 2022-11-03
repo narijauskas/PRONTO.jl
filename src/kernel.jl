@@ -72,16 +72,23 @@ end
 
 @fndef ξ_t  (θ,t,ξ,φ,Pr)
 
-@fndef Ko   (θ,t,ξ,Po) 
-@fndef Po_t (θ,t,ξ,Po)
-
 @fndef λ_t  (θ,t,ξ,φ,Pr,λ)
 
-@fndef ro_t  (θ,t,ξ,Po,ro)
-@fndef vo   (θ,t,ξ,ro)
+@fndef Ko1   (θ,t,ξ,Po) 
+@fndef Po1_t (θ,t,ξ,Po)
 
-@fndef ζ_t  (θ,t,ξ,ζ,Po,ro)
+@fndef Ko2   (θ,t,ξ,λ,Po) 
+@fndef Po2_t (θ,t,ξ,λ,Po)
+
+@fndef ro1_t  (θ,t,ξ,Po,ro)
+@fndef vo1   (θ,t,ξ,ro)
+
+@fndef ro2_t  (θ,t,ξ,λ,Po,ro)
+@fndef vo2   (θ,t,ξ,λ,ro)
+
+@fndef ζ1_t  (θ,t,ξ,ζ,Po,ro)
 @fndef _v   (θ,t,ξ,ζ,Po,ro)
+@fndef ζ2_t  (θ,t,ξ,ζ,λ,Po,ro)
 
 @fndef y_t  (θ,t,ξ,ζ)
 @fndef _Dh  (θ,t,φ,ζ,y)
@@ -97,9 +104,12 @@ f!(M::Model,buf,θ,t,ξ) = throw(ModelDefError(M, :f!))
 Pr_t!(M::Model,buf,θ,t,φ,Pr) = throw(ModelDefError(M, :Pr_t!))
 ξ_t!(M::Model,buf,θ,t,ξ,φ,P) = throw(ModelDefError(M, :ξ_t!))
 λ_t!(M::Model,buf,θ,t,ξ,φ,Pr) = throw(ModelDefError(M, :λ_t!))
-Po_t!(M::Model,buf,θ,t,ξ,P) = throw(ModelDefError(M, :Po_t!))
-ro_t!(M::Model,buf,θ,t,ξ,Po) = throw(ModelDefError(M, :ro_t!))
-ζ_t!(M::Model,buf,θ,t,ξ,ζ,Po,ro) = throw(ModelDefError(M, :ζ_t!))
+Po1_t!(M::Model,buf,θ,t,ξ,P) = throw(ModelDefError(M, :Po1_t!))
+Po2_t!(M::Model,buf,θ,t,ξ,λ,P) = throw(ModelDefError(M, :Po2_t!))
+ro1_t!(M::Model,buf,θ,t,ξ,Po) = throw(ModelDefError(M, :ro1_t!))
+ro2_t!(M::Model,buf,θ,t,ξ,λ,Po) = throw(ModelDefError(M, :ro2_t!))
+ζ1_t!(M::Model,buf,θ,t,ξ,ζ,Po,ro) = throw(ModelDefError(M, :ζ1_t!))
+ζ2_t!(M::Model,buf,θ,t,ξ,ζ,λ,Po,ro) = throw(ModelDefError(M, :ζ2_t!))
 y_t!(M::Model,buf,θ,t,ξ,ζ) = throw(ModelDefError(M, :y_t!))
 h_t!(M::Model,buf,θ,t,ξ) = throw(ModelDefError(M, :h_t!))
 φ̂_t!(M::Model,buf,θ,t,ξ,φ,ζ,φ̂,γ,Pr) = throw(ModelDefError(M, :φ̂_t!))
