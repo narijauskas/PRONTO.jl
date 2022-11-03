@@ -634,7 +634,7 @@ wait_for_key() = (print(stdout, "press a key..."); read(stdin, 1); nothing)
 struct InstabilityError <: Exception
 end
 
-eigcheck(Po,_,_) = maximum(eigvals( ishermitian(Po) ? Po : collect(Po)) ) >= 1e12
+eigcheck(Po,_,_) = maximum(eigvals( ishermitian(Po) ? Po : collect(Po)) ) >= 1e5
 # function eigcheck(Po,_,_)
 #     eig = maximum(eigvals( ishermitian(Po) ? Po : collect(Po)) )
 #     println(stdout, "max eig = $eig")
@@ -645,13 +645,15 @@ eigcheck(Po,_,_) = maximum(eigvals( ishermitian(Po) ? Po : collect(Po)) ) >= 1e1
 #     if
 # end
 
-unstable!(_) = throw(InstabilityError())
+# unstable!(_) = throw(InstabilityError())
+unstable!(_) = println(stdout, "eig = $eig")
 
-function pronto(M::Model{NX,NU,NΘ}, θ, t0, tf, x0, u0, φ) where {NX,NU,NΘ}
+
+function pronto(M::Model{NX,NU,NΘ}, θ, t0, tf, x0, u0, φ; tol = 1e-5, maxiters = 20) where {NX,NU,NΘ}
     #parameters
     # debug/verbose
-    tol = 1e-5
-    maxiters = 10
+    # tol = 1e-5
+    # maxiters = 10
 
     for i in 1:maxiters
 
@@ -677,12 +679,13 @@ function pronto(M::Model{NX,NU,NΘ}, θ, t0, tf, x0, u0, φ) where {NX,NU,NΘ}
 
 
         # iinfo("optimizer ... "); @tick
-        Po_f = pxx(M,θ,tf,φ(tf))
+        Po_f = Symmetric(pxx(M,θ,tf,φ(tf)))
         ro_f = px(M,θ,tf,φ(tf))
         ζ0 = [zeros(NX); zeros(NU)] # TODO: v(0) = vo(0)
 
         iinfo("trying 2nd order optimizer ... ")
-        Po = ODE(Po2_ode, Po_f, (tf,t0), (M,θ,ξ,λ), ODEBuffer{Tuple{NX,NX}}(); verbose=false)
+        cb = DiscreteCallback(eigcheck,unstable!)
+        Po = ODE(Po2_ode, Po_f, (tf,t0), (M,θ,ξ,λ), ODEBuffer{Tuple{NX,NX}}(); verbose=false, callback=cb)
         if Po.sln.retcode == :Success
             iinfo("success\n")
             order = 2
@@ -699,7 +702,7 @@ function pronto(M::Model{NX,NU,NΘ}, θ, t0, tf, x0, u0, φ) where {NX,NU,NΘ}
 
         # @tock; println(@clock)
         
-        # iinfo("unstable, switching to 1st order\n")
+        # iinfo("1st order override\n")
         # order = 1
         # Po = ODE(Po1_ode, Po_f, (tf,t0), (M,θ,ξ), ODEBuffer{Tuple{NX,NX}}())
         # ro = ODE(ro1_ode, ro_f, (tf,t0), (M,θ,ξ,Po), ODEBuffer{Tuple{NX}}())
