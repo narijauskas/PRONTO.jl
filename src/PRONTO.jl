@@ -8,6 +8,7 @@ using FastClosures
 using LinearAlgebra
 using UnicodePlots
 using MacroTools
+using SparseArrays
 # default_size!(;width=80)
 
 using DifferentialEquations
@@ -66,7 +67,7 @@ end
 
 # ----------------------------------- helper functions ----------------------------------- #
 
-inv!(A) = LinearAlgebra.inv!(lu!(A)) # general
+# inv!(A) = LinearAlgebra.inv!(lu!(A)) # general
 # LinearAlgebra.inv!(choelsky!(A)) # if SPD
 
 
@@ -634,19 +635,28 @@ wait_for_key() = (print(stdout, "press a key..."); read(stdin, 1); nothing)
 struct InstabilityError <: Exception
 end
 
-eigcheck(Po,_,_) = maximum(eigvals( ishermitian(Po) ? Po : collect(Po)) ) >= 1e5
-# function eigcheck(Po,_,_)
-#     eig = maximum(eigvals( ishermitian(Po) ? Po : collect(Po)) )
-#     println(stdout, "max eig = $eig")
-#     eig >= 1e12
-# end
+# eigcheck(Po,_,_) = maximum(eigvals( ishermitian(Po) ? Po : collect(Po)) ) >= 1e5
+function eigcheck(Po,_,_)
+    eig = maximum(eigvals( ishermitian(Po) ? Po : collect(Po)) )
+    eig >= 1e10 && println(stdout, "max eig = $eig")
+    eig >= 1e12
+end
 
 # function eigcheck(_,_,integrator)
 #     if
 # end
-
+export asymmetry
+function asymmetry(A)
+    (m,n) = size(A)
+    @assert m == n "must be square matrix"
+    sum([0.5*abs(A[i,j]-A[j,i]) for i in 1:n, j in 1:n])
+end
+function asymcheck(Po,_,_)
+    asymmetry(Po) > 1e-6 && println(stdout, "\tasymmetry = $(asymmetry(Po))")
+    asymmetry(Po) > 1e-6
+end
 # unstable!(_) = throw(InstabilityError())
-unstable!(_) = println(stdout, "eig = $eig")
+unstable!(_) = nothing
 
 
 function pronto(M::Model{NX,NU,NΘ}, θ, t0, tf, x0, u0, φ; tol = 1e-5, maxiters = 20) where {NX,NU,NΘ}
@@ -657,12 +667,14 @@ function pronto(M::Model{NX,NU,NΘ}, θ, t0, tf, x0, u0, φ; tol = 1e-5, maxiter
 
     for i in 1:maxiters
 
-        info(as_bold(string(nameof(typeof(M))))*" model iteration $i:")
+        cb = DiscreteCallback(asymcheck,unstable!)
 
+        info(as_bold(string(nameof(typeof(M))))*" model iteration $i:")
+        @tick iteration
 
         iinfo("regulator ... "); @tick
         Pr_f = diagm(ones(NX))
-        Pr = ODE(Pr_ode, Pr_f, (tf,t0), (M,θ,φ), ODEBuffer{Tuple{NX,NX}}())
+        Pr = ODE(Pr_ode, Pr_f, (tf,t0), (M,θ,φ), ODEBuffer{Tuple{NX,NX}}(), callback=cb)
         @tock; println(@clock)
 
 
@@ -670,21 +682,20 @@ function pronto(M::Model{NX,NU,NΘ}, θ, t0, tf, x0, u0, φ; tol = 1e-5, maxiter
         # ξ = Trajectory(M, ξ_ode, [x0;u0], (t0,tf), (M,θ,φ,Pr))
         ξ = ODE(ξ_ode, [x0;u0], (t0,tf), (M,θ,φ,Pr), ODEBuffer{Tuple{NX+NU}}(); dae=dae(M))
         @tock; println(@clock)
-
+        plot_trajectory(M,ξ)
         
         iinfo("lagrangian ... "); @tick
-        λ_f = px(M,θ,tf,φ(tf))
+        λ_f = collect(px(M,θ,tf,φ(tf)))
         λ = ODE(λ_ode, λ_f, (tf,t0), (M,θ,ξ,φ,Pr), ODEBuffer{Tuple{NX}}())
         @tock; println(@clock)
 
 
         # iinfo("optimizer ... "); @tick
-        Po_f = Symmetric(pxx(M,θ,tf,φ(tf)))
-        ro_f = px(M,θ,tf,φ(tf))
+        Po_f = collect(pxx(M,θ,tf,φ(tf)))
+        ro_f = collect(px(M,θ,tf,φ(tf)))
         ζ0 = [zeros(NX); zeros(NU)] # TODO: v(0) = vo(0)
 
         iinfo("trying 2nd order optimizer ... ")
-        cb = DiscreteCallback(eigcheck,unstable!)
         Po = ODE(Po2_ode, Po_f, (tf,t0), (M,θ,ξ,λ), ODEBuffer{Tuple{NX,NX}}(); verbose=false, callback=cb)
         if Po.sln.retcode == :Success
             iinfo("success\n")
@@ -723,16 +734,16 @@ function pronto(M::Model{NX,NU,NΘ}, θ, t0, tf, x0, u0, φ; tol = 1e-5, maxiter
         Dh > 0 && (info("increased cost - quitting"); (return φ))
         -Dh < tol && (info(as_bold("PRONTO converged")); (return φ))
 
-
-        iinfo("armijo backstep ... \n"); @tick
-
         # compute cost
         hf = p(M,θ,tf,ξ(tf))[]
         h = ODE(h_ode, [0.0], (t0,tf), (M,θ,ξ), ODEBuffer{Tuple{1}}())(tf)[] + hf
+        iinfo(as_bold("h = $(h)\n"))
 
+
+        iinfo("armijo backstep ... \n"); @tick
         local φ̂
         γ = 1.0; α=0.4; β=0.7
-        while γ > β^12
+        while γ > β^25
 
             φ̂ = ODE(φ̂_ode, [x0;u0], (t0,tf), (M,θ,ξ,φ,ζ,γ,Pr), ODEBuffer{Tuple{NX+NU}}(); dae=dae(M))
         
@@ -744,8 +755,13 @@ function pronto(M::Model{NX,NU,NΘ}, θ, t0, tf, x0, u0, φ; tol = 1e-5, maxiter
             iinfo("γ = $γ   h - g = $(h-g) g = $g\n")
             h-g >= -α*γ*Dh ? break : (γ *= β)
         end
+        γ <= β^15 && @warn "armijo maxiters"
         φ = φ̂
         @tock; println(@clock)
+
+
+        @tock iteration
+        info("iteration $i took "*(@clock iteration))
 
     end
     return φ

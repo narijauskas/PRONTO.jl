@@ -49,9 +49,16 @@ end
 
 M = InvPend()
 x0 = [2π/3;0]
+u0 = [0.0]
+ξ0 = [x0;u0]
+ξf = [0;0;0]
 t0 = 0.0; tf = 10.0
 
 x_eq = zeros(nx(M))
 u_eq = zeros(nu(M))
 
-φ = # simulate guess at xf,uf
+
+φg = @closure t->ξf
+φ = guess_φ(M,θ,ξf,t0,tf,φg)
+##
+@time ξ = pronto(M,θ,t0,tf,x0,u0,φ; tol = 1e-8, maxiters=32)
