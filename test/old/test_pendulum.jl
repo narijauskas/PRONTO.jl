@@ -12,24 +12,33 @@ end
 let
     g = 9.81
     L = 2
+
     f = (θ,t,x,u) -> [
         x[2],
-        g/L*sin(x[1])-u*cos(x[1])/L
+        g/L*sin(x[1])-u[1]*cos(x[1])/L
     ]
     
     Ql = I
     Rl = I
-    l = (θ,t,x,u) -> 1/2*collect(x)'*Q*collect(x) + 1/2*Rl*collect(u)^2
-
-    p = (θ,t,x,u) -> begin
-        P = arec(fx(θ,t,x,u), fu(θ,t,x,u), R, Q, S)
-    end
-
+    l = (θ,t,x,u) -> 1/2*collect(x)'*Ql*collect(x) + 1/2*collect(u)'*Rl*collect(u)
+    
+    Rr = (θ,t,x,u) -> diagm([1e-3])
+    Qr = (θ,t,x,u) -> diagm([10, 1])
     
 
-    Rr = (θ,t,x,u) ->
-    Qr = (θ,t,x,u) ->
+    x_eq = zeros(nx(M))
+    u_eq = zeros(nu(M))
+    
+    # global fx,fu,lxx,luu,lxu
+    # global lxx,luu,lxu
+    # PT,_ = arec(Ar(T), Br(T)*iRr(T)*Br(T)', Qr(T))
+    p = (θ,t,x,u) -> begin
+        ξ_eq = vcat(x_eq,u_eq)
+        # P,_ = arec(fx(θ,t,ξ_eq), fu(θ,t,ξ_eq)*inv(Rr(θ,t,x_eq,u_eq))*fu(θ,t,ξ_eq)', Qr(θ,t,x_eq,u_eq))
+        P,_ = arec(fx(θ,t,ξ_eq), fu(θ,t,ξ_eq), luu(θ,t,ξ_eq), lxx(θ,t,ξ_eq), lxu(θ,t,ξ_eq))
 
+        1/2*collect(x)'*P*collect(x)
+    end
 
     @derive InvPend
 end
