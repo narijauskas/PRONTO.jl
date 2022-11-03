@@ -681,29 +681,29 @@ function pronto(M::Model{NX,NU,NΘ}, θ, t0, tf, x0, u0, φ) where {NX,NU,NΘ}
         ro_f = px(M,θ,tf,φ(tf))
         ζ0 = [zeros(NX); zeros(NU)] # TODO: v(0) = vo(0)
 
-        # iinfo("trying 2nd order optimizer ... ")
-        # Po = ODE(Po2_ode, Po_f, (tf,t0), (M,θ,ξ,λ), ODEBuffer{Tuple{NX,NX}}(); verbose=false)
-        # if Po.sln.retcode == :Success
-        #     iinfo("success\n")
-        #     order = 2
-        #     ro = ODE(ro2_ode, ro_f, (tf,t0), (M,θ,ξ,λ,Po), ODEBuffer{Tuple{NX}}())
-        #     ζ = ODE(ζ2_ode, ζ0, (t0,tf), (M,θ,ξ,λ,Po,ro), ODEBuffer{Tuple{NX+NU}}(); dae=dae(M))
-        # else
-        #     iinfo("unstable, switching to 1st order\n")
-        #     order = 1
-        #     Po = ODE(Po1_ode, Po_f, (tf,t0), (M,θ,ξ), ODEBuffer{Tuple{NX,NX}}())
-        #     ro = ODE(ro1_ode, ro_f, (tf,t0), (M,θ,ξ,Po), ODEBuffer{Tuple{NX}}())
-        #     ζ = ODE(ζ1_ode, ζ0, (t0,tf), (M,θ,ξ,Po,ro), ODEBuffer{Tuple{NX+NU}}(); dae=dae(M))
-        # end
+        iinfo("trying 2nd order optimizer ... ")
+        Po = ODE(Po2_ode, Po_f, (tf,t0), (M,θ,ξ,λ), ODEBuffer{Tuple{NX,NX}}(); verbose=false)
+        if Po.sln.retcode == :Success
+            iinfo("success\n")
+            order = 2
+            ro = ODE(ro2_ode, ro_f, (tf,t0), (M,θ,ξ,λ,Po), ODEBuffer{Tuple{NX}}())
+            ζ = ODE(ζ2_ode, ζ0, (t0,tf), (M,θ,ξ,λ,Po,ro), ODEBuffer{Tuple{NX+NU}}(); dae=dae(M))
+        else
+            iinfo("unstable, switching to 1st order\n")
+            order = 1
+            Po = ODE(Po1_ode, Po_f, (tf,t0), (M,θ,ξ), ODEBuffer{Tuple{NX,NX}}())
+            ro = ODE(ro1_ode, ro_f, (tf,t0), (M,θ,ξ,Po), ODEBuffer{Tuple{NX}}())
+            ζ = ODE(ζ1_ode, ζ0, (t0,tf), (M,θ,ξ,Po,ro), ODEBuffer{Tuple{NX+NU}}(); dae=dae(M))
+        end
 
 
         # @tock; println(@clock)
         
-        iinfo("unstable, switching to 1st order\n")
-        order = 1
-        Po = ODE(Po1_ode, Po_f, (tf,t0), (M,θ,ξ), ODEBuffer{Tuple{NX,NX}}())
-        ro = ODE(ro1_ode, ro_f, (tf,t0), (M,θ,ξ,Po), ODEBuffer{Tuple{NX}}())
-        ζ = ODE(ζ1_ode, ζ0, (t0,tf), (M,θ,ξ,Po,ro), ODEBuffer{Tuple{NX+NU}}(); dae=dae(M))
+        # iinfo("unstable, switching to 1st order\n")
+        # order = 1
+        # Po = ODE(Po1_ode, Po_f, (tf,t0), (M,θ,ξ), ODEBuffer{Tuple{NX,NX}}())
+        # ro = ODE(ro1_ode, ro_f, (tf,t0), (M,θ,ξ,Po), ODEBuffer{Tuple{NX}}())
+        # ζ = ODE(ζ1_ode, ζ0, (t0,tf), (M,θ,ξ,Po,ro), ODEBuffer{Tuple{NX+NU}}(); dae=dae(M))
 
         # iinfo("search direction ... "); @tick
         # ζ0 = [zeros(NX); zeros(NU)] # TODO: v(0) = vo(0)
