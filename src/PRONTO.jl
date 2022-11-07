@@ -652,7 +652,7 @@ function asymmetry(A)
     sum([0.5*abs(A[i,j]-A[j,i]) for i in 1:n, j in 1:n])
 end
 function asymcheck(Po,_,_)
-    asymmetry(Po) > 1e-6 && println(stdout, "\tasymmetry = $(asymmetry(Po))")
+    # asymmetry(Po) > 1e-6 && println(stdout, "\tasymmetry = $(asymmetry(Po))")
     asymmetry(Po) > 1e-6
 end
 # unstable!(_) = throw(InstabilityError())

@@ -1,11 +1,16 @@
 
 using PRONTO
+using FastClosures
+using StaticArrays
+using LinearAlgebra
+using MatrixEquations
 
+##
 NX = 2
 NU = 1
 NΘ = 0
 
-struct InvPend <: PRONTO.Model{NX,NU,NΘ}
+struct InvPend <: PRONTO.Model{NX,NU,0}
 end
 
 
@@ -31,12 +36,16 @@ let
     
     # global fx,fu,lxx,luu,lxu
     # global lxx,luu,lxu
+    global P
     # PT,_ = arec(Ar(T), Br(T)*iRr(T)*Br(T)', Qr(T))
     p = (θ,t,x,u) -> begin
         ξ_eq = vcat(x_eq,u_eq)
         # P,_ = arec(fx(θ,t,ξ_eq), fu(θ,t,ξ_eq)*inv(Rr(θ,t,x_eq,u_eq))*fu(θ,t,ξ_eq)', Qr(θ,t,x_eq,u_eq))
         P,_ = arec(fx(θ,t,ξ_eq), fu(θ,t,ξ_eq), luu(θ,t,ξ_eq), lxx(θ,t,ξ_eq), lxu(θ,t,ξ_eq))
-
+        P = [
+            88.0233 39.3414;
+            39.3414 17.8531;
+        ]
         1/2*collect(x)'*P*collect(x)
     end
 
@@ -48,6 +57,7 @@ end
 ##
 
 M = InvPend()
+θ = Float64[]
 x0 = [2π/3;0]
 u0 = [0.0]
 ξ0 = [x0;u0]

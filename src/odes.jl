@@ -18,7 +18,7 @@ mass_matrix(M) = cat(diagm(ones(nx(M))), diagm(zeros(nu(M))); dims=(1,2))
 # constructor basically wraps ODEProblem
 function ODE(fn, x0, ts, ode_pm, buf::T; dae=nothing, ode_kw...) where {T}
     ode_fn = isnothing(dae) ? ODEFunction(fn) : ODEFunction(fn; mass_matrix=dae)
-    sln = solve(ODEProblem(ode_fn,x0,ts,ode_pm; ode_kw...); reltol=1e-6, alg_hints = [:stiff])
+    sln = solve(ODEProblem(ode_fn,x0,ts,ode_pm; ode_kw...); reltol=1e-7, saveat=0.0005, alg_hints = [:stiff])
     fxn = FunctionWrapper{T, Tuple{Float64}}(t->copy(sln(buf,t)))
     ODE{T}(fxn,buf,sln)
 end
