@@ -31,17 +31,17 @@ let
     Qr = (θ,t,x,u) -> diagm([10, 1])
     
 
-    x_eq = zeros(nx(M))
-    u_eq = zeros(nu(M))
+    # x_eq = zeros(nx(M))
+    # u_eq = zeros(nu(M))
     
     # global fx,fu,lxx,luu,lxu
     # global lxx,luu,lxu
-    global P
+    # global P
     # PT,_ = arec(Ar(T), Br(T)*iRr(T)*Br(T)', Qr(T))
     p = (θ,t,x,u) -> begin
-        ξ_eq = vcat(x_eq,u_eq)
+        # ξ_eq = vcat(x_eq,u_eq)
         # P,_ = arec(fx(θ,t,ξ_eq), fu(θ,t,ξ_eq)*inv(Rr(θ,t,x_eq,u_eq))*fu(θ,t,ξ_eq)', Qr(θ,t,x_eq,u_eq))
-        P,_ = arec(fx(θ,t,ξ_eq), fu(θ,t,ξ_eq), luu(θ,t,ξ_eq), lxx(θ,t,ξ_eq), lxu(θ,t,ξ_eq))
+        # P,_ = arec(fx(θ,t,ξ_eq), fu(θ,t,ξ_eq), luu(θ,t,ξ_eq), lxx(θ,t,ξ_eq), lxu(θ,t,ξ_eq))
         P = [
             88.0233 39.3414;
             39.3414 17.8531;
@@ -71,4 +71,4 @@ u_eq = zeros(nu(M))
 φg = @closure t->ξf
 φ = guess_φ(M,θ,ξf,t0,tf,φg)
 ##
-@time ξ = pronto(M,θ,t0,tf,x0,u0,φ; tol = 1e-8, maxiters=32)
+@time ξ = pronto(M,θ,t0,tf,x0,u0,φ; tol = 1e-8, maxiters=100)
