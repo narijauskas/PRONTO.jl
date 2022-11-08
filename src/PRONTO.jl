@@ -310,10 +310,9 @@ end
 
 
 function _regulator(T)::Expr
-    
+
     T = esc(T)
     M = :($T())
-    Rr = :(Rr(θ,t,φ))
     Ar = :(fx(θ,t,φ))
     Br = :(fu(θ,t,φ))
     Pr = :(collect(Pr))
