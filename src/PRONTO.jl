@@ -90,8 +90,9 @@ nθ(::Model{NX,NU,NΘ}) where {NX,NU,NΘ} = NΘ
 
 
 function build(f, args...)
-
+    # anonymous fxn
     f_sym = collect(Base.invokelatest(f, args...))
+    # symbolic
     f_ex = build_function(f_sym, args...)
     return eval.(f_ex)
 end
@@ -112,6 +113,7 @@ function jacobian(dx, f, args...; force_dims=nothing)
     # reshape/concatenate
     fx_sym = cat(jac_sym...; dims=ndims(f_sym)+1)
     isnothing(force_dims) || (fx_sym = reshape(fx_sym, force_dims...))
+    # symbolic
     fx_ex = build_function(fx_sym, args...)
     return eval.(fx_ex)
 end
@@ -177,7 +179,7 @@ function _dynamics(T)::Expr
     user_f = esc(:f)
 
     return quote
-
+        let
         # load user function, remap ξ<->(x,u)
         local f,f! = build(θ,t,ξ) do θ,t,ξ
 
@@ -202,12 +204,13 @@ function _dynamics(T)::Expr
         PRONTO.fuu(M::$T,θ,t,ξ) = fuu(θ,t,ξ) # NX,NU,NU
         PRONTO.f!(M::$T,buf,θ,t,ξ) = f!(buf,θ,t,ξ) # NX
     end
+    end
 end
 
 function _stage_cost(T)::Expr
 
     return quote
-
+        let
         # load user function, remap ξ<->(x,u)
         local l,l! = build(θ,t,ξ) do θ,t,ξ
             local x,u = split($T(),ξ)
@@ -229,12 +232,13 @@ function _stage_cost(T)::Expr
         PRONTO.lxu(M::$T,θ,t,ξ) = lxu(θ,t,ξ) # NX,NU
         PRONTO.luu(M::$T,θ,t,ξ) = luu(θ,t,ξ) # NU,NU
     end
+    end
 end
 
 function _terminal_cost(T)::Expr
 
     return quote
-
+        let
         # load user function, remap ξ<->(x,u)
         local p,p! = build(θ,t,ξ) do θ,t,ξ
 
@@ -251,261 +255,29 @@ function _terminal_cost(T)::Expr
         PRONTO.px(M::$T,θ,t,ξ) = px(θ,t,ξ) # NX
         PRONTO.pxx(M::$T,θ,t,ξ) = pxx(θ,t,ξ) # NX,NX
     end
+    end
 end
 
 include("model.jl")
-
-
-
-function _lagrangian(T)::Expr
-    A = :(fx(θ,t,ξ))
-    B = :(fu(θ,t,ξ))
-    a = :(lx(θ,t,ξ))
-    b = :(lu(θ,t,ξ))
-    Kr = :(Kr(θ,t,φ,Pr))
-    λ = :(collect(λ))
-
-    return quote
-
-        local λ_t,λ_t! = build(θ,t,ξ,φ,Pr,λ) do θ,t,ξ,φ,Pr,λ
-
-            -($A-$B*$Kr)'*$λ - $a + ($Kr)'*$b
-            # costate(fx(θ,t,ξ), fu(θ,t,ξ), lx(θ,t,ξ), lu(θ,t,ξ), Kr(θ,t,φ,Pr), @vec(λ))
-        end
-        # add definitions to PRONTO
-        PRONTO.λ_t(M::$T,θ,t,ξ,φ,Pr,λ) = λ_t(θ,t,ξ,φ,Pr,λ) #NX
-        PRONTO.λ_t!(M::$T,buf,θ,t,ξ,φ,Pr,λ) = λ_t!(buf,θ,t,ξ,φ,Pr,λ) #NX
-    end
-end
-
-
-function _optimizer(T)::Expr
-    A = :(fx(θ,t,ξ))
-    B = :(fu(θ,t,ξ))
-    Qo1 = :(lxx(θ,t,ξ))
-    Ro1 = :(luu(θ,t,ξ))
-    So1 = :(lxu(θ,t,ξ))
-    Qo2 = :(lxx(θ,t,ξ) + sum(λ[k]*fxx(θ,t,ξ)[k,:,:] for k in 1:nx($T())))
-    Ro2 = :(luu(θ,t,ξ) + sum(λ[k]*fuu(θ,t,ξ)[k,:,:] for k in 1:nx($T())))
-    So2 = :(lxu(θ,t,ξ) + sum(λ[k]*fxu(θ,t,ξ)[k,:,:] for k in 1:nx($T())))
-    Po = :(collect(Po))
-    # Ko = define(T, :(Ko(θ,t,ξ,Po) = inv($Ro)*(($So)'+($B)'*($Po))))
-    # So/Ro/Qo can be newton or gradient
-    return quote
-
-        # ideally:
-        # @build Ko (θ,t,ξ,Po) -> inv(Ro)(S'+B'Po)
-        # @define $T Ko(θ,t,ξ,Po) = inv($Ro)*(($So)'+($B)'($Po))
-        # #Ko = Ro\(So'+B'Po)
-        local Ko1,Ko1! = build(θ,t,ξ,Po) do θ,t,ξ,Po
-            inv($Ro1)*(($So1)'.+($B)'*($Po))
-        end
-
-        #dPo_dt = -A'Po - Po*A + Ko'Ro*Ko - Qo
-        local Po1_t,Po1_t! = build(θ,t,ξ,Po) do θ,t,ξ,Po
-            riccati($A, Ko1(θ,t,ξ,Po), $Po, $Qo1, $Ro1)
-        end
-
-        # add definitions to PRONTO
-        PRONTO.Ko1(M::$T,θ,t,ξ,Po) = Ko1(θ,t,ξ,Po) # NU,NX
-        PRONTO.Po1_t(M::$T,θ,t,ξ,Po) = Po1_t(θ,t,ξ,Po) # NX,NX
-        PRONTO.Po1_t!(M::$T,buf,θ,t,ξ,Po) = Po1_t!(buf,θ,t,ξ,Po) # NX,NX
-
-        local Ko2,Ko2! = build(θ,t,ξ,λ,Po) do θ,t,ξ,λ,Po
-            inv($Ro2)*(($So2)'.+($B)'*($Po))
-        end
-
-        #NOTE: this is where second order may break
-        #dPo_dt = -A'Po - Po*A + Ko'Ro*Ko - Qo
-        local Po2_t,Po2_t! = build(θ,t,ξ,λ,Po) do θ,t,ξ,λ,Po
-            riccati($A, Ko2(θ,t,ξ,λ,Po), $Po, $Qo2, $Ro2)
-        end
-
-        # add definitions to PRONTO
-        PRONTO.Ko2(M::$T,θ,t,ξ,λ,Po) = Ko2(θ,t,ξ,λ,Po) # NU,NX
-        PRONTO.Po2_t(M::$T,θ,t,ξ,λ,Po) = Po2_t(θ,t,ξ,λ,Po) # NX,NX
-        PRONTO.Po2_t!(M::$T,buf,θ,t,ξ,λ,Po) = Po2_t!(buf,θ,t,ξ,λ,Po) # NX,NX
-        
-        # costate
-        local vo1,vo1! = build(θ,t,ξ,ro) do θ,t,ξ,ro
-            inv(-$Ro1)*(fu(θ,t,ξ)'*@vec(ro) + lu(θ,t,ξ))
-        end
-        
-        local ro1_t,ro1_t! = build(θ,t,ξ,Po,ro) do θ,t,ξ,Po,ro
-            costate(fx(θ,t,ξ), fu(θ,t,ξ), lx(θ,t,ξ), lu(θ,t,ξ), Ko1(θ,t,ξ,Po), @vec(ro))
-        end
-
-        # add definitions to PRONTO
-        PRONTO.vo1(M::$T,θ,t,ξ,ro) = vo1(θ,t,ξ,ro) # NU,NX
-        PRONTO.ro1_t(M::$T,θ,t,ξ,Po,ro) = ro1_t(θ,t,ξ,Po,ro) # NX
-        PRONTO.ro1_t!(M::$T,buf,θ,t,ξ,Po,ro) = ro1_t!(buf,θ,t,ξ,Po,ro) # NX
-        
-
-        local vo2,vo2! = build(θ,t,ξ,λ,ro) do θ,t,ξ,λ,ro
-            inv(-$Ro2)*(fu(θ,t,ξ)'*@vec(ro) + lu(θ,t,ξ))
-        end
-
-        local ro2_t,ro2_t! = build(θ,t,ξ,λ,Po,ro) do θ,t,ξ,λ,Po,ro
-            costate(fx(θ,t,ξ), fu(θ,t,ξ), lx(θ,t,ξ), lu(θ,t,ξ), Ko2(θ,t,ξ,λ,Po), @vec(ro))
-        end
-        
-        # add definitions to PRONTO
-        PRONTO.vo2(M::$T,θ,t,ξ,λ,ro) = vo2(θ,t,ξ,λ,ro) # NU,NX
-        PRONTO.ro2_t(M::$T,θ,t,ξ,λ,Po,ro) = ro2_t(θ,t,ξ,λ,Po,ro) # NX
-        PRONTO.ro2_t!(M::$T,buf,θ,t,ξ,λ,Po,ro) = ro2_t!(buf,θ,t,ξ,λ,Po,ro) # NX
-    end    
-end
-
-function _search_direction(T)::Expr
-
-    Ko1 = :(Ko1(θ,t,ξ,Po))
-    Ko2 = :(Ko2(θ,t,ξ,λ,Po))
-    vo1 = :(vo1(θ,t,ξ,ro))
-    vo2 = :(vo2(θ,t,ξ,λ,ro))
-    A = :(fx(θ,t,ξ))
-    B = :(fu(θ,t,ξ))
-    v = :(collect(v))
-    z = :(collect(z))
-    
-    return quote
-
-        local ζ1_t,ζ1_t! = build(θ,t,ξ,ζ,Po,ro) do θ,t,ξ,ζ,Po,ro
-
-            local z,v = split($T(),ζ)
-            vcat(
-                
-                ($A*$z + $B*$v)...,
-                ($vo1 - $Ko1*$z - $v)...
-            )
-        end
-        PRONTO.ζ1_t(M::$T,θ,t,ξ,ζ,Po,ro) = ζ1_t(θ,t,ξ,ζ,Po,ro)
-        PRONTO.ζ1_t!(M::$T,buf,θ,t,ξ,ζ,Po,ro) = ζ1_t!(buf,θ,t,ξ,ζ,Po,ro)
-
-        local ζ2_t,ζ2_t! = build(θ,t,ξ,ζ,λ,Po,ro) do θ,t,ξ,ζ,λ,Po,ro
-
-            local z,v = split($T(),ζ)
-            vcat(
-                
-                ($A*$z + $B*$v)...,
-                ($vo2 - $Ko2*$z - $v)...
-            )
-        end
-        PRONTO.ζ2_t(M::$T,θ,t,ξ,ζ,λ,Po,ro) = ζ2_t(θ,t,ξ,ζ,λ,Po,ro)
-        PRONTO.ζ2_t!(M::$T,buf,θ,t,ξ,ζ,λ,Po,ro) = ζ2_t!(buf,θ,t,ξ,ζ,λ,Po,ro)
-
-
-        local _v,_v! = build(θ,t,ξ,ζ,Po,ro) do θ,t,ξ,ζ,Po,ro
-            
-            local z,v = split($T(),ζ)
-            $vo1 - $Ko1*$z
-        end
-        PRONTO._v(M::$T,θ,t,ξ,ζ,Po,ro) = _v(θ,t,ξ,ζ,Po,ro)
-    end
-end
-
-
-
-function _cost_derivatives(T)::Expr
-    a = :(lx(θ,t,ξ))
-    b = :(lu(θ,t,ξ))
-    v = :(collect(v))
-    z = :(collect(z))
-    # always second order
-    Qo = :(lxx(θ,t,ξ) + sum(λ[k]*fxx(θ,t,ξ)[k,:,:] for k in 1:nx($T())))
-    Ro = :(luu(θ,t,ξ) + sum(λ[k]*fuu(θ,t,ξ)[k,:,:] for k in 1:nx($T())))
-    So = :(lxu(θ,t,ξ) + sum(λ[k]*fxu(θ,t,ξ)[k,:,:] for k in 1:nx($T())))
-
-    return quote
- 
-
-        # simply need dy/dt
-        # @build y_t (θ,t,ξ,ζ) begin
-        local y_t, y_t! = build(θ,t,ξ,ζ,λ) do θ,t,ξ,ζ,λ
-        
-            local z, v = split($T(),ζ)
-            vcat(
-
-                ($a)'*($z) + ($b)'*($v),
-                ($z)'*($Qo)*($z) + 2*($z)'*($So)*($v) + ($v)'*($Ro)*($v)
-            )
-        end
-        PRONTO.y_t(M::$T,θ,t,ξ,ζ,λ) = y_t(θ,t,ξ,ζ,λ)
-        PRONTO.y_t!(M::$T,buf,θ,t,ξ,ζ,λ) = y_t!(buf,θ,t,ξ,ζ,λ)
-
-
-        local Dh, Dh! = build(θ,t,φ,ζ,y) do θ,t,φ,ζ,y
-
-            local z, v = split($T(),ζ)
-            y[1] + (px(θ,t,φ))'*($z)
-        end
-        PRONTO._Dh(M::$T,θ,t,φ,ζ,y) = Dh(θ,t,φ,ζ,y)
-
-        local D2g, D2g! = build(θ,t,φ,ζ,y) do θ,t,φ,ζ,y
-
-            local z, v = split($T(),ζ)
-            y[2] + ($z)'*pxx(θ,t,φ)*($z)
-        end
-        PRONTO._D2g(M::$T,θ,t,φ,ζ,y) = D2g(θ,t,φ,ζ,y)
-    end
-end
-
-function _armijo(T)::Expr
-    Kr = :(Kr(θ,t,φ,Pr))
-    u = :(collect(u)) 
-    v = :(collect(v)) 
-    μ̂ = :(collect(μ̂))   
-    x = :(collect(x)) 
-    z = :(collect(z)) 
-    α̂ = :(collect(α̂))
-    return quote
-        
-        # φ̂ = ξ+γζ
-
-        # # projection with respect to γ
-        local φ̂_t, φ̂_t! = build(θ,t,ξ,φ,ζ,φ̂,γ,Pr) do θ,t,ξ,φ,ζ,φ̂,γ,Pr
-            
-            local α, μ = split($T(),φ)
-            local x, u = split($T(),ξ)
-            local z, v = split($T(),ζ)
-            local α̂, μ̂ = split($T(),φ̂)
-
-            return vcat(
-                f(θ,t,φ̂)...,
-                ($u + γ*$v) - ($Kr)*($α̂ - ($x + γ*$z)) - $μ̂...
-            )
-        end
-        PRONTO.φ̂_t(M::$T,θ,t,ξ,φ,ζ,φ̂,γ,Pr) = φ̂_t(θ,t,ξ,φ,ζ,φ̂,γ,Pr)
-        PRONTO.φ̂_t!(M::$T,buf,θ,t,ξ,φ,ζ,φ̂,γ,Pr) = φ̂_t!(buf,θ,t,ξ,φ,ζ,φ̂,γ,Pr)
- 
-
-        # cost function ode
-        local h_t, h_t! = build(θ,t,ξ) do θ,t,ξ
-
-            l(θ,t,ξ)
-        end
-        PRONTO.h_t(M::$T,θ,t,ξ) = h_t(θ,t,ξ)
-        PRONTO.h_t!(M::$T,buf,θ,t,ξ) = h_t!(buf,θ,t,ξ)
-    end
-end
 
 # ----------------------------------- ode solution handling ----------------------------------- #
 include("odes.jl")
 
 # ----------------------------------- main loop ----------------------------------- #
 
-Pr_ode(dPr,Pr,(M,θ,φ),t) = Pr_t!(M,dPr,θ,t,φ(t),Pr)
-ξ_ode(dξ,ξ,(M,θ,φ,Pr),t) = ξ_t!(M,dξ,θ,t,ξ,φ(t),Pr(t))
-λ_ode(dλ,λ,(M,θ,ξ,φ,Pr),t) = λ_t!(M,dλ,θ,t,ξ(t),φ(t),Pr(t),λ)
-Po1_ode(dPo,Po,(M,θ,ξ),t) = Po1_t!(M,dPo,θ,t,ξ(t),Po)
-Po2_ode(dPo,Po,(M,θ,ξ,λ),t) = Po2_t!(M,dPo,θ,t,ξ(t),λ(t),Po)
-ro1_ode(dro,ro,(M,θ,ξ,Po),t) = ro1_t!(M,dro,θ,t,ξ(t),Po(t),ro)
-ro2_ode(dro,ro,(M,θ,ξ,λ,Po),t) = ro2_t!(M,dro,θ,t,ξ(t),λ(t),Po(t),ro)
-ζ1_ode(dζ,ζ,(M,θ,ξ,Po,ro),t) = ζ1_t!(M,dζ,θ,t,ξ(t),ζ,Po(t),ro(t))
-ζ2_ode(dζ,ζ,(M,θ,ξ,λ,Po,ro),t) = ζ2_t!(M,dζ,θ,t,ξ(t),ζ,λ(t),Po(t),ro(t))
+Pr_ode(dPr,Pr,(M,θ,φ),t) = dPr_dt!(M,dPr,θ,t,φ(t),Pr)
+ξ_ode(dξ,ξ,(M,θ,φ,Pr),t) = dξ_dt!(M,dξ,θ,t,ξ,φ(t),Pr(t))
+λ_ode(dλ,λ,(M,θ,ξ,φ,Pr),t) = dλ_dt!(M,dλ,θ,t,ξ(t),φ(t),Pr(t),λ)
+Po_1_ode(dPo,Po,(M,θ,ξ),t) = dPo_dt_1!(M,dPo,θ,t,ξ(t),Po)
+Po_2_ode(dPo,Po,(M,θ,ξ,λ),t) = dPo_dt_2!(M,dPo,θ,t,ξ(t),λ(t),Po)
+ro_1_ode(dro,ro,(M,θ,ξ,Po),t) = dro_dt_1!(M,dro,θ,t,ξ(t),Po(t),ro)
+ro_2_ode(dro,ro,(M,θ,ξ,λ,Po),t) = dro_dt_2!(M,dro,θ,t,ξ(t),λ(t),Po(t),ro)
+ζ_1_ode(dζ,ζ,(M,θ,ξ,Po,ro),t) = dζ_dt_1!(M,dζ,θ,t,ξ(t),ζ,Po(t),ro(t))
+ζ_2_ode(dζ,ζ,(M,θ,ξ,λ,Po,ro),t) = dζ_dt_2!(M,dζ,θ,t,ξ(t),ζ,λ(t),Po(t),ro(t))
 #MAYBE: split y into ω and Ω
-y_ode(dy,y,(M,θ,ξ,ζ,λ),t) = y_t!(M,dy,θ,t,ξ(t),ζ(t),λ(t))
-h_ode(dh,h,(M,θ,ξ),t) = h_t!(M,dh,θ,t,ξ(t))
-φ̂_ode(dφ̂,φ̂,(M,θ,ξ,φ,ζ,γ,Pr),t) = φ̂_t!(M,dφ̂,θ,t,ξ(t),φ(t),ζ(t),φ̂,γ,Pr(t))
+y_ode(dy,y,(M,θ,ξ,ζ,λ),t) = dy_dt!(M,dy,θ,t,ξ(t),ζ(t),λ(t))
+h_ode(dh,h,(M,θ,ξ),t) = dh_dt!(M,dh,θ,t,ξ(t))
+φ̂_ode(dφ̂,φ̂,(M,θ,ξ,φ,ζ,γ,Pr),t) = dφ̂_dt!(M,dφ̂,θ,t,ξ(t),φ(t),ζ(t),φ̂,γ,Pr(t))
 
 # for debug:
 wait_for_key() = (print(stdout, "press a key..."); read(stdin, 1); nothing)
@@ -574,18 +346,18 @@ function pronto(M::Model{NX,NU,NΘ}, θ, t0, tf, x0, u0, φ; tol = 1e-5, maxiter
         ζ0 = [zeros(NX); zeros(NU)] # TODO: v(0) = vo(0)
 
         iinfo("trying 2nd order optimizer ... ")
-        Po = ODE(Po2_ode, Po_f, (tf,t0), (M,θ,ξ,λ), ODEBuffer{Tuple{NX,NX}}(); verbose=false, callback=cb)
+        Po = ODE(Po_2_ode, Po_f, (tf,t0), (M,θ,ξ,λ), ODEBuffer{Tuple{NX,NX}}(); verbose=false, callback=cb)
         if Po.sln.retcode == :Success
             iinfo("success\n")
             order = 2
-            ro = ODE(ro2_ode, ro_f, (tf,t0), (M,θ,ξ,λ,Po), ODEBuffer{Tuple{NX}}())
-            ζ = ODE(ζ2_ode, ζ0, (t0,tf), (M,θ,ξ,λ,Po,ro), ODEBuffer{Tuple{NX+NU}}(); dae=dae(M))
+            ro = ODE(ro_2_ode, ro_f, (tf,t0), (M,θ,ξ,λ,Po), ODEBuffer{Tuple{NX}}())
+            ζ = ODE(ζ_2_ode, ζ0, (t0,tf), (M,θ,ξ,λ,Po,ro), ODEBuffer{Tuple{NX+NU}}(); dae=dae(M))
         else
             iinfo("unstable, switching to 1st order\n")
             order = 1
-            Po = ODE(Po1_ode, Po_f, (tf,t0), (M,θ,ξ), ODEBuffer{Tuple{NX,NX}}())
-            ro = ODE(ro1_ode, ro_f, (tf,t0), (M,θ,ξ,Po), ODEBuffer{Tuple{NX}}())
-            ζ = ODE(ζ1_ode, ζ0, (t0,tf), (M,θ,ξ,Po,ro), ODEBuffer{Tuple{NX+NU}}(); dae=dae(M))
+            Po = ODE(Po_1_ode, Po_f, (tf,t0), (M,θ,ξ), ODEBuffer{Tuple{NX,NX}}())
+            ro = ODE(ro_1_ode, ro_f, (tf,t0), (M,θ,ξ,Po), ODEBuffer{Tuple{NX}}())
+            ζ = ODE(ζ_1_ode, ζ0, (t0,tf), (M,θ,ξ,Po,ro), ODEBuffer{Tuple{NX+NU}}(); dae=dae(M))
         end
 
 

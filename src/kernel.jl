@@ -16,12 +16,7 @@ end
 # turn :(fn) into :(fn!)
 _!(ex) = Symbol(String(ex)*"!")
 
-macro _!(ex)
-    # :($(Symbol(String(ex)*"!")))
-    # Symbol(String($ex)*"!")
-    :(Symbol(String($ex)*"!"))
-end
-
+# MAYBE: merge this into build
 # @define f (θ,t,ξ)
 macro define(fn, args)
     fn! = esc(_!(fn)) # generates :(fn!)
@@ -50,6 +45,7 @@ end
 
 # @define f(θ,t,ξ)
 
+# temporarily required
 @define f    (θ,t,ξ)
 @define fx   (θ,t,ξ)
 @define fu   (θ,t,ξ)
@@ -69,56 +65,34 @@ end
 @define pxx  (θ,t,ξ)
 
 @define Rr   (θ,t,φ)
-@define Qr   (θ,t,φ) 
+@define Qr   (θ,t,φ)
 
-@define Pr_t (θ,t,φ,Pr)
+@define dPr_dt (θ,t,φ,Pr)
 @define Kr   (θ,t,φ,Pr)
 
-@define ξ_t  (θ,t,ξ,φ,Pr)
+@define dξ_dt  (θ,t,ξ,φ,Pr)
 
-@define λ_t  (θ,t,ξ,φ,Pr,λ)
+@define dλ_dt  (θ,t,ξ,φ,Pr,λ)
 
-@define Ko1   (θ,t,ξ,Po) 
-@define Po1_t (θ,t,ξ,Po)
+@define Ko_1   (θ,t,ξ,Po) 
+@define dPo_dt_1 (θ,t,ξ,Po)
 
-@define Ko2   (θ,t,ξ,λ,Po) 
-@define Po2_t (θ,t,ξ,λ,Po)
+@define Ko_2   (θ,t,ξ,λ,Po) 
+@define dPo_dt_2 (θ,t,ξ,λ,Po)
 
-@define ro1_t  (θ,t,ξ,Po,ro)
-@define vo1   (θ,t,ξ,ro)
+@define dro_dt_1  (θ,t,ξ,Po,ro)
+@define vo_1   (θ,t,ξ,ro)
 
-@define ro2_t  (θ,t,ξ,λ,Po,ro)
-@define vo2   (θ,t,ξ,λ,ro)
+@define dro_dt_2  (θ,t,ξ,λ,Po,ro)
+@define vo_2   (θ,t,ξ,λ,ro)
 
-@define ζ1_t  (θ,t,ξ,ζ,Po,ro)
+@define dζ_dt_1  (θ,t,ξ,ζ,Po,ro)
 @define _v   (θ,t,ξ,ζ,Po,ro)
-@define ζ2_t  (θ,t,ξ,ζ,λ,Po,ro)
+@define dζ_dt_2  (θ,t,ξ,ζ,λ,Po,ro)
 
-@define y_t  (θ,t,ξ,ζ)
+@define dy_dt  (θ,t,ξ,ζ)
 @define _Dh  (θ,t,φ,ζ,y)
 @define _D2g (θ,t,φ,ζ,y)
 
-@define h_t  (θ,t,ξ)
-@define φ̂_t  (θ,t,ξ,φ,ζ,φ̂,γ,Pr)
-# cost derivatives...
-# @fndef y_t
-
-# the "actual" in-place functions used by PRONTO
-# f!(M::Model,buf,θ,t,ξ) = throw(ModelDefError(M, :f!))
-# Pr_t!(M::Model,buf,θ,t,φ,Pr) = throw(ModelDefError(M, :Pr_t!))
-# ξ_t!(M::Model,buf,θ,t,ξ,φ,P) = throw(ModelDefError(M, :ξ_t!))
-# λ_t!(M::Model,buf,θ,t,ξ,φ,Pr) = throw(ModelDefError(M, :λ_t!))
-# Po1_t!(M::Model,buf,θ,t,ξ,P) = throw(ModelDefError(M, :Po1_t!))
-# Po2_t!(M::Model,buf,θ,t,ξ,λ,P) = throw(ModelDefError(M, :Po2_t!))
-# ro1_t!(M::Model,buf,θ,t,ξ,Po) = throw(ModelDefError(M, :ro1_t!))
-# ro2_t!(M::Model,buf,θ,t,ξ,λ,Po) = throw(ModelDefError(M, :ro2_t!))
-# ζ1_t!(M::Model,buf,θ,t,ξ,ζ,Po,ro) = throw(ModelDefError(M, :ζ1_t!))
-# ζ2_t!(M::Model,buf,θ,t,ξ,ζ,λ,Po,ro) = throw(ModelDefError(M, :ζ2_t!))
-# y_t!(M::Model,buf,θ,t,ξ,ζ) = throw(ModelDefError(M, :y_t!))
-# h_t!(M::Model,buf,θ,t,ξ) = throw(ModelDefError(M, :h_t!))
-# φ̂_t!(M::Model,buf,θ,t,ξ,φ,ζ,φ̂,γ,Pr) = throw(ModelDefError(M, :φ̂_t!))
-# Ko!(M::Model,buf,θ,t,ξ,Po) = throw(ModelDefError(M, :Ko_t!))
-# FUTURE: for each function and signature, macro-define:
-# - default function f(M,...) = @error
-# - default inplace f!(M,buf,...) = @error
-# - symbolic generator symbolic(M,f)
+@define dh_dt  (θ,t,ξ)
+@define dφ̂_dt  (θ,t,ξ,φ,ζ,φ̂,γ,Pr)

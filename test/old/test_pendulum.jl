@@ -5,15 +5,21 @@ using StaticArrays
 using LinearAlgebra
 using MatrixEquations
 
-##
+
 NX = 2
 NU = 1
 NΘ = 0
 
 struct InvPend <: PRONTO.Model{NX,NU,0}
 end
-##
 
+#FUTURE:
+# @model InvPend NX NU NΘ begin
+#     ...
+# end
+
+
+##
 let
     g = 9.81
     L = 2
@@ -67,7 +73,7 @@ t0 = 0.0; tf = 10.0
 x_eq = zeros(nx(M))
 u_eq = zeros(nu(M))
 
-
+##
 φg = @closure t->ξf
 φ = guess_φ(M,θ,ξf,t0,tf,φg)
 ##
