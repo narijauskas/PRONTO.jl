@@ -12,7 +12,7 @@ NΘ = 0
 
 struct InvPend <: PRONTO.Model{NX,NU,0}
 end
-
+##
 
 let
     g = 9.81
@@ -72,3 +72,15 @@ u_eq = zeros(nu(M))
 φ = guess_φ(M,θ,ξf,t0,tf,φg)
 ##
 @time ξ = pronto(M,θ,t0,tf,x0,u0,φ; tol = 1e-8, maxiters=100)
+
+
+##
+@macroexpand PRONTO.@build InvPend (Qr(θ, t, ξ)->begin
+                #= c:\Users\mantas\code\PRONTO.jl\src\PRONTO.jl:323 =#
+                #= c:\Users\mantas\code\PRONTO.jl\src\PRONTO.jl:325 =#
+                local (x, u) = split(InvPend(), ξ)
+                #= c:\Users\mantas\code\PRONTO.jl\src\PRONTO.jl:326 =#
+                (esc(:Qr))(θ, t, x, u)
+            end)
+    #= c:\Users\mantas\code\PRONTO.jl\src\PRONTO.jl:330 =#
+    #= c:\Users\mantas\code\PRONTO.jl\src\PRONTO.jl:330 =# 

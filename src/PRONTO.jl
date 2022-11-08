@@ -89,7 +89,6 @@ nθ(::Model{NX,NU,NΘ}) where {NX,NU,NΘ} = NΘ
 # ----------------------------------- symbolics & autodiff ----------------------------------- #
 
 
-
 function build(f, args...)
 
     f_sym = collect(Base.invokelatest(f, args...))
@@ -165,7 +164,7 @@ function _symbolics(T)::Expr
         @variables ro[1:nx($T())]
         @variables λ[1:nx($T())]
         @variables γ
-        @variables y[1:2]
+        @variables y[1:2] #YO: can we separate these into scalar Dh/D2g?
         @variables h #MAYBE: rename j or J?
 
         # create Jacobian operators
@@ -201,7 +200,7 @@ function _dynamics(T)::Expr
         PRONTO.fxx(M::$T,θ,t,ξ) = fxx(θ,t,ξ) # NX,NX,NX
         PRONTO.fxu(M::$T,θ,t,ξ) = fxu(θ,t,ξ) # NX,NX,NU
         PRONTO.fuu(M::$T,θ,t,ξ) = fuu(θ,t,ξ) # NX,NU,NU
-        PRONTO.f!(M::$T,buf,θ,t,ξ) = f!(buf,θ,t,ξ) #NX
+        PRONTO.f!(M::$T,buf,θ,t,ξ) = f!(buf,θ,t,ξ) # NX
     end
 end
 
@@ -254,43 +253,137 @@ function _terminal_cost(T)::Expr
     end
 end
 
+
+# @build Kr(M,θ,t,ξ,φ,Pr) -> inv($Rr)*(($Br)'*$Pr)
+macro build(T, ex)
+
+    # extract function name and arguments
+    _fn = ex.args[1].args[1]
+    _fn! = _!(_fn) # generates :(fn!)
+    fn = esc(_fn)
+    fn! = esc(_fn!)
+    # first arg is name, second is M
+    args = esc.(ex.args[1].args[3:end])
+    def = ex.args[2]
+    # T = esc(_T)
+
+    return quote
+        # symbolically generate local definitions for fn/fn!
+        local $_fn, $_fn! = build($(args...)) do $(args...)
+            $def
+        end
+
+        # define PRONTO.fn(M, args...) = local fn(args...)
+        function ($fn)(M::$T, $(args...))
+            ($_fn)($(args...))
+        end
+
+        # define PRONTO.fn!(M, buf, args...) = local fn!(buf, args...)
+        function ($fn!)(M::$T, buf, $(args...))
+            ($_fn!)(buf, $(args...))
+        end
+    end
+
+end
+
+
+
+
+#NOTE: to understand where this comes from, try:
+# ex = :(Kr(θ,t,ξ,φ,Pr) -> inv(Rr)*((Br)'*Pr))
+# dump(ex)
+# ex.args[1].args[2:end]
+
+
+# @build InvPend (Kr(θ, t, ξ, φ, Pr)->begin
+#                 #= c:\Users\mantas\code\PRONTO.jl\src\PRONTO.jl:342 =#
+#                 inv(Rr(θ, t, φ)) * ((fu(θ, t, φ))' * collect(Pr))
+#             end)
+
+
+# local Kr,Kr! = build(θ,t,φ,Pr) do θ,t,φ,Pr
+
+#     inv(Rr(θ,t,φ))*(fu(θ,t,φ)'*@vec(Pr))
+# end
+# PRONTO.Kr(M::$T,θ,t,φ,Pr) = Kr(θ,t,φ,Pr) # NU,NX
+
+
+
 function _regulator(T)::Expr
+    
+    T = esc(T)
+    M = :($T())
+    Rr = :(Rr(θ,t,φ))
+    Ar = :(fx(θ,t,φ))
+    Br = :(fu(θ,t,φ))
+    Pr = :(collect(Pr))
+    Rr = :(Rr($M,θ,t,φ))
+    Qr = :(Qr($M,θ,t,φ))
+    Kr = :(Kr($M,θ,t,φ,Pr))
+    user_Qr = esc(esc(:Qr))
+    user_Rr = esc(esc(:Rr))
+    # T = :(Main.($T))
 
     return quote
 
-        # load user functions remapping (x,u)->ξ
-        local Qr,Qr! = build(θ,t,ξ) do θ,t,ξ
+        @build $T Qr(θ,t,ξ) -> begin
 
-            local x,u = split($T(),ξ)
-            # ($user_Qr)(θ,t,x,u)
-            ($(esc(:(Qr))))(θ,t,x,u)
-
+            local x,u = split(($T)(),ξ)
+            ($user_Qr)(θ,t,x,u)
+            # ($(esc(:(Qr))))(θ,t,x,u)
         end
-        local Rr,Rr! = build(θ,t,ξ) do θ,t,ξ
+        # $T = Main.($T)
 
-            local x,u = split($T(),ξ)
-            ($(esc(:(Rr))))(θ,t,x,u)
-        end
+        @build $T Rr(θ,t,ξ) -> begin
 
-        #Kr = Rr\(Br'Pr)
-        local Kr,Kr! = build(θ,t,φ,Pr) do θ,t,φ,Pr
-
-            inv(Rr(θ,t,φ))*(fu(θ,t,φ)'*@vec(Pr))
+            local x,u = split(($T)(),ξ)
+            ($user_Rr)(θ,t,x,u)
+            # ($(esc(:(Rr))))(θ,t,x,u)
         end
 
-        local Pr_t,Pr_t! = build(θ,t,φ,Pr) do θ,t,φ,Pr
-
-            riccati(fx(θ,t,φ), Kr(θ,t,φ,Pr), @vec(Pr), Qr(θ,t,φ), Rr(θ,t,φ))
-        end
-
-        # add definitions to PRONTO
-        PRONTO.Kr(M::$T,θ,t,φ,Pr) = Kr(θ,t,φ,Pr) # NU,NX
-        PRONTO.Qr(M::$T,θ,t,φ) = Qr(θ,t,φ)
-        PRONTO.Rr(M::$T,θ,t,φ) = Rr(θ,t,φ)
-        PRONTO.Pr_t(M::$T,θ,t,φ,Pr) = Pr_t(θ,t,φ,Pr) # NX,NX
-        PRONTO.Pr_t!(M::$T,buf,θ,t,φ,Pr) = Pr_t!(buf,θ,t,φ,Pr) # NX,NX    
+        # @build $T dPr_dt()
+        @build $T Kr(M,θ,t,φ,Pr) -> inv($Rr)*(($Br)'*$Pr)
+        @build $T Pr_t(M,θ,t,φ,Pr) -> riccati($Ar,$Kr,$Pr,$Qr,$Rr)
     end    
 end
+
+# function _regulator(T)::Expr
+
+#     return quote
+
+#         # load user functions remapping (x,u)->ξ
+#         local Qr,Qr! = build(θ,t,ξ) do θ,t,ξ
+
+#             local x,u = split($T(),ξ)
+#             # ($user_Qr)(θ,t,x,u)
+#             ($(esc(:(Qr))))(θ,t,x,u)
+
+#         end
+#         local Rr,Rr! = build(θ,t,ξ) do θ,t,ξ
+
+#             local x,u = split($T(),ξ)
+#             ($(esc(:(Rr))))(θ,t,x,u)
+#         end
+
+#         #Kr = Rr\(Br'Pr)
+#         local Kr,Kr! = build(θ,t,φ,Pr) do θ,t,φ,Pr
+
+#             inv(Rr(θ,t,φ))*(fu(θ,t,φ)'*@vec(Pr))
+#         end
+
+#         local Pr_t,Pr_t! = build(θ,t,φ,Pr) do θ,t,φ,Pr
+
+#             riccati(fx(θ,t,φ), Kr(θ,t,φ,Pr), @vec(Pr), Qr(θ,t,φ), Rr(θ,t,φ))
+#         end
+
+#         # add definitions to PRONTO
+#         PRONTO.Kr(M::$T,θ,t,φ,Pr) = Kr(θ,t,φ,Pr) # NU,NX
+#         PRONTO.Qr(M::$T,θ,t,φ) = Qr(θ,t,φ)
+#         PRONTO.Rr(M::$T,θ,t,φ) = Rr(θ,t,φ)
+#         PRONTO.Pr_t(M::$T,θ,t,φ,Pr) = Pr_t(θ,t,φ,Pr) # NX,NX
+#         PRONTO.Pr_t!(M::$T,buf,θ,t,φ,Pr) = Pr_t!(buf,θ,t,φ,Pr) # NX,NX    
+#     end    
+# end
 
 function _projection(T)::Expr
 
@@ -586,6 +679,7 @@ macro derive(T)
         iinfo("regulator solver ... "); @tick
         $(_regulator(T)); @tock; println(@clock)
 
+        #=
         iinfo("projection solver ... "); @tick
         $(_projection(T)); @tock; println(@clock)
         
@@ -603,7 +697,7 @@ macro derive(T)
         
         iinfo("armijo rule ... "); @tick
         $(_armijo(T)); @tock; println(@clock)
-
+        =#
         @tock derive_time
         info("model derivation completed in $(@clock derive_time)\n")
     end
