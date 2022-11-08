@@ -36,16 +36,7 @@ let
     Rr = (θ,t,x,u) -> diagm([1e-3])
     Qr = (θ,t,x,u) -> diagm([10, 1])
     
-
-    # x_eq = zeros(nx(M))
-    # u_eq = zeros(nu(M))
-    
-    # global fx,fu,lxx,luu,lxu
-    # global lxx,luu,lxu
-    # global P
-    # PT,_ = arec(Ar(T), Br(T)*iRr(T)*Br(T)', Qr(T))
     p = (θ,t,x,u) -> begin
-        # ξ_eq = vcat(x_eq,u_eq)
         # P,_ = arec(fx(θ,t,ξ_eq), fu(θ,t,ξ_eq)*inv(Rr(θ,t,x_eq,u_eq))*fu(θ,t,ξ_eq)', Qr(θ,t,x_eq,u_eq))
         # P,_ = arec(fx(θ,t,ξ_eq), fu(θ,t,ξ_eq), luu(θ,t,ξ_eq), lxx(θ,t,ξ_eq), lxu(θ,t,ξ_eq))
         P = [
@@ -70,23 +61,9 @@ u0 = [0.0]
 ξf = [0;0;0]
 t0 = 0.0; tf = 10.0
 
-x_eq = zeros(nx(M))
-u_eq = zeros(nu(M))
 
 ##
 φg = @closure t->ξf
 φ = guess_φ(M,θ,ξf,t0,tf,φg)
 ##
 @time ξ = pronto(M,θ,t0,tf,x0,u0,φ; tol = 1e-8, maxiters=100)
-
-
-##
-@macroexpand PRONTO.@build InvPend (Qr(θ, t, ξ)->begin
-                #= c:\Users\mantas\code\PRONTO.jl\src\PRONTO.jl:323 =#
-                #= c:\Users\mantas\code\PRONTO.jl\src\PRONTO.jl:325 =#
-                local (x, u) = split(InvPend(), ξ)
-                #= c:\Users\mantas\code\PRONTO.jl\src\PRONTO.jl:326 =#
-                (esc(:Qr))(θ, t, x, u)
-            end)
-    #= c:\Users\mantas\code\PRONTO.jl\src\PRONTO.jl:330 =#
-    #= c:\Users\mantas\code\PRONTO.jl\src\PRONTO.jl:330 =# 
