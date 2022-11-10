@@ -97,7 +97,7 @@ function _derive(T)::Expr
             $μ - $Kr*($x-$α) - $u...
         )
         @tock; println(@clock)
-
+        #=
         iinfo("lagrangian ... "); @tick
         @build $T dλ_dt(M,θ,t,ξ,φ,Pr,λ) -> -($A - $B*$Kr)'*$λ - $a + ($Kr)'*$b
         @tock; println(@clock)
@@ -160,6 +160,7 @@ function _derive(T)::Expr
         )
         @build $T dh_dt(M,θ,t,ξ) -> PRONTO.l($M,θ,t,ξ)
         @tock; println(@clock)
+        =#
     end    
 end
 
