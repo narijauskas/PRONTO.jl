@@ -191,7 +191,7 @@ function _dynamics(T)::Expr
         # derive models
         local fx,fx! = Jx(f,θ,t,ξ)
         local fu,fu! = Ju(f,θ,t,ξ)
-        local fxx,fxx! = Jx(fx,θ,t,ξ)
+        local fxx,fxx! = Jx(fx,θ,t,ξ; force_dims=(nx($T()),nx($T()),nx($T())))
         local fxu,fxu! = Ju(fx,θ,t,ξ)
         local fuu,fuu! = Ju(fu,θ,t,ξ)
 
@@ -424,5 +424,37 @@ end
 include("kernel.jl")
 # helpers for finding guess trajectories
 include("guess.jl")
+
+
+# temporary debugging helpers
+
+function _Qo_2(M)
+    # create symbolic variables
+    @variables θ[1:nθ(M)]
+    @variables t
+    @variables x[1:nx(M)] 
+    @variables u[1:nu(M)]
+    ξ = vcat(x,u)
+    @variables α[1:nx(M)] 
+    @variables μ[1:nu(M)]
+    φ = vcat(α,μ)
+    @variables z[1:nx(M)] 
+    @variables v[1:nu(M)]
+    ζ = vcat(z,v)
+    @variables α̂[1:nx(M)] 
+    @variables μ̂[1:nu(M)]
+    φ̂ = vcat(α̂,μ̂)
+    @variables Pr[1:nx(M),1:nx(M)]
+    @variables Po[1:nx(M),1:nx(M)]
+    @variables ro[1:nx(M)]
+    @variables λ[1:nx(M)]
+    @variables γ
+    @variables y[1:2] #YO: can we separate these into scalar Dh/D2g?
+    @variables h #MAYBE: rename j or J?
+
+    lxx(M,θ,t,ξ) + sum(λ[k].*fxx(M,θ,t,ξ)[k,:,:] for k in 1:nx(M))
+end
+
+
 
 end # module

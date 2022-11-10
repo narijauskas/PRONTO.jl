@@ -10,55 +10,83 @@ NX = 22
 NU = 1
 NΘ = 0
 
-struct InvPend <: PRONTO.Model{NX,NU,NΘ}
+struct Split <: PRONTO.Model{NX,NU,NΘ}
+end
+
+function mprod(x)
+    Re = I(2)  
+    Im = [0 -1;
+           1 0]   
+    M = kron(Re,real(x)) + kron(Im,imag(x));
+    return M   
+end
+
+function inprod(x)
+    a = x[1:Int(NX/2)]
+    b = x[(Int(NX/2)+1):(2*Int(NX/2))]
+    P = [a*a'+b*b' -(a*b'+b*a');
+         a*b'+b*a' a*a'+b*b']
+    return P
 end
 
 
 ##
 let
-    g = 9.81
-    L = 2
+    N = 5
+    n = 2*N+1
+    α = 10
+    ω = 0.5
 
-    f = (θ,t,x,u) -> [
-        x[2],
-        g/L*sin(x[1])-u[1]*cos(x[1])/L
-    ]
+    H = zeros(n,n)
+    for i = 1:n
+        H[i,i] = 4*(i-N-1)^2
+    end
+    v = -α/4 * ones(n-1)
+
+    H0 = H + Bidiagonal(zeros(n), v, :U) + Bidiagonal(zeros(n), v, :L)
+    H1 = Bidiagonal(zeros(n), -v*1im, :U) + Bidiagonal(zeros(n), v*1im, :L)
+    H2 = Bidiagonal(zeros(n), -v, :U) + Bidiagonal(zeros(n), -v, :L)
+
+    nu = eigvecs(H0)
+
+    nu1 = nu[:,1]
+    nu2 = nu[:,2]
+    global x0 = [nu1;0*nu1]
+    global xf = [nu2;0*nu2]
+
+    f = (θ,t,x,u) -> collect(mprod(-1im*ω*(H0 + sin(u[1])*H1 + (1-cos(u[1]))*H2))*x)
     
-    Ql = I
+    Ql = zeros(2*n,2*n)
     Rl = I
     l = (θ,t,x,u) -> 1/2*collect(x)'*Ql*collect(x) + 1/2*collect(u)'*Rl*collect(u)
     
-    Rr = (θ,t,x,u) -> diagm([1e-3])
-    Qr = (θ,t,x,u) -> diagm([10, 1])
+    Rr = (θ,t,x,u) -> diagm(ones(1))
+    Qr = (θ,t,x,u) -> diagm(ones(2*n))
     
     p = (θ,t,x,u) -> begin
-        # P,_ = arec(fx(θ,t,ξ_eq), fu(θ,t,ξ_eq)*inv(Rr(θ,t,x_eq,u_eq))*fu(θ,t,ξ_eq)', Qr(θ,t,x_eq,u_eq))
-        # P,_ = arec(fx(θ,t,ξ_eq), fu(θ,t,ξ_eq), luu(θ,t,ξ_eq), lxx(θ,t,ξ_eq), lxu(θ,t,ξ_eq))
-        P = [
-            88.0233 39.3414;
-            39.3414 17.8531;
-        ]
+        P = I(2*n) - inprod(xf)
         1/2*collect(x)'*P*collect(x)
     end
 
-    @derive InvPend
+
+    @derive Split
 end
 
 
 
 ##
 
-M = InvPend()
+M = Split()
 θ = Float64[]
-x0 = [2π/3;0]
+# x0 = [2π/3;0]
 u0 = [0.0]
 ξ0 = [x0;u0]
-ξf = [0;0;0]
+# ξf = [0;0;0]
 t0 = 0.0; tf = 10.0
 
 
 ##
-φg = @closure t->ξf
+φg = @closure t->ξ0
 φ = guess_φ(M,θ,ξf,t0,tf,φg)
 ##
 @time ξ = pronto(M,θ,t0,tf,x0,u0,φ; tol = 1e-8, maxiters=100)
