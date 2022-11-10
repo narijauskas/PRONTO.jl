@@ -69,6 +69,7 @@ function _derive(T)::Expr
     Qo_1 = :(PRONTO.lxx($M,θ,t,ξ))
     Ro_1 = :(PRONTO.luu($M,θ,t,ξ))
     So_1 = :(PRONTO.lxu($M,θ,t,ξ))
+    #TODO: create convenience access for these
     Qo_2 = :(PRONTO.lxx($M,θ,t,ξ) + sum(λ[k]*PRONTO.fxx($M,θ,t,ξ)[k,:,:] for k in 1:nx($M)))
     Ro_2 = :(PRONTO.luu($M,θ,t,ξ) + sum(λ[k]*PRONTO.fuu($M,θ,t,ξ)[k,:,:] for k in 1:nx($M)))
     So_2 = :(PRONTO.lxu($M,θ,t,ξ) + sum(λ[k]*PRONTO.fxu($M,θ,t,ξ)[k,:,:] for k in 1:nx($M)))

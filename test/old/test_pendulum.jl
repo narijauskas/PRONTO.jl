@@ -67,3 +67,6 @@ t0 = 0.0; tf = 10.0
 φ = guess_φ(M,θ,ξf,t0,tf,φg)
 ##
 @time ξ = pronto(M,θ,t0,tf,x0,u0,φ; tol = 1e-8, maxiters=100)
+
+
+##

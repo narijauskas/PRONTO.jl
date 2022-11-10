@@ -1,9 +1,48 @@
+# φ = guess_ol(M,θ,t0,tf,x0,ug) # where ug is a function of t
+# φ = guess_zi(M,θ,t0,tf,xg) # where xg is a function of t
+# xg = smooth(x0,xf,T) # returns a closure for a smooth function from x0->xf
+# φ = guess_cl(M,θ,t0,tf,φg) # where φg is a function of t
+
+#= #TODO: finish
+
+# generate the open-loop trajectory of the system M with parameters θ from x0 at t0 until tf
+function guess_ol(M,θ,t0,tf,x0,ug)
+end
+
+
+# generate the zero-input trajectory of the system M with parameters θ from t0 until tf
+function guess_zi(M,θ,t0,tf,xg)
+    # ug = t->0
+    # solve ol
+end
+
+
+# generate a smooth curve from x0 to xf, then simulate a regulated zero-input response around it
+function guess_φ()
+    # make φg
+    # build regulator
+    # simulate projection
+end
+
+
+=#
+
+
+
+#MAYBE:
+# visualize(φ) # plot φ where φ is an ODE object or a closure (t)->(...)
+
+
+
+
+
+
 
 #MAYBE: convert to ξ0?
 function guess_zi(M::Model{NX,NU,NΘ},θ,x0,u0,t0,tf) where {NX,NU,NΘ}
-    ODE(zi_dyn!, [x0;u0], (t0,tf), (M,θ), ODEBuffer{Tuple{NX+NU}}(); dae=dae(M))
+    ODE(ol_ode, [x0;u0], (t0,tf), (M,θ), ODEBuffer{Tuple{NX+NU}}(); dae=dae(M))
 end
-function zi_dyn!(dξ,ξ,(M,θ),t)
+function ol_ode(dξ,ξ,(M,θ),t)
     dx = @view dξ[1:nx(M)]
     du = @view dξ[(nx(M)+1):end]
     # x = @view ξ[1:nx(M)]
