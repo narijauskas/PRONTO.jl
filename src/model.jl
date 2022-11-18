@@ -101,6 +101,7 @@ macro model(T, ex)
     M = Expr[]
     # define model type
     push!(M, striplines(:(struct $T <: PRONTO.Model{$NX,$NU,$NΘ} end)))
+    push!(M, striplines(:(export $T)))
 
     # create symbolic variables & operators
     @variables x[1:NX] u[1:NU] θ[1:NΘ] t
@@ -240,7 +241,7 @@ end
 #         end
 #     end
 # end
-
+#=
 
 # derivatives:
 # base
@@ -395,3 +396,4 @@ function _symbolics(T)::Expr
         Jx,Ju = Jacobian.([x,u])
     end
 end
+=#

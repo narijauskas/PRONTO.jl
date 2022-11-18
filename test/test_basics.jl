@@ -1,6 +1,7 @@
 using PRONTO
 
-@model TwoSpinP2 begin
+@model TwoSpinP begin
+    using SparseArrays
     NX = 4; NU = 1; NΘ = 1
 
     # model dynamics
