@@ -4,6 +4,7 @@ using FunctionWrappers
 using FunctionWrappers: FunctionWrapper
 using StaticArrays
 using FastClosures
+export @closure
 using LinearAlgebra
 using UnicodePlots
 using MacroTools
@@ -88,6 +89,7 @@ include("odes.jl")
 
 # ----------------------------------- PRONTO loop ----------------------------------- #
 
-
+# ----------------------------------- guess functions ----------------------------------- #
+include("guess.jl")
 
 end

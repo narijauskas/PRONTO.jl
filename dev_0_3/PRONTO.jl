@@ -99,19 +99,19 @@ end
 
 function jacobian(dx, f, args...; force_dims=nothing)
 
-    f_sym = collect(Base.invokelatest(f, args...))
+    f_sym = Base.invokelatest(f, args...) # is collect actually needed?
     
     # generate symbolic derivatives
     jac_sym = map(1:length(dx)) do i
 
-        map(f_sym) do f
+        map(collect(f_sym)) do f
 
             derivative(f, dx[i])
         end
     end
 
     # reshape/concatenate
-    fx_sym = cat(jac_sym...; dims=ndims(f_sym)+1)
+    fx_sym = cat(jac_sym...; dims=ndims(f_sym)+1) #ndims = 0 for scalar-valued l,p
     isnothing(force_dims) || (fx_sym = reshape(fx_sym, force_dims...))
     # symbolic
     fx_ex = build_function(fx_sym, args...)
