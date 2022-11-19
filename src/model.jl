@@ -62,6 +62,8 @@ end
 @define p    (θ,t,ξ)
 @define px   (θ,t,ξ)
 @define pxx  (θ,t,ξ)
+@define Qr   (θ,t,ξ)
+@define Rr   (θ,t,ξ)
 
 #TODO: macro
 # f(M::Model,θ,t,ξ) = throw(ModelDefError(M,nameof(f)))
@@ -111,7 +113,7 @@ end
 # isnothing(force_dims) || (fx_sym = reshape(fx_sym, force_dims...))
 
 macro model(T, ex)
-    info("deriving a new model for $T")
+    info("deriving a new model for $(as_bold(T))")
 
     # evaluate user-specified code sandboxed inside a module
     mod = eval(:(module $(gensym()) $ex end))
@@ -126,16 +128,20 @@ macro model(T, ex)
     push!(M, striplines(:(struct $T <: PRONTO.Model{$NX,$NU,$NΘ} end)))
     push!(M, striplines(:(export $T))) # make it available in Main
 
-    iinfo("initializing symbolics $mod\n")
+    iinfo("initializing symbolics\n")
     # create symbolic variables & operators
     @variables x[1:NX] u[1:NU] θ[1:NΘ] t
     ξ = vcat(x,u)
     Jx,Ju = Jacobian.([x,u])
 
     # trace user expression with symbolic variables
+    iinfo("tracing model\n")
     local f = collect(invokelatest(mod.f, collect(θ), t, collect(x), collect(u)))
     local l = collect(invokelatest(mod.l, collect(θ), t, collect(x), collect(u)))
     local p = collect(invokelatest(mod.p, collect(θ), t, collect(x), collect(u)))
+    local Qr = collect(invokelatest(mod.Qr, collect(θ), t, collect(x), collect(u)))
+    local Rr = collect(invokelatest(mod.Rr, collect(θ), t, collect(x), collect(u)))
+
 
     # generate method definitions for PRONTO functions
     iinfo("differentiating model dynamics\n")
@@ -159,13 +165,17 @@ macro model(T, ex)
     build_defs!(M, :px, T, (θ, t, ξ), p |> Jx |> px->reshape(px,NX))
     build_defs!(M, :pxx, T, (θ, t, ξ), p |> Jx |> px->reshape(px,NX) |> Jx)
 
+    iinfo("building regulator functions\n")
+    build_defs!(M, :Qr, T, (θ, t, ξ), Qr)
+    build_defs!(M, :Rr, T, (θ, t, ξ), Rr)
+
     fname = tempname()*"_$T.jl"
     hdr = "#= this file was machine generated at $(now()) - DO NOT MODIFY =#\n\n"
     write(fname, hdr*prod(string.(M).*"\n\n"))
     info("model defined at $fname")
     quote
         include($fname)
-        info("$($T) model available")
+        info("$(as_bold($T)) model available")
     end
 end
 

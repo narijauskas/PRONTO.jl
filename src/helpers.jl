@@ -4,7 +4,8 @@ using Crayons
 as_tag(str) = as_tag(crayon"default", str)
 as_tag(c::Crayon, str) = as_color(c, as_bold("[$str: "))
 as_color(c::Crayon, str) = "$c" * str * "$(crayon"default")"
-as_bold(str) = "$(crayon"bold")" * str * "$(crayon"!bold")"
+as_bold(ex) = as_bold(string(ex))
+as_bold(str::String) = "$(crayon"bold")" * str * "$(crayon"!bold")"
 clearln() = print("\e[2K","\e[1G")
 
 info(str) = println(as_tag(crayon"magenta","PRONTO"), str)

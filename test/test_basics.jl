@@ -2,6 +2,7 @@ using PRONTO
 
 @model TwoSpinP begin
     NX = 4; NU = 1; NΘ = 1
+    using LinearAlgebra: diagm
 
     # model dynamics
     H0 = [0 0 1 0;0 0 0 -1;-1 0 0 0;0 1 0 0]
@@ -16,6 +17,10 @@ using PRONTO
     # terminal cost
     Pl = [0 0 0 0;0 1 0 0;0 0 0 0;0 0 0 1]
     p(θ,t,x,u) = 1/2*x'*Pl*x
+
+    # regulator matrices
+    Rr(θ,t,x,u) = diagm([1])*θ[1]
+    Qr(θ,t,x,u) = diagm([1,1,1,1])
 end
 #
 
@@ -29,6 +34,10 @@ u0 = [0.0]
 ug = @closure t -> u0
 
 φg = PRONTO.guess_ol(M,θ,t0,tf,x0,ug)
+
+##
+
+
 
 mod = PRONTO.@test1 begin
     H0 = [0 0 1 0;0 0 0 -1;-1 0 0 0;0 1 0 0]
