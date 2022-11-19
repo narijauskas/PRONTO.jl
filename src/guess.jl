@@ -17,8 +17,8 @@ end
 
 
 # generate the open-loop trajectory of the system M with parameters θ from x0 at t0 until tf
-function guess_ol(M,θ,t0,tf,x0,ug)
-    ODE(ol_ode, [x0;u0], (t0,tf), (M,θ), Buffer{Tuple{NX+NU}}(); dae=dae(M))
+function guess_ol(M::Model{NX,NU,NΘ},θ,t0,tf,x0,ug) where {NX,NU,NΘ}
+    ODE(ol_ode, [x0;ug(t0)], (t0,tf), (M,θ), Buffer{Tuple{NX+NU}}(); dae=dae(M))
 end
 
 

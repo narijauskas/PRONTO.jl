@@ -1,7 +1,6 @@
 using PRONTO
 
 @model TwoSpinP begin
-    using SparseArrays
     NX = 4; NU = 1; NΘ = 1
 
     # model dynamics
@@ -13,8 +12,12 @@ using PRONTO
     Ql = zeros(NX,NX)
     Rl = [0.01]
     l(θ,t,x,u) = 1/2*x'*Ql*x .+ 1/2*u'*Rl*u
-end
 
+    # terminal cost
+    Pl = [0 0 0 0;0 1 0 0;0 0 0 0;0 0 0 1]
+    p(θ,t,x,u) = 1/2*x'*Pl*x
+end
+#
 
 M = TwoSpinP()
 θ = [1.0]
@@ -25,7 +28,7 @@ xf = [1.0;0.0;0.0;0.0]
 u0 = [0.0]
 ug = @closure t -> u0
 
-φg = guess_ol(M,θ,t0,tf,x0,ug)
+φg = PRONTO.guess_ol(M,θ,t0,tf,x0,ug)
 
 mod = PRONTO.@test1 begin
     H0 = [0 0 1 0;0 0 0 -1;-1 0 0 0;0 1 0 0]

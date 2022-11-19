@@ -5,7 +5,9 @@ using FunctionWrappers: FunctionWrapper
 using StaticArrays
 using FastClosures
 export @closure
+
 # using LinearAlgebra # don't import lu
+using LinearAlgebra: diagm
 using UnicodePlots
 using MacroTools
 using SparseArrays
