@@ -62,8 +62,8 @@ end
 @define p    (θ,t,ξ)
 @define px   (θ,t,ξ)
 @define pxx  (θ,t,ξ)
-@define Qr   (θ,t,ξ)
-@define Rr   (θ,t,ξ)
+@define Qrr   (θ,t,ξ)
+@define Rrr   (θ,t,ξ)
 
 #TODO: macro
 # f(M::Model,θ,t,ξ) = throw(ModelDefError(M,nameof(f)))
@@ -96,6 +96,53 @@ end
 # px!(M::Model,θ,t,ξ) = throw(ModelDefError(M,nameof(px!)))
 # pxx(M::Model,θ,t,ξ) = throw(ModelDefError(M,nameof(pxx)))
 # pxx!(M::Model,θ,t,ξ) = throw(ModelDefError(M,nameof(pxx!)))
+# struct Yeet2  <: Model{22,1,0}
+#     Ar::MMatrix{NX,NX,Float64,NX*NX}
+#     Br::MMatrix{NX,NU,Float64,NX*NU}
+# end
+
+# function Yeet2(#=future θ=#)
+#     Yeet2(MMatrix())
+# end
+
+# $build_buf(:Ar, NX, NX)
+function buffer_def(name, dims...)
+    :($name::MArray{Tuple{$(dims...)},Float64,$(length(dims)),$(prod(dims))})
+    # if 0 == length(dims)
+    #     :($name::MArray{Tuple{$(dims...)},Float64,$(length(dims))})
+    # else
+    # end
+end
+function buffer_init(name, dims...)
+    :(zeros(MArray{Tuple{$(dims...)},Float64}))
+end
+function type_def(T,NX,NU,NΘ)
+    # buffers = Dict
+    ex = quote
+        export $T
+        struct $T <: PRONTO.Model{$NX,$NU,$NΘ}
+            $(buffer_def(:θ, NΘ))
+            $(buffer_def(:Ar, NX, NX))
+            $(buffer_def(:Br, NX, NU))
+            $(buffer_def(:Qr, NX, NX))
+            $(buffer_def(:Rr, NU, NU))
+            $(buffer_def(:Kr, NU, NX))
+        end
+        function $T()
+            $T(
+                $(buffer_init(:θ, NΘ)),
+                $(buffer_init(:Ar, NX, NX)),
+                $(buffer_init(:Br, NX, NU)),
+                $(buffer_init(:Qr, NX, NX)),
+                $(buffer_init(:Rr, NU, NU)),
+                $(buffer_init(:Kr, NU, NX))
+            )
+        end
+    end
+    striplines(ex).args
+end
+
+
 
 
 # eg. Jx = Jacobian(x); fx_sym = Jx(f_sym)
@@ -112,21 +159,22 @@ function (J::Jacobian)(f_sym)
 end
 # isnothing(force_dims) || (fx_sym = reshape(fx_sym, force_dims...))
 
-macro model(T, ex)
+function model(T, ex)
     info("deriving a new model for $(as_bold(T))")
 
     # evaluate user-specified code sandboxed inside a module
-    mod = eval(:(module $(gensym()) $ex end))
-    iinfo("model evaluated to $mod\n")
+    mdl = eval(:(module $(gensym()) $ex end))
+    iinfo("model evaluated to $mdl\n")
 
     # extract dimensions
-    NX = mod.NX; NU = mod.NU; NΘ = mod.NΘ
+    NX = mdl.NX; NU = mdl.NU; NΘ = mdl.NΘ
 
     # goal: build a set of expressions describing the user model to PRONTO
     M = Expr[]
     # define model type
-    push!(M, striplines(:(struct $T <: PRONTO.Model{$NX,$NU,$NΘ} end)))
-    push!(M, striplines(:(export $T))) # make it available in Main
+    # push!(M, striplines(:(struct $T <: PRONTO.Model{$NX,$NU,$NΘ} end)))
+    # push!(M, striplines(:(export $T))) # make it available in Main
+    append!(M, type_def(T,NX,NU,NΘ))
 
     iinfo("initializing symbolics\n")
     # create symbolic variables & operators
@@ -136,21 +184,21 @@ macro model(T, ex)
 
     # trace user expression with symbolic variables
     iinfo("tracing model\n")
-    local f = collect(invokelatest(mod.f, collect(θ), t, collect(x), collect(u)))
-    local l = collect(invokelatest(mod.l, collect(θ), t, collect(x), collect(u)))
-    local p = collect(invokelatest(mod.p, collect(θ), t, collect(x), collect(u)))
-    local Qr = collect(invokelatest(mod.Qr, collect(θ), t, collect(x), collect(u)))
-    local Rr = collect(invokelatest(mod.Rr, collect(θ), t, collect(x), collect(u)))
-
+    local f = collect(invokelatest(mdl.f, collect(θ), t, collect(x), collect(u)))
+    local l = collect(invokelatest(mdl.l, collect(θ), t, collect(x), collect(u)))
+    local p = collect(invokelatest(mdl.p, collect(θ), t, collect(x), collect(u)))
+    local Qr = collect(invokelatest(mdl.Qr, collect(θ), t, collect(x), collect(u)))
+    local Rr = collect(invokelatest(mdl.Rr, collect(θ), t, collect(x), collect(u)))
+    # return Jx,Ju,f,l,p,Qr,Rr
 
     # generate method definitions for PRONTO functions
     iinfo("differentiating model dynamics\n")
     build_defs!(M, :f, T, (θ, t, ξ), f)
-    build_defs!(M, :fx, T, (θ, t, ξ), f |> Jx)
-    build_defs!(M, :fu, T, (θ, t, ξ), f |> Ju)
-    build_defs!(M, :fxx, T, (θ, t, ξ), f |> Jx |> Jx)
-    build_defs!(M, :fxu, T, (θ, t, ξ), f |> Jx |> Ju)
-    build_defs!(M, :fuu, T, (θ, t, ξ), f |> Ju |> Ju)
+    build_defs!(M, :fx, T, (θ, t, ξ), Jx(f))
+    build_defs!(M, :fu, T, (θ, t, ξ), Ju(f))
+    build_defs!(M, :fxx, T, (θ, t, ξ), Jx(Jx(f)))
+    build_defs!(M, :fxu, T, (θ, t, ξ), Ju(Jx(f)))
+    build_defs!(M, :fuu, T, (θ, t, ξ), Ju(Ju(f)))
 
     iinfo("differentiating stage cost\n")
     build_defs!(M, :l, T, (θ, t, ξ), l)
@@ -159,6 +207,7 @@ macro model(T, ex)
     build_defs!(M, :lxx, T, (θ, t, ξ), l |> Jx |> lx->reshape(lx,NX) |> Jx)
     build_defs!(M, :lxu, T, (θ, t, ξ), l |> Jx |> lx->reshape(lx,NX) |> Ju)
     build_defs!(M, :luu, T, (θ, t, ξ), l |> Ju |> lu->reshape(lu,NU) |> Ju)
+    # @build lx(θ,t,ξ)->reshape(l|>Jx,NX)
 
     iinfo("differentiating terminal cost\n")
     build_defs!(M, :p, T, (θ, t, ξ), p)
@@ -166,8 +215,45 @@ macro model(T, ex)
     build_defs!(M, :pxx, T, (θ, t, ξ), p |> Jx |> px->reshape(px,NX) |> Jx)
 
     iinfo("building regulator functions\n")
-    build_defs!(M, :Qr, T, (θ, t, ξ), Qr)
-    build_defs!(M, :Rr, T, (θ, t, ξ), Rr)
+    build_defs!(M, :Qrr, T, (θ, t, ξ), Qr)
+    build_defs!(M, :Rrr, T, (θ, t, ξ), Rr)
+
+
+
+    # @variables 
+    # local B = f |> Ju
+    # local Kr = collect(Rr\collect(B'*Pr))
+    # cleanup(collect(build_function(Kr, θ, t, ξ, Pr; parallel=Symbolics.MultithreadedForm(),expression=Val{true}))[2], :θ, :t, :ξ, :Pr)
+    # build_defs!(M, :Kr, T, (θ, t, ξ, Pr), collect(Rr\collect(B'*Pr)))
+    
+    return M
+end
+
+
+function build_dP()
+    @variables Pr[1:NX,1:NX]
+    # @variables Kr[1:NU,1:NX]
+    @variables Rr[1:NU,1:NU]
+    @variables Qr[1:NX,1:NX]
+    @variables Ar[1:NX,1:NX]
+    @variables Br[1:NX,1:NU]
+
+    Ar = sparse_mask(Ar, Jx(f))
+    Kr = collect(Rr \ collect(Br'*Pr))
+    # fx_mask
+end
+
+
+# make a version of v with the sparsity pattern of fn
+function sparse_mask(v, fn)
+    v .* map(fn) do ex
+        iszero(ex) ? 0 : 1
+    end |> collect |> sparse
+end
+
+
+macro model(T, ex)
+    M = model(T,ex)
 
     fname = tempname()*"_$T.jl"
     hdr = "#= this file was machine generated at $(now()) - DO NOT MODIFY =#\n\n"
@@ -190,6 +276,35 @@ function rename(exps, name, T)
     defs[1].args[1] = :(PRONTO.$(name)(M::$T, $(defs[1].args[1].args...)))
     defs[2].args[1] = :(PRONTO.$(_!(name))(M::$T, $(defs[2].args[1].args...)))
     return defs
+end
+
+# remove excess begin blocks
+function unwrap(ex)
+    postwalk(striplines(ex)) do ex
+        isexpr(ex) && ex.head == :block && length(ex.args) == 1 ? ex.args[1] : ex
+    end
+end
+
+function cleanup(ex, args...)
+    # extract generated variable names from argument signature (for replacement)
+    vars = ex.args[1].args
+    # arg_names = collect(Symbolics.getname.(args))
+    arg_names = collect(args)
+    length(vars) == length(arg_names) + 1 && pushfirst!(arg_names, :out)
+    postwalk(striplines(ex)) do ex
+        # remove unused begin blocks
+        if isexpr(ex) && ex.head == :block && length(ex.args) == 1
+            return ex.args[1]
+        end
+        # and rename matching variables:
+        for (i,name) in enumerate(arg_names)
+            if @capture(ex, $(vars[i]))
+                return name
+            end
+        end
+        # otherwise, leave the expression unchanged
+        return ex
+    end
 end
 
 # makes generated definitions pretty
@@ -215,3 +330,15 @@ function cleanup(ex)
     end
 end
 
+
+
+
+
+
+# build sparsity-aware custom version
+# @variables A[1:NX,1:NX] -> match sparsity pattern of fx
+# generate kernel Kr, dPr_dt
+
+
+# benchmark compare
+# also compare against multithreaded

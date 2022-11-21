@@ -22,6 +22,31 @@ using PRONTO
     Rr(θ,t,x,u) = diagm([1])*θ[1]
     Qr(θ,t,x,u) = diagm([1,1,1,1])
 end
+
+T = :TwoSpinP
+ex = quote
+    NX = 4; NU = 1; NΘ = 1
+    using LinearAlgebra: diagm
+
+    # model dynamics
+    H0 = [0 0 1 0;0 0 0 -1;-1 0 0 0;0 1 0 0]
+    H1 = [0 -1 0 0;1 0 0 0;0 0 0 -1;0 0 1 0]
+    f(θ,t,x,u) = (H0 + u[1]*H1)*x
+
+    # stage cost
+    Ql = zeros(NX,NX)
+    Rl = [0.01]
+    l(θ,t,x,u) = 1/2*x'*Ql*x .+ 1/2*u'*Rl*u
+
+    # terminal cost
+    Pl = [0 0 0 0;0 1 0 0;0 0 0 0;0 0 0 1]
+    p(θ,t,x,u) = 1/2*x'*Pl*x
+
+    # regulator matrices
+    Rr(θ,t,x,u) = diagm([1])*θ[1]
+    Qr(θ,t,x,u) = diagm([1,1,1,1])
+end
+Jx,Ju,ff,ll,pp,Qr,Rr = PRONTO.model(T,ex)
 #
 
 M = TwoSpinP()
