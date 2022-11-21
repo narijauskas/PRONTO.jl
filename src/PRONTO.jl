@@ -112,7 +112,7 @@ function Krr(M::Model{NX,NU,NΘ}, θ, t, φ, Pr) where {NX,NU,NΘ}
     return buf
 end
 # dPr_dt!(M::Model, out, θ, t, φ, Pr) = out .= riccati(Ar(M,θ,t,φ), Kr(M,θ,t,φ,Pr), Pr, Qr(M,θ,t,φ), Rr(M,θ,t,φ))
-include("C:/Users/mantas/AppData/Local/Temp/jl_56RGhMZEBm.jl")
+# include("C:/Users/mantas/AppData/Local/Temp/jl_56RGhMZEBm.jl")
 function dPr_dt!(M, out, θ, t, φ, Pr)
     fill!(out, 0)
     A = Ar(M, θ, t, φ)

@@ -189,7 +189,7 @@ function model(T, ex)
     local p = collect(invokelatest(mdl.p, collect(θ), t, collect(x), collect(u)))
     local Qr = collect(invokelatest(mdl.Qr, collect(θ), t, collect(x), collect(u)))
     local Rr = collect(invokelatest(mdl.Rr, collect(θ), t, collect(x), collect(u)))
-    # return Jx,Ju,f,l,p,Qr,Rr
+    return Jx,Ju,f,l,p,Qr,Rr
 
     # generate method definitions for PRONTO functions
     iinfo("differentiating model dynamics\n")

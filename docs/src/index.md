@@ -61,7 +61,70 @@ f[2] = f_2 # NX
 fx[2,1] = df2/dx1 # NX,NX
 fxu[2,1,3] = d(df2/dx1)/du3# NX,NX,NU
 ```
+## Hello Jay
+Here is a model:
+```julia
 
+@model Split begin
+    using LinearAlgebra
+        
+    NX = 22; NU = 1; NΘ = 0
+
+    function mprod(x)
+        Re = I(2)  
+        Im = [0 -1;
+            1 0]   
+        M = kron(Re,real(x)) + kron(Im,imag(x));
+        return M   
+    end
+
+    function inprod(x)
+        a = x[1:Int(NX/2)]
+        b = x[(Int(NX/2)+1):(2*Int(NX/2))]
+        P = [a*a'+b*b' -(a*b'+b*a');
+            a*b'+b*a' a*a'+b*b']
+        return P
+    end
+
+    N = 5
+    n = 2*N+1
+    α = 10
+    ω = 0.5
+
+    H = zeros(n,n)
+    for i = 1:n
+        H[i,i] = 4*(i-N-1)^2
+    end
+    v = -α/4 * ones(n-1)
+
+    H0 = H + Bidiagonal(zeros(n), v, :U) + Bidiagonal(zeros(n), v, :L)
+    H1 = Bidiagonal(zeros(n), -v*1im, :U) + Bidiagonal(zeros(n), v*1im, :L)
+    H2 = Bidiagonal(zeros(n), -v, :U) + Bidiagonal(zeros(n), -v, :L)
+
+    nu = eigvecs(H0)
+
+    nu1 = nu[:,1]
+    nu2 = nu[:,2]
+
+    f(θ,t,x,u) = mprod(-1im*ω*(H0 + sin(u[1])*H1 + (1-cos(u[1]))*H2))*x
+    
+    Ql = zeros(2*n,2*n)
+    Rl = I
+    l(θ,t,x,u) = 1/2*x'*Ql*x + 1/2*u'*Rl*u
+    
+    Rr(θ,t,x,u) = diagm(ones(1))
+    Qr(θ,t,x,u) = diagm(ones(2*n))
+    
+    xf = [nu2;0*nu2]
+    function p(θ,t,x,u)
+        P = I(2*n) - inprod(xf)
+        1/2*x'*P*x
+    end
+
+
+end
+
+```
 ## 3. Intermediate Operators
 Provide convenience for efficiently defining diffeq's later on. Eg.
 

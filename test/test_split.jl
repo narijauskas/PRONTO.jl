@@ -66,10 +66,10 @@ let
 
     @derive Split
 end
-
-@model Split begin
 # T = :Split
 # ex = quote
+
+@model Split begin
     using LinearAlgebra
         
     NX = 22; NU = 1; NΘ = 0
@@ -144,6 +144,8 @@ end |> collect |> sparse
 
 sparse_mask(Ar, Jx(f))
 
+sparse(collect(x))
+x |> collect |> sparse
 
 M = Split()
 θ = Float64[]
