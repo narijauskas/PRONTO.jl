@@ -75,55 +75,35 @@ include("model.jl")
 @inline Qr(M,θ,t,φ) = (Qrr!(M, M.Qr, M.θ, t, φ); return M.Qr)
 @inline Rr(M,θ,t,φ) = (Rrr!(M, M.Rr, M.θ, t, φ); return M.Rr)
 
-# function Ar(M::Model{NX,NU,NΘ},θ,t,φ) where {NX,NU,NΘ}
-#     buf = Buffer{Tuple{NX,NX}}()
-#     fx!(M,buf,θ,t,φ)
-#     return buf
-# end
-
-# function Br(M::Model{NX,NU,NΘ},θ,t,φ) where {NX,NU,NΘ}
-#     buf = Buffer{Tuple{NX,NU}}()
-#     fu!(M,buf,θ,t,φ)
-#     return buf
-#     # fu(M,θ,t,φ)
-# end
-
-# function Qr(M::Model{NX,NU,NΘ},θ,t,φ) where {NX,NU,NΘ}
-#     buf = Buffer{Tuple{NX,NX}}()
-#     Qrr!(M,buf,θ,t,φ)
-#     return buf
-# end
-
-regulator(B,P,R) = R \ collect(B')*P
-
+regulator(B,P,R) = Diagonal(R)\B'P
 
 riccati(A,K,P,Q,R) = -A'P - P*A + K'R*K - Q
+# M.buf_nx_nx - could this cause problems, eg. with threading?
 
+
+function riccati!(out,A,K,P,Q,R)
+    # fill!(out, 0) # reset the output (which is reused by the ODE solver)
+    # # maybe not the most efficient way to do this, but prevents numerical instabilities
+    # copy!(out, Q)
+    out .= .- Q
+    mul!(out, A', P, -1, 1) # -A'P
+    mul!(out, P, A, -1, 1) # -P*A
+    # can we more efficiently solve: P'B*(R\B'P) ?
+    out .+= K'*R*K
+end
 
 # generate naive, generic Kr, and dPr_dt
 function Kr(M, θ, t, φ, Pr)
-    M.Kr .= Rr(M,θ,t,φ) \ (Br(M,θ,t,φ)'*Pr)
+    mul!(out, Diagonal(R)\B', Pr)
+    M.Kr .= Diagonal(Rr(M,θ,t,φ)) \ (Br(M,θ,t,φ)'*Pr)
     return M.Kr
 end
 
-function Krr(M::Model{NX,NU,NΘ}, θ, t, φ, Pr) where {NX,NU,NΘ}
-    buf = Buffer{Tuple{NU,NX}}()
-    buf .= Rr(M,θ,t,φ) \ (Br(M,θ,t,φ)'*Pr)
-    return buf
-end
+
 # dPr_dt!(M::Model, out, θ, t, φ, Pr) = out .= riccati(Ar(M,θ,t,φ), Kr(M,θ,t,φ,Pr), Pr, Qr(M,θ,t,φ), Rr(M,θ,t,φ))
 # include("C:/Users/mantas/AppData/Local/Temp/jl_56RGhMZEBm.jl")
-function dPr_dt!(M, out, θ, t, φ, Pr)
-    fill!(out, 0)
-    A = Ar(M, θ, t, φ)
-    B = Br(M, θ, t, φ)
-    R = Diagonal(Rr(M, θ, t, φ))
-    # K = Kr(M, θ, t, φ, Pr)
-    out .-= A'*Pr
-    out .-= Pr*A
-    out .-= Qr(M, θ, t, φ)
-    # out .+= K'*R*K
-    out .+= (R\(B'Pr))'R*(R\(B'Pr))
+function dPr_dt!(dPr,Pr,(M,θ,φ),t)#(M, out, θ, t, φ, Pr)
+    riccati!(dPr,Ar(M,θ,t,φ),Kr(M,θ,t,φ,Pr),Pr,Qr(M,θ,t,φ),Rr(M,θ,t,φ))
 end
 # Pr_ode(dPr,Pr,(M,θ,φ),t) = dPr_dt!(M,dPr,θ,t,φ(t),Pr)
 
@@ -131,7 +111,9 @@ Pr_ode(dPr,Pr,(M,θ,φ),t) = dPr_auto(dPr, Ar(M, θ, t, φ(t)), Br(M, θ, t, φ(
 # ----------------------------------- 4. ode equations ----------------------------------- #
 function pronto(M::Model{NX,NU,NΘ}, θ, t0, tf, x0, u0, φ; tol = 1e-5, maxiters = 20) where {NX,NU,NΘ}
     Pr_f = diagm(ones(NX))
-    Pr = ODE(Pr_ode, Pr_f, (tf,t0), (M,θ,φ), Buffer{Tuple{NX,NX}}())
+    Pr = ODE(dPr_dt!, Pr_f, (tf,t0), (M,θ,φ), Buffer{Tuple{NX,NX}}())
+    ξ = ODE(ξ_ode, [x0;u0], (t0,tf), (M,θ,φ,Pr), ODEBuffer{Tuple{NX+NU}}(); dae=dae(M))
+
 end
 
 
