@@ -1,6 +1,12 @@
 # Dev Notes and Version History
 
-
+## v0.4.0-dev
+  - refactor v0.3 with optional symbolics
+  - generic methods for all steps -> dispatch on M
+  - sparsity-aware, consolidated symbolics?
+  - build chains with LinearOperators.jl
+  - Triangular dPr structure (ie, make dPr a vector)
+  - @model macro to provide isolated eval of user code
 
 
 ## v0.3.0-dev

@@ -253,6 +253,12 @@ end
 
 
 macro model(T, ex)
+    mdl = gensym()
+    eval(:(module $mdl $ex end))
+    iinfo("model evaluated to temporary module: PRONTO.var\"$mdl\"\n")
+    return mdl
+    # ignored:
+    
     M = model(T,ex)
 
     fname = tempname()*"_$T.jl"
