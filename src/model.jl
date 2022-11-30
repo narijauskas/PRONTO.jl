@@ -293,19 +293,17 @@ end
 
 function cleanup(ex, args...)
     # extract generated variable names from argument signature (for replacement)
-    vars = ex.args[1].args
+    og_args = ex.args[1].args
     # arg_names = collect(Symbolics.getname.(args))
-    arg_names = collect(args)
-    length(vars) == length(arg_names) + 1 && pushfirst!(arg_names, :out)
+    new_args = collect(args)
+    length(og_args) == length(new_args) + 1 && pushfirst!(new_args, :out)
     postwalk(striplines(ex)) do ex
-        # remove unused begin blocks
         if isexpr(ex) && ex.head == :block && length(ex.args) == 1
-            return ex.args[1]
+            return ex.args[1] # remove unused begin blocks
         end
-        # and rename matching variables:
-        for (i,name) in enumerate(arg_names)
-            if @capture(ex, $(vars[i]))
-                return name
+        for (i,name) in enumerate(new_args)
+            if @capture(ex, $(og_args[i]))
+                return name # and rename matching variables:
             end
         end
         # otherwise, leave the expression unchanged

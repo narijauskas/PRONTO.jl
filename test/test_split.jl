@@ -1,15 +1,15 @@
+#
 
 using PRONTO
-using FastClosures
 using StaticArrays
 using Symbolics
 using LinearAlgebra
 using MatrixEquations
-
+using SparseArrays
 
 using MacroTools, BenchmarkTools
 
-#= ----------------------------------- model expansion ----------------------------------- =#
+## ------------------------------- model expansion ------------------------------- ##
 
 # T = :Split
 # ex = quote
@@ -73,7 +73,7 @@ mdl = @model Split begin
 
 end
 
-#= ----------------------------------- symbolic derivatives ----------------------------------- =#
+## ------------------------------- symbolic derivatives ------------------------------- ##
 using PRONTO: Jacobian
 using Base: invokelatest
 
@@ -95,6 +95,7 @@ f_ip = eval(build_function(f_tr,θ,t,ξ)[2])
 fx_tr = Jx(f_tr)
 fu_tr = Ju(f_tr)
 
+
 α = rand(22)
 μ = rand(1)
 φ = vcat(α,μ)
@@ -106,10 +107,20 @@ out = zeros(22)
 
 
 
-#= ----------------------------------- symbolic construction of odes ----------------------------------- =#
+## ------------------------------- symbolic construction of odes ------------------------------- ##
 
+Kr(B,P,R) = R\(B'P)
+# Kr(θ,t,φ) = Kr(B(θ,t,φ), ...)
+function dPr_dt!(dPr,Pr,(A,B,Q,R),t)
+    dPr .=  -A'P - P*A + P'B*(R\B'P) - Q
+end
 
+function riccati(A,B,P,Q,R)
+    # uses expanded K'R*K
+    -A'P - P*A + P'B*(R\B'P) - Q
+end
 
+dPr = unroll(riccati(fx_trace, fu_trace,Pr,Qr,Rr))
 
 # Kr??
 # Pr??
@@ -117,8 +128,167 @@ out = zeros(22)
 fx_tr = Jx(f_tr) #Ar
 fu_tr = Ju(f_tr) #Br
 
-@variables P[1:NX,1:NX]
+
+function dξ_dt()
+    f(x,u)
+    μ - Kr(θ,t,φ,Pr)*(x-α) - u
+end
+# trace, build:
+dξ_dt!(out, θ, t, ξ, φ, Pr)
+
+
+# build a function for each Br[i] -> generator of those functions
+build_function(collect(fu_tr[1,1]), θ, t, ξ)
+Br_fns = eval.(build_function(fu_tr[i,j], θ, t, ξ) for i in 1:NX, j in 1:NU)
+Br_fn = eval(build_function(fu_tr, θ, t, ξ)[1])
+Br_fn! = eval(build_function(fu_tr, θ, t, ξ)[2])
+[Br([],0,φ) for Br in Br_fns] # 3 μs
+function fn1(Br_fns,φ)
+    [Br([],0,φ) for Br in Br_fns]
+end
+@time fn1(Br_fns,φ) # 3 μs
+
+@benchmark Br_fn([],0,φ) # 600 ns
+@benchmark Br_fn!(out,[],0,φ) # 280 ns
+@benchmark Br_fn2([],0,φ) # 354 ns
+
+
+Br_fn2(θ,t,ξ) = let Br! = Br_fn!
+    out = SizedMatrix{22,1}(zeros(22,1))
+    Br!(out,θ,t,ξ)
+    return out
+end
+
+
+
+@build Br(θ,t,ξ) = fu_tr
+
+build_function(fu_tr, θ, t, ξ)[2] # |> rename Br!(out,θ,t,ξ)
+# |> rename fxn!(out,args...)
+
+# define
+function Br(args...)
+    out = SizedMatrix{22,1}(zeros(22,1))
+    Br!(out,θ,t,ξ)
+    return out
+end
+
+
+
+
+
+
+using StaticArrays: sacollect
+sacollect(SMatrix{NX,NU}, Br_fns[i,j]([],0,φ) for i in 1:NX, j in 1:NU)
+fn2(Br_fns,φ) = sacollect(SMatrix{22,1}, Br_fns[i,j]([],0,φ) for i in 1:22, j in 1:1)
+fn3(Br_fns,φ) = sacollect(SMatrix{22,1}, Br_fns[i,j]([],0,φ)::Float64 for i in 1:22, j in 1:1)
+fn4(Br_fns,φ) = sacollect(SMatrix{22,1,Float64}, Br([],0,φ) for Br in Br_fns)
+fn5(Br_fns,φ) = SA_F64[Br_fns[i,j]([],0,φ) for i in 1:22, j in 1:1]
+
+function fn1!(out,Br_fns,φ)
+    for i in eachindex(out)
+        out[i] = Br_fns[i]([],0,φ)
+    end
+end
+
+function fn2!(out,Br_fns,φ)
+    for (i,Br) in enumerate(Br_fns)
+        setindex!(out, Br([],0,φ), i)
+    end
+end
+
+
+
+
+
+
+using FunctionWrappers: FunctionWrapper
+FunctionWrapper{Float64, Tuple{Vector,Number,Vector{Float64}}}((θ,t,ξ)->Br_fns[1,1](θ,t,ξ))
+Br_w = FunctionWrapper{Float64, Tuple{Vector,Number,Vector{Float64}}}.((θ,t,ξ)->Br(θ,t,ξ) for Br in Br_fns)
+
+
+@benchmark fn2(Br_fns,φ) # 4.1 μs
+@benchmark fn2(Br_w,φ) # 1.6 μs
+@benchmark fn3(Br_fns,φ) # 3.1 μs
+@benchmark fn4(Br_fns,φ) # 4.6 μs
+@benchmark fn5(Br_fns,φ) # 3.7 μs
+
+
+out = zeros(22,1)
+@benchmark fn1!(out,Br_fns,φ)
+@benchmark fn1!(out,Br_w,φ)
+@benchmark fn2!($out,$Br_fns,$φ)
+
+
+
+out[i] = $(Br_fns[i])([],0,$φ)
+@benchmark begin # 0.7 μs
+    setindex!($out, $(Br_fns[1])([],0,$φ), 1)
+    setindex!($out, $(Br_fns[2])([],0,$φ), 2)
+    setindex!($out, $(Br_fns[3])([],0,$φ), 3)
+    setindex!($out, $(Br_fns[4])([],0,$φ), 4)
+    setindex!($out, $(Br_fns[5])([],0,$φ), 5)
+    setindex!($out, $(Br_fns[6])([],0,$φ), 6)
+    setindex!($out, $(Br_fns[7])([],0,$φ), 7)
+    setindex!($out, $(Br_fns[8])([],0,$φ), 8)
+    setindex!($out, $(Br_fns[9])([],0,$φ), 9)
+    setindex!($out, $(Br_fns[10])([],0,$φ), 10)
+    setindex!($out, $(Br_fns[11])([],0,$φ), 11)
+    setindex!($out, $(Br_fns[12])([],0,$φ), 12)
+    setindex!($out, $(Br_fns[13])([],0,$φ), 13)
+    setindex!($out, $(Br_fns[14])([],0,$φ), 14)
+    setindex!($out, $(Br_fns[15])([],0,$φ), 15)
+    setindex!($out, $(Br_fns[16])([],0,$φ), 16)
+    setindex!($out, $(Br_fns[17])([],0,$φ), 17)
+    setindex!($out, $(Br_fns[18])([],0,$φ), 18)
+    setindex!($out, $(Br_fns[19])([],0,$φ), 19)
+    setindex!($out, $(Br_fns[20])([],0,$φ), 20)
+    setindex!($out, $(Br_fns[21])([],0,$φ), 21)
+    setindex!($out, $(Br_fns[22])([],0,$φ), 22)
+end
+
+Br_w[1]([],0,φ)
+
+function fn4(Br_fns,φ)
+    temp = sacollect(SMatrix{22,1}, Br_fns[i,j]([],0,φ) for i in 1:22, j in 1:1)
+    sum(temp'temp)
+end
+
+
+@variables P[1:NX,1:NX] Q[1:NX,1:NX] R[1:NU,1:NU]
+Ar = sparse(fx_tr)
+Br = sparse(fu_tr)
 Pr = Symmetric(P)
+Qr = collect(Diagonal(collect(Q)))
+Rr = collect(Diagonal(collect(R)))
+Kr(Br,Pr,Rr)
+@time dPr_trace = riccati(Ar,Br,Pr,Qr,Rr);
+dPr_11 = dPr_trace[1,1]
+dPr_fn = build_function(dPr_11,θ,t,ξ,Pr,Qr,Rr)
+R0 = [1.0;;]
+Q0 = diagm(ones(NX))
+P0 = Symmetric(rand(NX,NX))
+dPr_fn([],0,φ,P0,Q0,R0) # 636 ns
+
+@variables A[1:NX,1:NX] B[1:NX,1:NU]
+A = PRONTO.sparse_mask(A,Ar)
+B = PRONTO.sparse_mask(B,Br)
+@time dPr_trace = riccati(A,B,Pr,Qr,Rr);
+dPr_11 = dPr_trace[1,1]
+dPr_fn = eval(build_function(dPr_trace,collect(A),collect(B),P,Q,R)[1])
+
+A0 = PRONTO.sparse_mask(ones(NX,NX),Ar)
+B0 = PRONTO.sparse_mask(ones(NX,NU),Br)
+
+R0 = [1.0;;]
+Q0 = diagm(ones(NX))
+P0 = Symmetric(rand(NX,NX))
+
+@benchmark riccati(A0,B0,P0,Q0,R0) # approx 167ns
+dPr_fn(A0,B0,P0,Q0,R0)
+
+
+
 
 # @variables Q[1:NX,1:NX]
 # QQ = collect(Q).*Int.(I(NX)) # extract diagonal
