@@ -9,7 +9,7 @@ using SparseArrays
 
 using MacroTools, BenchmarkTools
 
-## ------------------------------- model expansion ------------------------------- ##
+# ------------------------------- model expansion ------------------------------- #
 
 # T = :Split
 # ex = quote
@@ -73,9 +73,11 @@ mdl = @model Split begin
 
 end
 
-## ------------------------------- symbolic derivatives ------------------------------- ##
+# ------------------------------- symbolic derivatives ------------------------------- #
 using PRONTO: Jacobian
 using Base: invokelatest
+using PRONTO: now
+
 
 NX = mdl.NX; NU = mdl.NU; NΘ = mdl.NΘ
 # initialize variables for tracing
@@ -86,14 +88,99 @@ Jx,Ju = Jacobian.((x,u))
 
 
 # trace symbolic
-f_tr = invokelatest(mdl.f,collect(θ),t,collect(x),collect(u))
-# assemble function
-f_fn = eval(build_function(f_tr,θ,t,ξ)[1])
-f_ip = eval(build_function(f_tr,θ,t,ξ)[2])
+f_trace = invokelatest(mdl.f,collect(θ),t,collect(x),collect(u))
+Rr_trace = invokelatest(mdl.Rr,collect(θ),t,collect(x),collect(u))
+Qr_trace = invokelatest(mdl.Qr,collect(θ),t,collect(x),collect(u))
+
+##
 
 
-fx_tr = Jx(f_tr)
-fu_tr = Ju(f_tr)
+T = :Split2
+M = Expr[]
+push!(M,:(
+    struct $T <: PRONTO.Model{$NX,$NU,$NΘ}
+        #TODO: parameter support
+    end
+))
+
+
+def = PRONTO.define(Jx(f_trace),θ,t,ξ)
+append!(M,PRONTO.build_methods(:Ar,T,[NX,NX],[:θ,:t,:ξ],def))
+
+def = PRONTO.define(Ju(f_trace),θ,t,ξ)
+append!(M,PRONTO.build_methods(:Br,T,[NX,NU],[:θ,:t,:ξ],def))
+
+def = PRONTO.define(Rr_trace,θ,t,ξ)
+append!(M,PRONTO.build_methods(:Rr,T,[NU,NU],[:θ,:t,:ξ],def))
+
+def = PRONTO.define(Qr_trace,θ,t,ξ)
+append!(M,PRONTO.build_methods(:Qr,T,[NX,NX],[:θ,:t,:ξ],def))
+
+
+fname = tempname()*"_$T.jl"
+hdr = "#= this file was machine generated at $(now()) - DO NOT MODIFY =#\n\n"
+write(fname, hdr*prod(string.(M).*"\n\n"))
+include(fname)
+##
+θ = Split2()
+P0 = SizedMatrix{NX,NX}(collect(1.0*I(NX)))
+PRONTO.Kr(θ,0,φ,P0)
+#DONE: trace & build Qr
+#DONE: trace & build Rr
+
+#DONE: benchmark matrix Kr ~ 0.6 μs
+#DONE: benchmark buffered matrix Kr
+#DONE: benchmark autodiff Kr ~ 8.3 μs
+
+#TODO: register symbolic Kr
+#TODO: make dξ_dt!
+
+
+function Kr1(θ,t,ξ,Pr)
+    PRONTO.Rr(θ,t,ξ)\PRONTO.Br(θ,t,ξ)'Pr
+end
+
+function Kr2(θ,t,ξ,Pr)
+    buf = SizedMatrix{NU,NX,Float64}(undef)
+    mul!(buf,PRONTO.Br(θ,t,ξ)',Symmetric(Pr))
+    Diagonal(PRONTO.Rr(θ,t,ξ))\buf
+end
+
+@variables P[1:NX,1:NX]
+Pr = Symmetric(P)
+args = [:θ,:t,:ξ, :Pr]
+def = PRONTO.define(Rr_trace\Ju(f_trace)'*Pr,θ,t,ξ,Pr);
+append!(M,PRONTO.build_methods(:Kr,T,[NX,NU],args,def));
+
+
+##
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# # assemble function
+# f_fn = eval(build_function(f_tr,θ,t,ξ)[1])
+# f_ip = eval(build_function(f_tr,θ,t,ξ)[2])
+
+
+fx_trace = Jx(f_tr)
+fu_trace = Ju(f_tr)
 
 
 α = rand(22)
@@ -160,8 +247,76 @@ Br_fn2(θ,t,ξ) = let Br! = Br_fn!
 end
 
 
+Ar_1 = eval(build_function(Jx(f_trace), θ, t, ξ)[1])
+@benchmark Ar_1([],0,φ) # 1.2 ms
 
-@build Br(θ,t,ξ) = fu_tr
+Ar_2 = let Ar! = eval(build_function(Jx(f_trace), θ, t, ξ)[2])
+    function _Ar(θ,t,ξ)
+        out = SizedMatrix{22,22,Float64}(undef)
+        Ar!(out,θ,t,ξ)
+        return out
+    end
+end
+
+@benchmark Ar_2([],0,φ) # 535.8 ns
+
+
+
+
+using Base.Threads: @spawn
+
+tsk = map(1:400000) do i
+    @spawn Ar_2([],0, i .+ rand(23))
+end
+
+
+
+
+
+
+
+
+
+abstract type AbstractModel{NX,NU,NΘ} <: FieldVector{NΘ,Float64} end
+
+struct Yeet <: AbstractModel{22,1,0}
+end
+
+
+
+@build Br{$NX,$NU}(θ,t,ξ) = Ju(f_trace)
+
+
+
+
+
+
+
+
+
+
+
+
+function separate(ex)
+    @capture(ex, name_{dims__}(args__) = body_)
+    return (name,dims,args)
+end
+
+(name,dims,args) = separate(ex)
+
+
+PRONTO.@build Br{$NX,$NU}(θ,t,ξ) 
+
+ex = :(Br{$NX,$NU}(θ,t,ξ) = Ju(f_trace))
+separate(ex)
+
+
+hdr = ex.args[1]
+@capture(ex, name_{dims__}(args__) = body_)
+
+
+# expects Ju(f_trace) will evaluate with locally defined (θ,t,ξ)
+@build Br{NX,NU}(θ,t,ξ) = Ju(f_trace)
 
 build_function(fu_tr, θ, t, ξ)[2] # |> rename Br!(out,θ,t,ξ)
 # |> rename fxn!(out,args...)
@@ -172,7 +327,6 @@ function Br(args...)
     Br!(out,θ,t,ξ)
     return out
 end
-
 
 
 

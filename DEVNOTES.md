@@ -8,6 +8,9 @@
   - Triangular dPr structure (ie, make dPr a vector)
   - @model macro to provide isolated eval of user code
 
+### autodiff
+  - allocates minimal, thread-safe buffer
+
 
 ## v0.3.0-dev
     - rewrite with new dispatch-on-model function pasing structure

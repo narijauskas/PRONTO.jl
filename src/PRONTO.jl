@@ -52,7 +52,7 @@ export @model
 export nx,nu,nθ
 
 
-abstract type Model{NX,NU,NΘ} end
+abstract type Model{NX,NU,NΘ} <: FieldVector{NΘ,Float64} end
 
 nx(::Model{NX,NU,NΘ}) where {NX,NU,NΘ} = NX
 nu(::Model{NX,NU,NΘ}) where {NX,NU,NΘ} = NU

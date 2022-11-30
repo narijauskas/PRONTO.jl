@@ -65,6 +65,16 @@ end
 @define Qrr   (θ,t,ξ)
 @define Rrr   (θ,t,ξ)
 
+Ar!(out,θ::Model,t,ξ) = throw(ModelDefError(M,nameof(Ar!)))
+Ar(θ::Model,t,ξ) = throw(ModelDefError(M,nameof(Ar)))
+Br!(out,θ::Model,t,ξ) = throw(ModelDefError(M,nameof(Br!)))
+Br(θ::Model,t,ξ) = throw(ModelDefError(M,nameof(Br)))
+# Kr!(out,θ::Model,t,ξ) = throw(ModelDefError(M,nameof(Kr!)))
+Kr(θ::Model,t,ξ,Pr) = Rr(θ,t,ξ)\Br(θ,t,ξ)'Pr
+Qr!(out,θ::Model,t,ξ) = throw(ModelDefError(M,nameof(Qr!)))
+Qr(θ::Model,t,ξ) = throw(ModelDefError(M,nameof(Qr)))
+Rr!(out,θ::Model,t,ξ) = throw(ModelDefError(M,nameof(Rr!)))
+Rr(θ::Model,t,ξ) = throw(ModelDefError(M,nameof(Rr)))
 #TODO: macro
 # f(M::Model,θ,t,ξ) = throw(ModelDefError(M,nameof(f)))
 # f!(M::Model,θ,t,ξ) = throw(ModelDefError(M,nameof(f!)))
@@ -191,32 +201,32 @@ function model(T, ex)
     local Rr = collect(invokelatest(mdl.Rr, collect(θ), t, collect(x), collect(u)))
     return Jx,Ju,f,l,p,Qr,Rr
 
-    # generate method definitions for PRONTO functions
-    iinfo("differentiating model dynamics\n")
-    build_defs!(M, :f, T, (θ, t, ξ), f)
-    build_defs!(M, :fx, T, (θ, t, ξ), Jx(f))
-    build_defs!(M, :fu, T, (θ, t, ξ), Ju(f))
-    build_defs!(M, :fxx, T, (θ, t, ξ), Jx(Jx(f)))
-    build_defs!(M, :fxu, T, (θ, t, ξ), Ju(Jx(f)))
-    build_defs!(M, :fuu, T, (θ, t, ξ), Ju(Ju(f)))
+    # # generate method definitions for PRONTO functions
+    # iinfo("differentiating model dynamics\n")
+    # build_defs!(M, :f, T, (θ, t, ξ), f)
+    # build_defs!(M, :fx, T, (θ, t, ξ), Jx(f))
+    # build_defs!(M, :fu, T, (θ, t, ξ), Ju(f))
+    # build_defs!(M, :fxx, T, (θ, t, ξ), Jx(Jx(f)))
+    # build_defs!(M, :fxu, T, (θ, t, ξ), Ju(Jx(f)))
+    # build_defs!(M, :fuu, T, (θ, t, ξ), Ju(Ju(f)))
 
-    iinfo("differentiating stage cost\n")
-    build_defs!(M, :l, T, (θ, t, ξ), l)
-    build_defs!(M, :lx, T, (θ, t, ξ), l |> Jx |> lx->reshape(lx,NX))
-    build_defs!(M, :lu, T, (θ, t, ξ), l |> Ju |> lu->reshape(lu,NU))
-    build_defs!(M, :lxx, T, (θ, t, ξ), l |> Jx |> lx->reshape(lx,NX) |> Jx)
-    build_defs!(M, :lxu, T, (θ, t, ξ), l |> Jx |> lx->reshape(lx,NX) |> Ju)
-    build_defs!(M, :luu, T, (θ, t, ξ), l |> Ju |> lu->reshape(lu,NU) |> Ju)
-    # @build lx(θ,t,ξ)->reshape(l|>Jx,NX)
+    # iinfo("differentiating stage cost\n")
+    # build_defs!(M, :l, T, (θ, t, ξ), l)
+    # build_defs!(M, :lx, T, (θ, t, ξ), l |> Jx |> lx->reshape(lx,NX))
+    # build_defs!(M, :lu, T, (θ, t, ξ), l |> Ju |> lu->reshape(lu,NU))
+    # build_defs!(M, :lxx, T, (θ, t, ξ), l |> Jx |> lx->reshape(lx,NX) |> Jx)
+    # build_defs!(M, :lxu, T, (θ, t, ξ), l |> Jx |> lx->reshape(lx,NX) |> Ju)
+    # build_defs!(M, :luu, T, (θ, t, ξ), l |> Ju |> lu->reshape(lu,NU) |> Ju)
+    # # @build lx(θ,t,ξ)->reshape(l|>Jx,NX)
 
-    iinfo("differentiating terminal cost\n")
-    build_defs!(M, :p, T, (θ, t, ξ), p)
-    build_defs!(M, :px, T, (θ, t, ξ), p |> Jx |> px->reshape(px,NX))
-    build_defs!(M, :pxx, T, (θ, t, ξ), p |> Jx |> px->reshape(px,NX) |> Jx)
+    # iinfo("differentiating terminal cost\n")
+    # build_defs!(M, :p, T, (θ, t, ξ), p)
+    # build_defs!(M, :px, T, (θ, t, ξ), p |> Jx |> px->reshape(px,NX))
+    # build_defs!(M, :pxx, T, (θ, t, ξ), p |> Jx |> px->reshape(px,NX) |> Jx)
 
-    iinfo("building regulator functions\n")
-    build_defs!(M, :Qrr, T, (θ, t, ξ), Qr)
-    build_defs!(M, :Rrr, T, (θ, t, ξ), Rr)
+    # iinfo("building regulator functions\n")
+    # build_defs!(M, :Qrr, T, (θ, t, ξ), Qr)
+    # build_defs!(M, :Rrr, T, (θ, t, ξ), Rr)
 
 
 
@@ -259,20 +269,20 @@ macro model(T, ex)
     return mdl
     # ignored:
     
-    M = model(T,ex)
+    # M = model(T,ex)
 
-    fname = tempname()*"_$T.jl"
-    hdr = "#= this file was machine generated at $(now()) - DO NOT MODIFY =#\n\n"
-    write(fname, hdr*prod(string.(M).*"\n\n"))
-    info("model defined at $fname")
-    quote
-        include($fname)
-        info("$(as_bold($T)) model available")
-    end
+    # fname = tempname()*"_$T.jl"
+    # hdr = "#= this file was machine generated at $(now()) - DO NOT MODIFY =#\n\n"
+    # write(fname, hdr*prod(string.(M).*"\n\n"))
+    # info("model defined at $fname")
+    # quote
+    #     include($fname)
+    #     info("$(as_bold($T)) model available")
+    # end
 end
 
 # write("temp.jl", prod(string.(M).*"\n"))
-
+#=
 build_defs!(M, name, T, args, sym) = append!(M, build_defs(name, T, args, sym))
 build_defs(name, T, args, sym) = rename(build_function(sym, args...), name, T)
 
@@ -291,19 +301,23 @@ function unwrap(ex)
     end
 end
 
+
+
 function cleanup(ex, args...)
     # extract generated variable names from argument signature (for replacement)
-    og_args = ex.args[1].args
+    vars = ex.args[1].args
     # arg_names = collect(Symbolics.getname.(args))
-    new_args = collect(args)
-    length(og_args) == length(new_args) + 1 && pushfirst!(new_args, :out)
+    arg_names = collect(args)
+    length(vars) == length(arg_names) + 1 && pushfirst!(arg_names, :out)
     postwalk(striplines(ex)) do ex
+        # remove unused begin blocks
         if isexpr(ex) && ex.head == :block && length(ex.args) == 1
-            return ex.args[1] # remove unused begin blocks
+            return ex.args[1]
         end
-        for (i,name) in enumerate(new_args)
-            if @capture(ex, $(og_args[i]))
-                return name # and rename matching variables:
+        # and rename matching variables:
+        for (i,name) in enumerate(arg_names)
+            if @capture(ex, $(vars[i]))
+                return name
             end
         end
         # otherwise, leave the expression unchanged
@@ -334,7 +348,95 @@ function cleanup(ex)
     end
 end
 
+=#
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function build_struct(T,NX,NU,NΘ)
+    :(
+        struct $T <: Model{$NX,$NU,$NΘ}
+            #TODO: parameter support
+        end
+    )
+end
+
+
+
+
+# remove excess begin blocks & comments
+function strip(ex)
+    postwalk(striplines(ex)) do ex
+        isexpr(ex) && ex.head == :block && length(ex.args) == 1 ? ex.args[1] : ex
+    end
+end
+
+
+# macro build(ex)
+#     @capture(ex, name_{dims__}(args__) = def_)
+#     @show eval.(esc.(args))
+#     :()
+#     # strip(build_function(eval(def), eval.(args)...)[2])
+# end
+
+define(symex, symargs...)::Expr = strip(build_function(symex, symargs...)[2])
+
+# sort of redundant
+body(args, symex, symargs...) = rename_args(define(symex, symargs...),args)
+
+# rename each oldargs with each args
+function rename_args(def,args)::Expr
+    oldargs = def.args[1].args
+    newargs = vcat(:out, args)
+    postwalk(def) do ex
+        for (i,argname) in enumerate(newargs)
+            if @capture(ex, $(oldargs[i]))
+                return argname
+            end
+        end
+        # otherwise, leave the expression unchanged
+        return ex
+    end.args[2]
+end
+
+# generate method definitions to add to PRONTO
+function build_methods(name,T,dims,args,def)
+    striplines(quote
+        function PRONTO.$(_!(name))(out, $(θ_dispatch(T,args...)...))
+            $(rename_args(def,args))
+        end
+
+        function PRONTO.$name($(θ_dispatch(T,args...)...))
+            out = SizedArray{Tuple{$(dims...)},Float64}(undef)
+            PRONTO.$(_!(name))(out, $(args...))
+            return out
+        end
+    end).args
+end
+
+function θ_dispatch(T,args...)
+    map(args) do ex
+        ex == :θ ? :(θ::$T) : ex
+    end
+end
+
+
+# defs[1].args[1] = :(PRONTO.$(name)(M::$T, $(defs[1].args[1].args...)))
+# defs[2].args[1] = :(PRONTO.$(_!(name))(M::$T, $(defs[2].args[1].args...)))
+
+# PRONTO.Br(θ::Split,)
 
 
 
