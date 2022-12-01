@@ -92,7 +92,7 @@ f_trace = invokelatest(mdl.f,collect(θ),t,collect(x),collect(u))
 Rr_trace = invokelatest(mdl.Rr,collect(θ),t,collect(x),collect(u))
 Qr_trace = invokelatest(mdl.Qr,collect(θ),t,collect(x),collect(u))
 
-##
+#
 
 
 T = :Split
@@ -123,13 +123,17 @@ hdr = "#= this file was machine generated at $(now()) - DO NOT MODIFY =#\n\n"
 write(fname, hdr*prod(string.(M).*"\n\n"))
 include(fname)
 
-##
-ξ0 = SizedVector{23}([mdl.xf; 0])
-g = @closure t->[0.2]
+
+# ξ0 = SizedVector{23}([mdl.xf; 0])
+ξ0 = [mdl.xf; 0]
+g = @closure t->SizedVector{1}(0.2)
 θ = Split()
 φg = ODE(PRONTO.forced_dynamics!, collect(ξ0), (0,10), (θ,g), Buffer{Tuple{NX+NU}}(); dae = dae(θ))
+Pr = SizedMatrix{NX,NX}(collect(1.0*I(NX)))
+ξ = ODE(PRONTO.regulated_dynamics!, collect(ξ0), (0,10), (θ,φg,Pr), Buffer{Tuple{NX+NU}}(); dae = dae(θ))
 
-
+PRONTO.regulated_dynamics!(buf,ξ,(θ,φg,Pr),t)
+##
 
 
 

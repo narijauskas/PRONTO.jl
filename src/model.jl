@@ -100,7 +100,29 @@ end
 
 
 
+closed_loop!(dξ,ξ,(θ,φ,Pr),t) = _closed_loop!(dξ,ξ,(θ,φ,Pr),t)
+function _closed_loop!(dξ,ξ,(θ,φ,Pr),t)
+    # x,u = views(θ,ξ)
+    dx,du = views(θ,dξ)
+    # α,μ = views(θ,φ(t))
 
+    f!(dx,θ,ξ,t)
+    # copyto!(du, μ - Kr(θ,t,φ,Pr)*(x-α) - u)
+    copyto!(du, Δu(θ,ξ,φ(t),Pr,t))
+    return nothing
+end
+
+Δu(θ,ξ,φ,Pr,t) = Δu(θ,views(θ,ξ)...,views(θ,φ)...,Pr,t)
+Δu(θ,x,u,α,μ,Pr,t) = μ - Kr(θ,t,[α;μ],Pr)*(x-α) - u
+
+
+
+function dynamics!(dx,x,(θ,φ,Pr),t)
+    α,μ = views(θ,φ(t))
+    u = μ - Kr(θ,t,φ(t),Pr)*(x-α)
+    ξ = [x;u]
+    f!(dx,θ,ξ,t)
+end
 
 
 #TODO: macro

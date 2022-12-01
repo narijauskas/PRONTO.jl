@@ -16,8 +16,8 @@ using MacroTools
 using SparseArrays
 using MatrixEquations
 
-using OrdinaryDiffEq
-# using DifferentialEquations
+# using OrdinaryDiffEq
+using DifferentialEquations
 using Symbolics
 using Symbolics: derivative
 
@@ -27,7 +27,7 @@ export info
 
 export @tick,@tock,@clock
 
-export ODE, ODEBuffer
+export ODE, Buffer
 export dae
 export preview
 
@@ -39,8 +39,10 @@ export preview
 include("helpers.jl")
 
 # S is a Tuple{dims...}
-Buffer{S} = MArray{S, Float64}
-Buffer{S}() where {S} = zeros(MArray{S, Float64})
+Buffer{S} = SizedArray{S, Float64}
+Buffer{S}() where {S} = SizedArray{S,Float64}(undef)
+# Buffer{S}() where {S} = zeros(MArray{S, Float64})
+
 export Buffer
 
 
