@@ -18,12 +18,17 @@ mass_matrix(M) = cat(diagm(ones(nx(M))), diagm(zeros(nu(M))); dims=(1,2))
 # constructor basically wraps ODEProblem
 function ODE(fn, x0, ts, ode_pm, buf::T; dae=nothing, ode_kw...) where {T}
     ode_fn = isnothing(dae) ? ODEFunction(fn) : ODEFunction(fn; mass_matrix=dae)
-    sln = solve(ODEProblem(ode_fn,x0,ts,ode_pm; ode_kw...); reltol=1e-7, saveat=0.001)
+    sln = solve(ODEProblem(ode_fn,x0,ts,ode_pm; ode_kw...), Rodas4(); reltol=1e-7, saveat=0.001)
     fxn = FunctionWrapper{T, Tuple{Float64}}(t->copy(sln(buf,t)))
     ODE{T}(fxn,buf,sln)
 end
 
 Base.size(ode::ODE) = size(ode.buf)
+
+
+
+
+
 
 function _preview(ode::ODE)
     T = LinRange(extrema(ode.sln.t)..., 240)

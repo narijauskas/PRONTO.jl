@@ -124,6 +124,34 @@ write(fname, hdr*prod(string.(M).*"\n\n"))
 include(fname)
 
 ##
+ξ0 = SizedVector{23}([mdl.xf; 0])
+g = @closure t->[0.2]
+θ = Split()
+φg = ODE(PRONTO.forced_dynamics!, collect(ξ0), (0,10), (θ,g), Buffer{Tuple{NX+NU}}(); dae = dae(θ))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 θ = Split2()
 P0 = SizedMatrix{NX,NX}(collect(1.0*I(NX)))
 PRONTO.Kr(θ,0,φ,P0)

@@ -55,7 +55,7 @@ end
 # @define lxx  (θ,t,ξ)
 # @define lxu  (θ,t,ξ)
 # @define luu  (θ,t,ξ)
-# @define p    (θ,t,ξ)
+# @define p    (θ,t,ξ) 
 # @define px   (θ,t,ξ)
 # @define pxx  (θ,t,ξ)
 # @define Qrr   (θ,t,ξ)
@@ -74,6 +74,7 @@ Rr!(out,θ::Model,t,ξ) = throw(ModelDefError(M,nameof(Rr!)))
 Rr(θ::Model,t,ξ) = throw(ModelDefError(M,nameof(Rr)))
 
 f!(dx,θ,ξ,t) = @error "no f! defined"
+f(θ,ξ,t) = @error "no f defined"
 
 views(::Model{NX,NU,NΘ},ξ) where {NX,NU,NΘ} = (@view ξ[1:NX]),(@view ξ[NX+1:end])
 

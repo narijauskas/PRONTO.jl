@@ -16,7 +16,8 @@ using MacroTools
 using SparseArrays
 using MatrixEquations
 
-using DifferentialEquations
+using OrdinaryDiffEq
+# using DifferentialEquations
 using Symbolics
 using Symbolics: derivative
 
@@ -70,10 +71,10 @@ include("model.jl")
 
 # ----------------------------------- 3. intermediate operators ----------------------------------- #
 # M contains buffers
-@inline Ar(M,θ,t,φ) = (fx!(M, M.Ar, M.θ, t, φ); return M.Ar)
-@inline Br(M,θ,t,φ) = (fu!(M, M.Br, M.θ, t, φ); return M.Br)
-@inline Qr(M,θ,t,φ) = (Qrr!(M, M.Qr, M.θ, t, φ); return M.Qr)
-@inline Rr(M,θ,t,φ) = (Rrr!(M, M.Rr, M.θ, t, φ); return M.Rr)
+# @inline Ar(M,θ,t,φ) = (fx!(M, M.Ar, M.θ, t, φ); return M.Ar)
+# @inline Br(M,θ,t,φ) = (fu!(M, M.Br, M.θ, t, φ); return M.Br)
+# @inline Qr(M,θ,t,φ) = (Qrr!(M, M.Qr, M.θ, t, φ); return M.Qr)
+# @inline Rr(M,θ,t,φ) = (Rrr!(M, M.Rr, M.θ, t, φ); return M.Rr)
 
 regulator(B,P,R) = Diagonal(R)\B'P
 
@@ -93,11 +94,11 @@ function riccati!(out,A,K,P,Q,R)
 end
 
 # generate naive, generic Kr, and dPr_dt
-function Kr(M, θ, t, φ, Pr)
-    mul!(out, Diagonal(R)\B', Pr)
-    M.Kr .= Diagonal(Rr(M,θ,t,φ)) \ (Br(M,θ,t,φ)'*Pr)
-    return M.Kr
-end
+# function Kr(M, θ, t, φ, Pr)
+#     mul!(out, Diagonal(R)\B', Pr)
+#     M.Kr .= Diagonal(Rr(M,θ,t,φ)) \ (Br(M,θ,t,φ)'*Pr)
+#     return M.Kr
+# end
 
 
 # dPr_dt!(M::Model, out, θ, t, φ, Pr) = out .= riccati(Ar(M,θ,t,φ), Kr(M,θ,t,φ,Pr), Pr, Qr(M,θ,t,φ), Rr(M,θ,t,φ))
