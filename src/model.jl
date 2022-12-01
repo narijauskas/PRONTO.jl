@@ -5,7 +5,7 @@ using Symbolics
 using SparseArrays
 using Dates
 
-
+# or just throw a method error?
 struct ModelDefError <: Exception
     M::Model
     fn::Symbol
@@ -13,11 +13,7 @@ end
 
 function Base.showerror(io::IO, e::ModelDefError)
     T = typeof(e.M)
-    print(io, 
-        "PRONTO.$(e.fn) is missing a method for the $T model.\n",
-        "Please check the $T model definition and then re-run: ",
-        "@derive $T\n"
-    )
+    print(io, "PRONTO.$(e.fn) is missing a method for the $T model.\n")
 end
 
 _!(ex) = Symbol(String(ex)*"!")
@@ -47,34 +43,65 @@ macro define(fn, args)
     end
 end
 
-@define f    (θ,t,ξ)
-@define fx   (θ,t,ξ)
-@define fu   (θ,t,ξ)
-@define fxx  (θ,t,ξ)
-@define fxu  (θ,t,ξ)
-@define fuu  (θ,t,ξ)
-@define l    (θ,t,ξ)
-@define lx   (θ,t,ξ)
-@define lu   (θ,t,ξ)
-@define lxx  (θ,t,ξ)
-@define lxu  (θ,t,ξ)
-@define luu  (θ,t,ξ)
-@define p    (θ,t,ξ)
-@define px   (θ,t,ξ)
-@define pxx  (θ,t,ξ)
-@define Qrr   (θ,t,ξ)
-@define Rrr   (θ,t,ξ)
+# @define f    (θ,t,ξ)
+# @define fx   (θ,t,ξ)
+# @define fu   (θ,t,ξ)
+# @define fxx  (θ,t,ξ)
+# @define fxu  (θ,t,ξ)
+# @define fuu  (θ,t,ξ)
+# @define l    (θ,t,ξ)
+# @define lx   (θ,t,ξ)
+# @define lu   (θ,t,ξ)
+# @define lxx  (θ,t,ξ)
+# @define lxu  (θ,t,ξ)
+# @define luu  (θ,t,ξ)
+# @define p    (θ,t,ξ)
+# @define px   (θ,t,ξ)
+# @define pxx  (θ,t,ξ)
+# @define Qrr   (θ,t,ξ)
+# @define Rrr   (θ,t,ξ)
 
+#TODO: don't dispatch on model
 Ar!(out,θ::Model,t,ξ) = throw(ModelDefError(M,nameof(Ar!)))
 Ar(θ::Model,t,ξ) = throw(ModelDefError(M,nameof(Ar)))
 Br!(out,θ::Model,t,ξ) = throw(ModelDefError(M,nameof(Br!)))
 Br(θ::Model,t,ξ) = throw(ModelDefError(M,nameof(Br)))
 # Kr!(out,θ::Model,t,ξ) = throw(ModelDefError(M,nameof(Kr!)))
-Kr(θ::Model,t,ξ,Pr) = Rr(θ,t,ξ)\Br(θ,t,ξ)'Pr
+Kr(θ::Model,t,ξ,Pr) = Rr(θ,t,ξ)\(Br(θ,t,ξ)'Pr)
 Qr!(out,θ::Model,t,ξ) = throw(ModelDefError(M,nameof(Qr!)))
 Qr(θ::Model,t,ξ) = throw(ModelDefError(M,nameof(Qr)))
 Rr!(out,θ::Model,t,ξ) = throw(ModelDefError(M,nameof(Rr!)))
 Rr(θ::Model,t,ξ) = throw(ModelDefError(M,nameof(Rr)))
+
+f!(dx,θ,ξ,t) = @error "no f! defined"
+
+views(::Model{NX,NU,NΘ},ξ) where {NX,NU,NΘ} = (@view ξ[1:NX]),(@view ξ[NX+1:end])
+
+function forced_dynamics!(dξ,ξ,(θ,g),t)
+    _,u = views(θ,ξ)
+    dx,du = views(θ,dξ)
+
+    f!(dx,θ,ξ,t)
+    copyto!(du, g(t) - u)
+    return nothing
+end
+
+function regulated_dynamics!(dξ,ξ,(θ,φ,Pr),t)
+    x,u = views(θ,ξ)
+    dx,du = views(θ,dξ)
+    α,μ = views(θ,φ(t))
+
+    f!(dx,θ,ξ,t)
+    copyto!(du, μ - Kr(θ,t,ξ,Pr)*(x-α) - u)
+    return nothing
+end
+
+
+
+
+
+
+
 #TODO: macro
 # f(M::Model,θ,t,ξ) = throw(ModelDefError(M,nameof(f)))
 # f!(M::Model,θ,t,ξ) = throw(ModelDefError(M,nameof(f!)))
@@ -258,7 +285,7 @@ end
 function sparse_mask(v, fn)
     v .* map(fn) do ex
         iszero(ex) ? 0 : 1
-    end |> collect |> sparse
+    end |> collect
 end
 
 
@@ -393,6 +420,8 @@ end
 
 define(symex, symargs...)::Expr = strip(build_function(symex, symargs...)[2])
 
+# build_inplace()
+
 # sort of redundant
 body(args, symex, symargs...) = rename_args(define(symex, symargs...),args)
 
@@ -429,6 +458,13 @@ end
 function θ_dispatch(T,args...)
     map(args) do ex
         ex == :θ ? :(θ::$T) : ex
+    end
+end
+
+# insert the `new` expression at each matching `tgt` in the `src`
+function crispr(src,tgt,new)
+    postwalk(src) do ex
+        return @capture(ex, tgt) ? new : ex
     end
 end
 

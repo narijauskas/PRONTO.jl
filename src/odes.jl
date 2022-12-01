@@ -28,7 +28,7 @@ Base.size(ode::ODE) = size(ode.buf)
 function _preview(ode::ODE)
     T = LinRange(extrema(ode.sln.t)..., 240)
     x = [ode(t)[i] for t in T, i in 1:length(ode.buf)]
-    lineplot(T, x; height=20, width=80, labels=false)
+    lineplot(T, x; height=30, width=120, labels=false)
 end
 
 function preview(ode::ODE)

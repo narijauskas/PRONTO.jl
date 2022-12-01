@@ -77,7 +77,7 @@ end
 using PRONTO: Jacobian
 using Base: invokelatest
 using PRONTO: now
-
+using PRONTO: define, build_methods
 
 NX = mdl.NX; NU = mdl.NU; NΘ = mdl.NΘ
 # initialize variables for tracing
@@ -95,7 +95,7 @@ Qr_trace = invokelatest(mdl.Qr,collect(θ),t,collect(x),collect(u))
 ##
 
 
-T = :Split2
+T = :Split
 M = Expr[]
 push!(M,:(
     struct $T <: PRONTO.Model{$NX,$NU,$NΘ}
@@ -103,6 +103,8 @@ push!(M,:(
     end
 ))
 
+def = define(f_trace,θ,ξ,t)
+append!(M,build_methods(:f,T,[NX],[:θ,:ξ,:t],def))
 
 def = PRONTO.define(Jx(f_trace),θ,t,ξ)
 append!(M,PRONTO.build_methods(:Ar,T,[NX,NX],[:θ,:t,:ξ],def))
@@ -116,11 +118,11 @@ append!(M,PRONTO.build_methods(:Rr,T,[NU,NU],[:θ,:t,:ξ],def))
 def = PRONTO.define(Qr_trace,θ,t,ξ)
 append!(M,PRONTO.build_methods(:Qr,T,[NX,NX],[:θ,:t,:ξ],def))
 
-
 fname = tempname()*"_$T.jl"
 hdr = "#= this file was machine generated at $(now()) - DO NOT MODIFY =#\n\n"
 write(fname, hdr*prod(string.(M).*"\n\n"))
 include(fname)
+
 ##
 θ = Split2()
 P0 = SizedMatrix{NX,NX}(collect(1.0*I(NX)))
@@ -132,8 +134,31 @@ PRONTO.Kr(θ,0,φ,P0)
 #DONE: benchmark buffered matrix Kr
 #DONE: benchmark autodiff Kr ~ 8.3 μs
 
-#TODO: register symbolic Kr
+#TODO: register symbolic Kr(θ,t,ξ,Pr)
 #TODO: make dξ_dt!
+
+
+PRONTO.Kr(θ::Split,t,ξ,Pr) = PRONTO.Rr(θ,t,ξ)\(PRONTO.Br(θ,t,ξ)'Pr)
+
+
+
+@variables K[1:NU,1:NX], x[1:NX]
+def1 = define(K*x + K*x,θ,t,ξ)
+build_methods(:Kr1,T,[NU,NX],[:θ,:t,:ξ],def1)
+def2 = define(collect(K*x),θ,t,ξ)
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 function Kr1(θ,t,ξ,Pr)
