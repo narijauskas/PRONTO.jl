@@ -60,7 +60,7 @@ Qr(θ,x,u,t) = θ[2]*I(NX)
 
 
 
-
+MacroTools.prettify(ex)
 
 
 
@@ -88,7 +88,18 @@ f_trace = invokelatest(f,collect(θ),collect(x),collect(u),t)
 Rr_trace = invokelatest(Rr,collect(θ),collect(x),collect(u),t)
 Qr_trace = invokelatest(Qr,collect(θ),collect(x),collect(u),t)
 
+ex1 = build_pretty(:f, :SplitP, f_trace)
+ex2 = build_pretty(:fx, :SplitP, Jx(f_trace))
 
+
+
+# fname = tempname()*"_$T.jl"
+
+fname = tempname()*".jl"
+hdr = "#= this file was machine generated at $(now()) - DO NOT MODIFY =#\n\n"
+M = [ex1;ex2]
+write(fname, hdr*prod(string.(M).*"\n\n"))
+    
 
 
 ex = build_function(f_trace,θ,x,u,t)[2]
@@ -105,13 +116,49 @@ ex = crispr(ex, :ˍ₋out, :out) |> clean
 
 M = Expr[]
 
+tmap(f_trace) do x
+    string(prettify(toexpr(x)))
+end
+
+trace_symbolic(f) = invokelatest(f, collect.(args)...)
+
+# need to know:
+# name, size, args/T
+build_pretty(name, T, syms) = build_expr(name, T, syms; postprocess = prettify)
+
+function build_expr(name, T, syms; postprocess = identity)
+    # parallel map each symbolic to expr
+    defs = tmap(enumerate(syms)) do (i,x)
+        :(out[$i] = $(postprocess(toexpr(x))))
+    end
+
+    return quote
+        function PRONTO.$name(θ::$T,x,u,t)
+            out = SizedMatrix{$NX,$NX,Float64}(undef)
+            @inbounds begin
+                $(defs...)
+            end
+            return out
+        end
+    end |> clean
+end
+
+M1 = build_expr(:f1, :SplitP, f_trace)
+M2 = build_pretty(:f1, :SplitP, f_trace)
 
 
 
 
 
+ex = quote
+    function Foo(b,a,r)
+        out = SizedMatrix{$NX,$NX,Float64}(undef)
+        @inbounds begin $(M...) end
+        return out
+    end
+end
 
-
+clean(ex)
 
 α = 10
 ω = 0.5

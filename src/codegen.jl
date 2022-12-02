@@ -5,10 +5,6 @@
 _!(ex) = Symbol(String(ex)*"!")
 
 
-
-
-
-
 # eg. Jx = Jacobian(x); fx_sym = Jx(f_sym)
 # maps symbolic -> symbolic
 struct Jacobian dv end
@@ -24,6 +20,25 @@ end
 # isnothing(force_dims) || (fx_sym = reshape(fx_sym, force_dims...))
 
 
+
+build_pretty(name, T, syms) = build_expr(name, T, syms; postprocess = prettify)
+
+function build_expr(name, T, syms; postprocess = identity)
+    # parallel map each symbolic to expr
+    defs = tmap(enumerate(syms)) do (i,x)
+        :(out[$i] = $(postprocess(toexpr(x))))
+    end
+
+    return quote
+        function PRONTO.$name(θ::$T,x,u,t)
+            out = SizedMatrix{$NX,$NX,Float64}(undef)
+            @inbounds begin
+                $(defs...)
+            end
+            return out
+        end
+    end |> clean
+end
 
 
 # make a version of v with the sparsity pattern of fn
@@ -44,9 +59,12 @@ function clean(ex)
 end
 
 
+
 # insert the `new` expression at each matching `tgt` in the `src`
 function crispr(src,tgt,new)
     postwalk(src) do ex
         return @capture(ex, $tgt) ? new : ex
     end
 end
+
+
