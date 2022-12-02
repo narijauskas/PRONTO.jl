@@ -85,7 +85,7 @@ struct ModelDefError <: Exception
 end
 
 function Base.showerror(io::IO, e::ModelDefError)
-    T = typeof(e.M)
+    T = typeof(e.θ)
     print(io, "PRONTO is missing method definitions for the $T model.\n")
 end
 

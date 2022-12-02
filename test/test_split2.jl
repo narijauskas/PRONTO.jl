@@ -1,4 +1,4 @@
-
+##
 using StaticArrays, LinearAlgebra, Symbolics
 using SparseArrays, MatrixEquations
 using MacroTools, BenchmarkTools
@@ -42,8 +42,8 @@ end
 
 
 function f(θ,x,u,t)
-    α = 10
-    ω = 0.5
+    α = 10 #TODO: parameterize
+    ω = 1.0
     n = 5
     v = -α/4
     H0 = SymTridiagonal([4.0i^2 for i in -n:n], v*ones(2n))
@@ -51,6 +51,7 @@ function f(θ,x,u,t)
     H2 = v*Tridiagonal(ones(2n), zeros(2n+1), -ones(2n))
     return mprod(-im*ω*(H0 + sin(u[1])*H1 + (1-cos(u[1]))*H2) )*x
 end
+
 
 
 # for now, this will work:
@@ -62,7 +63,7 @@ Qr(θ,x,u,t) = θ[2]*I(NX)
 
 # PRONTO.define(f,Rr,Qr)
 
-generate_methods(SplitP,f,Rr,Qr)
+# generate_methods(SplitP,f,Rr,Qr)
 
 
 ## ------------------------------- symbolic derivatives ------------------------------- ##
@@ -90,14 +91,17 @@ Qr_trace = invokelatest(Qr,collect(θ),collect(x),collect(u),t)
 T = :SplitP
 M = [
     build_inplace(T, :f!, f_trace),
-    build(Size(NX), T, :f, f_trace),
-    build(Size(NX,NX), T, :Ar, Jx(f_trace)),
-    build(Size(NX,NU), T, :Br, Ju(f_trace)),
-    build(Size(NX,NX), T, :Qr, Qr_trace),
-    build(Size(NU,NU), T, :Rr, Rr_trace)
+    build_expr(Size(NX), T, :f, f_trace),
+    build_expr(Size(NX,NX), T, :Ar, Jx(f_trace)),
+    build_expr(Size(NX,NU), T, :Br, Ju(f_trace)),
+    build_expr(Size(NX,NX), T, :Qr, Qr_trace),
+    build_expr(Size(NU,NU), T, :Rr, Rr_trace)
 ];
 
 
+tmap(f_trace) do x
+    prettify(toexpr(x))
+end
 
 
 # fname = tempname()*"_$T.jl"
@@ -124,7 +128,7 @@ n = 5
 v = -α/4
 H0 = SymTridiagonal([4.0i^2 for i in -n:n], v*ones(2n))
 w = eigvecs(H0)
-xg = i -> SVector{NX}(kron([1;0],w[:,i]))
+x_eig = i -> SVector{NX}(kron([1;0],w[:,i]))
 
 x0 = SVector{NX}(kron([1;0],w[:,1]))
 xf = SVector{NX}(kron([1;0],w[:,2]))
@@ -134,8 +138,8 @@ t0,tf = (0,10)
 θ = SplitP(1,1)
 μ = @closure t->SizedVector{1}(0.2)
 
-α = ODE(dx_dt!, xf, (t0,tf), (θ,u_ol(θ,μ,t)), Size(x0))
-x = ODE(dx_dt!, x0, (t0,tf), (θ,u_ol(θ,μ,t)), Size(x0))
+α = ODE(dx_dt_ol!, xf, (t0,tf), (θ,μ), Size(x0))
+x = ODE(dx_dt_ol!, x0, (t0,tf), (θ,μ), Size(x0))
 u = @closure t->u_ol(θ,μ,t)
 
 Prf = SizedMatrix{NX,NX}(I(nx(θ)))
@@ -152,8 +156,8 @@ x = ODE(dx_dt!, x0, (t0,tf), (θ,α,μ,Pr), Size(x0))
 
 # this is insanely cool:
 μ = @closure t->SizedVector{1}(0.1)
-
-for x0 in xg.(1:11)
+ODE(dx_dt_ol!, x0, (t0,tf), (θ,μ), Size(x0))
+for x0 in x_eig.(1:11)
     show(ODE(dx_dt_ol!, x0, (t0,tf), (θ,μ), Size(x0)))
 end
 
@@ -162,14 +166,20 @@ end
 
 
 
+tsk = map(1:100) do kr
+    θ = SplitP(kr, 1)
+    @spawn ODE(dx_dt!, x0, (t0,tf), (θ,α,μ,Pr), Size(x0))
+end
+
+fetch.(tsk)
 
 
 
 
 
-
-
-
+θ = SplitP(1, 1)
+Pr = @closure t->Prf
+x = ODE(dx_dt!, x0, (t0,tf), (θ,α,μ,Pr), Size(x0))
 
 
 
