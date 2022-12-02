@@ -1,3 +1,4 @@
+# PRONTO.jl dev_0.4
 module PRONTO
 
 using FunctionWrappers
@@ -6,11 +7,7 @@ using StaticArrays
 using FastClosures
 export @closure
 
-function lu end
-function lu! end
-# using LinearAlgebra # don't import lu
-import LinearAlgebra
-using LinearAlgebra: diagm, Diagonal
+using LinearAlgebra
 using UnicodePlots
 using MacroTools
 using SparseArrays
@@ -35,21 +32,14 @@ export preview
 
 
 
-# ----------------------------------- 0. preliminaries & helpers ----------------------------------- #
-include("helpers.jl")
-
-# S is a Tuple{dims...}
-Buffer{S} = MArray{S, Float64}
-Buffer{S}() where {S} = MArray{S,Float64}(undef)
-# Buffer{S}() where {S} = zeros(MArray{S, Float64})
+# ----------------------------------- 0. preliminaries & typedefs ----------------------------------- #
 
 
-# ----------------------------------- 1. model definition ----------------------------------- #
 using MacroTools
 using MacroTools: @capture
 
-export @model
-# export Model
+# export @model
+export Model
 export nx,nu,nθ
 
 
@@ -60,16 +50,122 @@ nu(::Model{NX,NU,NΘ}) where {NX,NU,NΘ} = NU
 nθ(::Model{NX,NU,NΘ}) where {NX,NU,NΘ} = NΘ
 
 
+# not used
 inv!(A) = LinearAlgebra.inv!(LinearAlgebra.cholesky!(Hermitian(A)))
 
 
-# ----------------------------------- 2. model derivation ----------------------------------- #
+# ----------------------------------- 1. helpers ----------------------------------- #
+include("helpers.jl")
+
+
+#YO: can I actually deprecate this? :)
+views(::Model{NX,NU,NΘ},ξ) where {NX,NU,NΘ} = (@view ξ[1:NX]),(@view ξ[NX+1:end])
+
+
+include("codegen.jl") # takes derivatives
+include("odes.jl") # ODE solution handling
+
+
 # defines all PRONTO.f(M,θ,t,ξ) and PRONTO.f!(M,θ,t,ξ) along with derivatives
+#TODO: #MAYBE: deprecate
 include("model.jl")
 
 
 
-# ----------------------------------- 3. intermediate operators ----------------------------------- #
+# ----------------------------------- 2. model functions ----------------------------------- #
+# missing implementations provided by codegen
+
+
+# or just throw a method error?
+struct ModelDefError <: Exception
+    θ::Model
+end
+
+function Base.showerror(io::IO, e::ModelDefError)
+    T = typeof(e.M)
+    print(io, "PRONTO is missing method definitions for the $T model.\n")
+end
+
+
+#TODO: cleanup, don't dispatch on model
+Ar!(out,θ,α,μ,t) = throw(ModelDefError(θ))
+Ar(θ,α,μ,t) = throw(ModelDefError(θ))
+
+Br!(out,θ,α,μ,t) = throw(ModelDefError(θ))
+Br(θ,α,μ,t) = throw(ModelDefError(θ))
+
+Qr!(out,θ,α,μ,t) = throw(ModelDefError(θ))
+Qr(θ,α,μ,t) = throw(ModelDefError(θ))
+
+Rr!(out,θ,α,μ,t) = throw(ModelDefError(θ))
+Rr(θ,α,μ,t) = throw(ModelDefError(θ))
+
+f!(dx,θ,x,u,t) = throw(ModelDefError(θ))
+f(θ,x,u,t) = throw(ModelDefError(θ))
+
+
+# Kr!(out,θ,x,u,t) = throw(ModelDefError(M,nameof(Kr!)))
+Kr(θ,α,μ,Pr) = Rr(θ,α,μ,t)\(Br(θ,α,μ,t)'Pr)
+
+
+
+
+
+
+
+
+# ----------------------------------- 3. ode functions ----------------------------------- #
+include("guess.jl") #TODO: merge these in
+
+
+
+
+riccati(A,K,P,Q,R) = -A'P - P*A + K'R*K - Q
+
+function dPr_dt!(dPr,Pr,(M,θ,φ),t)#(M, out, θ, t, φ, Pr)
+    riccati!(dPr,Ar(θ,x,u,t),Kr(θ,α,μ,Pr),Pr,Qr(M,θ,t,φ),Rr(M,θ,t,φ))
+end
+
+# forced
+function dx_dt!(dx,x,(θ,μ),t)
+    f!(dx,θ,x,μ,t) # u = μ
+end
+
+# regulated
+function dx_dt!(dx,x,(θ,α,μ,Pr),t)
+    u = μ - Kr(θ,α,μ,Pr)*(x-α)
+    f!(dx,θ,x,u,t)
+end
+
+
+# ----------------------------------- pronto loop ----------------------------------- #
+
+
+
+# solves for x(t),u(t)
+function pronto(θ::Model{NX,NU,NΘ}, x0::StaticVector, α, μ, (t0,tf);
+            tol = 1e-5,
+            maxiters = 20) where {NX,NU,NΘ}
+   
+    Pr_f = diagm(ones(NX)) #TODO: generalize
+    # Prf = SizedMatrix{NX,NX}(I(nx(θ)))
+    Pr = ODE(dPr_dt!, Prf, (tf,t0), (θ,α,μ), Size(NX,NX))
+
+    # x0 is always the same
+    x = ODE(dx_dt!, x0, (t0,tf), (θ,α,μ,Pr), Size(x0))
+
+    # ξ = ODE(ξ_ode, [x0;u0], (t0,tf), (M,θ,φ,Pr), ODEBuffer{Tuple{NX+NU}}(); dae=dae(M))
+
+end
+
+
+
+
+
+
+# ----------------------------------- ?? ----------------------------------- #
+
+
 # M contains buffers
 # @inline Ar(M,θ,t,φ) = (fx!(M, M.Ar, M.θ, t, φ); return M.Ar)
 # @inline Br(M,θ,t,φ) = (fu!(M, M.Br, M.θ, t, φ); return M.Br)
@@ -120,22 +216,13 @@ end
 
 
 # ----------------------------------- 5. ode solutions ----------------------------------- #
-include("odes.jl")
+# include("odes.jl")
 
 # ----------------------------------- 6. trajectories ----------------------------------- #
-
-function Ar2(θ, t, ξ)
-    (SymbolicUtils.Code.create_array)(typeof(ξ), nothing, Val{2}(), Val{(22, 22)}(), 0, (*)(-1.25, (sin)((getindex)(ξ, 23))), 0, 0, 0, 0, 0, 0, 0, 0, 0, -50.0, (*)(1.25, (cos)((getindex)(ξ, 23))), 0, 0, 0, 0, 0, 0, 0, 0, 0, (*)(1.25, (sin)((getindex)(ξ, 23))), 0, (*)(-1.25, (sin)((getindex)(ξ, 23))), 0, 0, 0, 0, 0, 0, 0, 0, (*)(1.25, (cos)((getindex)(ξ, 23))), -32.0, (*)(1.25, (cos)((getindex)(ξ, 23))), 0, 0, 0, 0, 0, 0, 0, 0, 0, (*)(1.25, (sin)((getindex)(ξ, 23))), 0, (*)(-1.25, (sin)((getindex)(ξ, 23))), 0, 0, 0, 0, 0, 0, 0, 0, (*)(1.25, (cos)((getindex)(ξ, 23))), -18.0, (*)(1.25, (cos)((getindex)(ξ, 23))), 0, 0, 0, 0, 0, 0, 0, 0, 0, (*)(1.25, (sin)((getindex)(ξ, 23))), 0, (*)(-1.25, (sin)((getindex)(ξ, 23))), 0, 0, 0, 0, 0, 0, 0, 0, (*)(1.25, (cos)((getindex)(ξ, 23))), -8.0, (*)(1.25, (cos)((getindex)(ξ, 23))), 0, 0, 0, 0, 0, 0, 0, 0, 0, (*)(1.25, (sin)((getindex)(ξ, 23))), 0, (*)(-1.25, (sin)((getindex)(ξ, 23))), 0, 0, 0, 0, 0, 0, 0, 0, (*)(1.25, (cos)((getindex)(ξ, 23))), -2.0, (*)(1.25, (cos)((getindex)(ξ, 23))), 0, 0, 0, 0, 0, 0, 0, 0, 0, (*)(1.25, (sin)((getindex)(ξ, 23))), 0, (*)(-1.25, (sin)((getindex)(ξ, 23))), 0, 0, 0, 0, 0, 0, 0, 0, (*)(1.25, (cos)((getindex)(ξ, 23))), 0, (*)(1.25, (cos)((getindex)(ξ, 23))), 0, 0, 0, 0, 0, 0, 0, 0, 0, (*)(1.25, (sin)((getindex)(ξ, 23))), 0, (*)(-1.25, (sin)((getindex)(ξ, 23))), 0, 0, 0, 0, 0, 0, 0, 0, (*)(1.25, (cos)((getindex)(ξ, 23))), -2.0, (*)(1.25, (cos)((getindex)(ξ, 23))), 0, 0, 0, 0, 0, 0, 0, 0, 0, (*)(1.25, (sin)((getindex)(ξ, 23))), 0, (*)(-1.25, (sin)((getindex)(ξ, 23))), 0, 0, 0, 0, 0, 0, 0, 0, (*)(1.25, (cos)((getindex)(ξ, 23))), -8.0, (*)(1.25, (cos)((getindex)(ξ, 23))), 0, 0, 0, 0, 0, 0, 0, 0, 0, (*)(1.25, (sin)((getindex)(ξ, 23))), 0, (*)(-1.25, (sin)((getindex)(ξ, 23))), 0, 0, 0, 0, 0, 0, 0, 0, (*)(1.25, (cos)((getindex)(ξ, 23))), -18.0, (*)(1.25, (cos)((getindex)(ξ, 23))), 0, 0, 0, 0, 0, 0, 0, 0, 0, (*)(1.25, (sin)((getindex)(ξ, 23))), 0, (*)(-1.25, (sin)((getindex)(ξ, 23))), 0, 0, 0, 0, 0, 0, 0, 0, (*)(1.25, (cos)((getindex)(ξ, 23))), -32.0, (*)(1.25, (cos)((getindex)(ξ, 23))), 0, 0, 0, 0, 0, 0, 0, 0, 0, (*)(1.25, (sin)((getindex)(ξ, 23))), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, (*)(1.25, (cos)((getindex)(ξ, 23))), -50.0, 50.0, (*)(-1.25, (cos)((getindex)(ξ, 23))), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, (*)(-1.25, (sin)((getindex)(ξ, 23))), 0, 0, 0, 0, 0, 0, 0, 0, 0, (*)(-1.25, (cos)((getindex)(ξ, 23))), 32.0, (*)(-1.25, (cos)((getindex)(ξ, 23))), 0, 0, 0, 0, 0, 0, 0, 0, (*)(1.25, (sin)((getindex)(ξ, 23))), 0, (*)(-1.25, (sin)((getindex)(ξ, 23))), 0, 0, 0, 0, 0, 0, 0, 0, 0, (*)(-1.25, (cos)((getindex)(ξ, 23))), 18.0, (*)(-1.25, (cos)((getindex)(ξ, 23))), 0, 0, 0, 0, 0, 0, 0, 0, (*)(1.25, (sin)((getindex)(ξ, 23))), 0, (*)(-1.25, (sin)((getindex)(ξ, 23))), 0, 0, 0, 0, 0, 0, 0, 0, 0, (*)(-1.25, (cos)((getindex)(ξ, 23))), 8.0, (*)(-1.25, (cos)((getindex)(ξ, 23))), 0, 0, 0, 0, 0, 0, 0, 0, (*)(1.25, (sin)((getindex)(ξ, 23))), 0, (*)(-1.25, (sin)((getindex)(ξ, 23))), 0, 0, 0, 0, 0, 0, 0, 0, 0, (*)(-1.25, (cos)((getindex)(ξ, 23))), 2.0, (*)(-1.25, (cos)((getindex)(ξ, 23))), 0, 0, 0, 0, 0, 0, 0, 0, (*)(1.25, (sin)((getindex)(ξ, 23))), 0, (*)(-1.25, (sin)((getindex)(ξ, 23))), 0, 0, 0, 0, 0, 0, 0, 0, 0, (*)(-1.25, (cos)((getindex)(ξ, 23))), 0, (*)(-1.25, (cos)((getindex)(ξ, 23))), 0, 0, 0, 0, 0, 0, 0, 0, (*)(1.25, (sin)((getindex)(ξ, 23))), 0, (*)(-1.25, (sin)((getindex)(ξ, 23))), 0, 0, 0, 0, 0, 0, 0, 0, 0, (*)(-1.25, (cos)((getindex)(ξ, 23))), 2.0, (*)(-1.25, (cos)((getindex)(ξ, 23))), 0, 0, 0, 0, 0, 0, 0, 0, (*)(1.25, (sin)((getindex)(ξ, 23))), 0, (*)(-1.25, (sin)((getindex)(ξ, 23))), 0, 0, 0, 0, 0, 0, 0, 0, 0, (*)(-1.25, (cos)((getindex)(ξ, 23))), 8.0, (*)(-1.25, (cos)((getindex)(ξ, 23))), 0, 0, 0, 0, 0, 0, 0, 0, (*)(1.25, (sin)((getindex)(ξ, 23))), 0, (*)(-1.25, (sin)((getindex)(ξ, 23))), 0, 0, 0, 0, 0, 0, 0, 0, 0, (*)(-1.25, (cos)((getindex)(ξ, 23))), 18.0, (*)(-1.25, (cos)((getindex)(ξ, 23))), 0, 0, 0, 0, 0, 0, 0, 0, (*)(1.25, (sin)((getindex)(ξ, 23))), 0, (*)(-1.25, (sin)((getindex)(ξ, 23))), 0, 0, 0, 0, 0, 0, 0, 0, 0, (*)(-1.25, (cos)((getindex)(ξ, 23))), 32.0, (*)(-1.25, (cos)((getindex)(ξ, 23))), 0, 0, 0, 0, 0, 0, 0, 0, (*)(1.25, (sin)((getindex)(ξ, 23))), 0, (*)(-1.25, (sin)((getindex)(ξ, 23))), 0, 0, 0, 0, 0, 0, 0, 0, 0, (*)(-1.25, (cos)((getindex)(ξ, 23))), 50.0, 0, 0, 0, 0, 0, 0, 0, 0, 0, (*)(1.25, (sin)((getindex)(ξ, 23))), 0)
-end
-# ----------------------------------- * buffer type ----------------------------------- #
-# ----------------------------------- * timing ----------------------------------- #
-
-
 
 
 # ----------------------------------- PRONTO loop ----------------------------------- #
 
 # ----------------------------------- guess functions ----------------------------------- #
-include("guess.jl")
 
 end

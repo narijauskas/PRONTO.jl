@@ -35,12 +35,17 @@ StaticArrays.Size(::Type{ODE{T}}) where {T} = Size(T)
 Base.size(::ODE{T}) where {T} = size(T)
 Base.length(::ODE{T}) where {T} = length(T)
 Base.eltype(::Type{ODE{T}}) where {T} = T
-
 Base.extrema(ode::ODE) = extrema(ode.soln.t)
 domain(ode::ODE; n=240) = LinRange(extrema(ode)..., n)
+
+# stats(ode)
+# retcode(ode)
+# algorithm(ode)
+
+
 # T = LinRange(extrema(ode.soln.t)..., 240)
 
-
+#TODO: more info
 function Base.show(io::IO, ode::ODE)
     print(io, typeof(ode))
     # compact = get(io, :compact, false)
@@ -52,24 +57,18 @@ function Base.show(io::IO, ode::ODE)
     # return nothing
 end
 
-# lineplot(T, )
-preview(ode::ODE) = preview(ode, axes(ode))
-function preview(ode::ODE, ix)
-    tx = domain(ode)
-    x = [ode(t)[i] for t in tx, i in 1:length(ode)]
-    lineplot(tx, x; height=30, width=120, labels=false)
+function preview(ode::ODE)
+    T = domain(ode)
+    x = [ode(t)[i] for t in T, i in 1:length(ode)]
+    lineplot(T, x; height=30, width=120, labels=false)
 end
 
-# get everything by default
 export domain, preview
 
-# preview(x)
-# preview(x[1:4])
-
-
-# preview(ode::ODE)
-# preview(ode::ODE, idx)
-
+# this might be type piracy... but it prevents some obscenely long error messages
+function Base.show(io::IO, fn::FunctionWrapper{T,A}) where {T,A}
+    print(io, "FunctionWrapper: $A -> $T $(fn.ptr)")
+end
 
 
 
@@ -82,8 +81,7 @@ export domain, preview
 
 
 
-
-
+#=
 
 
 
@@ -152,3 +150,5 @@ function Base.getindex(ode::ODE, i)
     T = LinRange(extrema(ode.sln.t)..., 1001)
     [ode(t)[ix] for t in T, ix in i]
 end
+
+=#

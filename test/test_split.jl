@@ -1,14 +1,11 @@
-#
-#
-using PRONTO
-using StaticArrays
-using Symbolics
-using LinearAlgebra
-using MatrixEquations
-using SparseArrays
 
+using StaticArrays, LinearAlgebra, Symbolics
+using SparseArrays, MatrixEquations
 using MacroTools, BenchmarkTools
+##
+using PRONTO
 
+##
 # ------------------------------- model expansion ------------------------------- #
 
 # T = :Split

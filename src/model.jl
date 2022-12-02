@@ -5,18 +5,19 @@ using Symbolics
 using SparseArrays
 using Dates
 
-# or just throw a method error?
-struct ModelDefError <: Exception
-    M::Model
-    fn::Symbol
-end
+#=
+# # or just throw a method error?
+# struct ModelDefError <: Exception
+#     M::Model
+#     fn::Symbol
+# end
 
-function Base.showerror(io::IO, e::ModelDefError)
-    T = typeof(e.M)
-    print(io, "PRONTO.$(e.fn) is missing a method for the $T model.\n")
-end
+# function Base.showerror(io::IO, e::ModelDefError)
+#     T = typeof(e.M)
+#     print(io, "PRONTO.$(e.fn) is missing a method for the $T model.\n")
+# end
 
-_!(ex) = Symbol(String(ex)*"!")
+# _!(ex) = Symbol(String(ex)*"!")
 
 macro define(fn, args)
     fn! = esc(_!(fn)) # generates :(fn!)
@@ -61,22 +62,6 @@ end
 # @define Qrr   (θ,t,ξ)
 # @define Rrr   (θ,t,ξ)
 
-#TODO: don't dispatch on model
-Ar!(out,θ::Model,t,ξ) = throw(ModelDefError(M,nameof(Ar!)))
-Ar(θ::Model,t,ξ) = throw(ModelDefError(M,nameof(Ar)))
-Br!(out,θ::Model,t,ξ) = throw(ModelDefError(M,nameof(Br!)))
-Br(θ::Model,t,ξ) = throw(ModelDefError(M,nameof(Br)))
-# Kr!(out,θ::Model,t,ξ) = throw(ModelDefError(M,nameof(Kr!)))
-Kr(θ::Model,t,ξ,Pr) = Rr(θ,t,ξ)\(Br(θ,t,ξ)'Pr)
-Qr!(out,θ::Model,t,ξ) = throw(ModelDefError(M,nameof(Qr!)))
-Qr(θ::Model,t,ξ) = throw(ModelDefError(M,nameof(Qr)))
-Rr!(out,θ::Model,t,ξ) = throw(ModelDefError(M,nameof(Rr!)))
-Rr(θ::Model,t,ξ) = throw(ModelDefError(M,nameof(Rr)))
-
-f!(dx,θ,ξ,t) = @error "no f! defined"
-f(θ,ξ,t) = @error "no f defined"
-
-views(::Model{NX,NU,NΘ},ξ) where {NX,NU,NΘ} = (@view ξ[1:NX]),(@view ξ[NX+1:end])
 
 function forced_dynamics!(dξ,ξ,(θ,g),t)
     _,u = views(θ,ξ)
@@ -203,21 +188,6 @@ function type_def(T,NX,NU,NΘ)
 end
 
 
-
-
-# eg. Jx = Jacobian(x); fx_sym = Jx(f_sym)
-# maps symbolic -> symbolic
-struct Jacobian dv end
-
-function (J::Jacobian)(f_sym)
-    fv_sym = map(1:length(J.dv)) do i
-        map(f_sym) do f
-            derivative(f, J.dv[i])
-        end
-    end
-    return cat(fv_sym...; dims=ndims(f_sym)+1) #ndims = 0 for scalar-valued l,p
-end
-# isnothing(force_dims) || (fx_sym = reshape(fx_sym, force_dims...))
 
 function model(T, ex)
     info("deriving a new model for $(as_bold(T))")
@@ -410,7 +380,7 @@ end
 
 
 
-
+=#
 
 
 
@@ -425,13 +395,6 @@ end
 
 
 
-
-# remove excess begin blocks & comments
-function strip(ex)
-    postwalk(striplines(ex)) do ex
-        isexpr(ex) && ex.head == :block && length(ex.args) == 1 ? ex.args[1] : ex
-    end
-end
 
 
 # macro build(ex)
@@ -484,10 +447,12 @@ function θ_dispatch(T,args...)
     end
 end
 
-# insert the `new` expression at each matching `tgt` in the `src`
-function crispr(src,tgt,new)
-    postwalk(src) do ex
-        return @capture(ex, $tgt) ? new : ex
+
+
+# remove excess begin blocks & comments
+function strip(ex)
+    postwalk(striplines(ex)) do ex
+        isexpr(ex) && ex.head == :block && length(ex.args) == 1 ? ex.args[1] : ex
     end
 end
 
@@ -507,3 +472,9 @@ end
 
 # benchmark compare
 # also compare against multithreaded
+
+
+
+header(ex) = ex.args[1]
+
+get_args(ex) = ex.args[1].args
