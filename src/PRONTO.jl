@@ -17,6 +17,9 @@ using MatrixEquations
 using DifferentialEquations
 using Symbolics
 using Symbolics: derivative
+using SymbolicUtils.Code
+
+using ThreadTools
 
 export @derive
 export pronto
@@ -88,24 +91,19 @@ end
 
 
 #TODO: cleanup, don't dispatch on model
-Ar!(out,θ,α,μ,t) = throw(ModelDefError(θ))
 Ar(θ,α,μ,t) = throw(ModelDefError(θ))
-
-Br!(out,θ,α,μ,t) = throw(ModelDefError(θ))
 Br(θ,α,μ,t) = throw(ModelDefError(θ))
-
-Qr!(out,θ,α,μ,t) = throw(ModelDefError(θ))
 Qr(θ,α,μ,t) = throw(ModelDefError(θ))
-
-Rr!(out,θ,α,μ,t) = throw(ModelDefError(θ))
 Rr(θ,α,μ,t) = throw(ModelDefError(θ))
-
-f!(dx,θ,x,u,t) = throw(ModelDefError(θ))
 f(θ,x,u,t) = throw(ModelDefError(θ))
 
+# Ar!(out,θ,α,μ,t) = throw(ModelDefError(θ))
+# Br!(out,θ,α,μ,t) = throw(ModelDefError(θ))
+# Qr!(out,θ,α,μ,t) = throw(ModelDefError(θ))
+# Rr!(out,θ,α,μ,t) = throw(ModelDefError(θ))
 
-# Kr!(out,θ,x,u,t) = throw(ModelDefError(M,nameof(Kr!)))
-Kr(θ,α,μ,Pr) = Rr(θ,α,μ,t)\(Br(θ,α,μ,t)'Pr)
+f!(dx,θ,x,u,t) = throw(ModelDefError(θ))
+Kr(θ,α,μ,Pr,t) = Rr(θ,α,μ,t)\(Br(θ,α,μ,t)'Pr)
 
 
 
@@ -122,25 +120,28 @@ include("guess.jl") #TODO: merge these in
 
 riccati(A,K,P,Q,R) = -A'P - P*A + K'R*K - Q
 
-function dPr_dt!(dPr,Pr,(M,θ,φ),t)#(M, out, θ, t, φ, Pr)
-    riccati!(dPr,Ar(θ,x,u,t),Kr(θ,α,μ,Pr),Pr,Qr(M,θ,t,φ),Rr(M,θ,t,φ))
+function dPr_dt!(dPr,Pr,(θ,α,μ),t)#(M, out, θ, t, φ, Pr)
+    riccati!(dPr,Ar(θ,α(t),μ(t),t),Kr(θ,α(t),μ(t),Pr,t),Pr,Qr(θ,α(t),μ(t),t),Rr(θ,α(t),μ(t),t))
 end
 
 # forced
-function dx_dt!(dx,x,(θ,μ),t)
-    f!(dx,θ,x,μ,t) # u = μ
+function dx_dt_ol!(dx,x,(θ,u),t)
+    u = μ
+    f!(dx,θ,x,u,t)
 end
 
 # regulated
 function dx_dt!(dx,x,(θ,α,μ,Pr),t)
-    u = μ - Kr(θ,α,μ,Pr)*(x-α)
+    u = μ(t) - Kr(θ,α(t),μ(t),Pr(t),t)*(x-α(t))
     f!(dx,θ,x,u,t)
 end
-
+export u_ol,u_cl
+# u_ol(θ,μ,t) = μ(t)
+# u_cl(θ,x,α,μ,Pr,t) = μ - Kr(θ,α,μ,Pr,t)*(x-α)
 
 # ----------------------------------- pronto loop ----------------------------------- #
 
-
+export dx_dt!
 
 # solves for x(t),u(t)
 function pronto(θ::Model{NX,NU,NΘ}, x0::StaticVector, α, μ, (t0,tf);
@@ -197,21 +198,21 @@ end
 # end
 
 
-# dPr_dt!(M::Model, out, θ, t, φ, Pr) = out .= riccati(Ar(M,θ,t,φ), Kr(M,θ,t,φ,Pr), Pr, Qr(M,θ,t,φ), Rr(M,θ,t,φ))
-# include("C:/Users/mantas/AppData/Local/Temp/jl_56RGhMZEBm.jl")
-function dPr_dt!(dPr,Pr,(M,θ,φ),t)#(M, out, θ, t, φ, Pr)
-    riccati!(dPr,Ar(M,θ,t,φ),Kr(M,θ,t,φ,Pr),Pr,Qr(M,θ,t,φ),Rr(M,θ,t,φ))
-end
-# Pr_ode(dPr,Pr,(M,θ,φ),t) = dPr_dt!(M,dPr,θ,t,φ(t),Pr)
+# # dPr_dt!(M::Model, out, θ, t, φ, Pr) = out .= riccati(Ar(M,θ,t,φ), Kr(M,θ,t,φ,Pr), Pr, Qr(M,θ,t,φ), Rr(M,θ,t,φ))
+# # include("C:/Users/mantas/AppData/Local/Temp/jl_56RGhMZEBm.jl")
+# function dPr_dt!(dPr,Pr,(M,θ,φ),t)#(M, out, θ, t, φ, Pr)
+#     riccati!(dPr,Ar(M,θ,t,φ),Kr(M,θ,t,φ,Pr),Pr,Qr(M,θ,t,φ),Rr(M,θ,t,φ))
+# end
+# # Pr_ode(dPr,Pr,(M,θ,φ),t) = dPr_dt!(M,dPr,θ,t,φ(t),Pr)
 
-Pr_ode(dPr,Pr,(M,θ,φ),t) = dPr_auto(dPr, Ar(M, θ, t, φ(t)), Br(M, θ, t, φ(t)), Pr, Qr(M, θ, t, φ(t)), Rr(M, θ, t, φ(t)))
-# ----------------------------------- 4. ode equations ----------------------------------- #
-function pronto(M::Model{NX,NU,NΘ}, θ, t0, tf, x0, u0, φ; tol = 1e-5, maxiters = 20) where {NX,NU,NΘ}
-    Pr_f = diagm(ones(NX))
-    Pr = ODE(dPr_dt!, Pr_f, (tf,t0), (M,θ,φ), Buffer{Tuple{NX,NX}}())
-    ξ = ODE(ξ_ode, [x0;u0], (t0,tf), (M,θ,φ,Pr), ODEBuffer{Tuple{NX+NU}}(); dae=dae(M))
+# Pr_ode(dPr,Pr,(M,θ,φ),t) = dPr_auto(dPr, Ar(M, θ, t, φ(t)), Br(M, θ, t, φ(t)), Pr, Qr(M, θ, t, φ(t)), Rr(M, θ, t, φ(t)))
+# # ----------------------------------- 4. ode equations ----------------------------------- #
+# function pronto(M::Model{NX,NU,NΘ}, θ, t0, tf, x0, u0, φ; tol = 1e-5, maxiters = 20) where {NX,NU,NΘ}
+#     Pr_f = diagm(ones(NX))
+#     Pr = ODE(dPr_dt!, Pr_f, (tf,t0), (M,θ,φ), Buffer{Tuple{NX,NX}}())
+#     ξ = ODE(ξ_ode, [x0;u0], (t0,tf), (M,θ,φ,Pr), ODEBuffer{Tuple{NX+NU}}(); dae=dae(M))
 
-end
+# end
 
 
 

@@ -21,21 +21,49 @@ end
 
 
 
-build_pretty(name, T, syms) = build_expr(name, T, syms; postprocess = prettify)
+# build_pretty(name, T, syms) = build_expr(name, T, syms; postprocess = prettify)
 
-function build_expr(name, T, syms; postprocess = identity)
+# options for format: identity, MacroTools.prettify
+function build_expr(sz::Size, T, name, syms; format = identity)
     # parallel map each symbolic to expr
     defs = tmap(enumerate(syms)) do (i,x)
-        :(out[$i] = $(postprocess(toexpr(x))))
+        :(out[$i] = $(format(toexpr(x))))
     end
 
     return quote
         function PRONTO.$name(θ::$T,x,u,t)
-            out = SizedMatrix{$NX,$NX,Float64}(undef)
+            # out = SizedArray{Tuple{S...}, Float64, length(S), prod(S)}(undef)
+            out = $(SizedBuffer(sz))
             @inbounds begin
                 $(defs...)
             end
             return out
+        end
+    end |> clean
+end
+
+function SizedBuffer(::Size{S}) where {S}
+    if 1 == length(S)
+        :(SizedVector{$(S...), Float64}(undef))
+    elseif 2 == length(S)
+        :(SizedMatrix{$(S...), Float64}(undef))
+    elseif 3 == length(S)
+        :(SizedArray{Tuple{$(S...)}, Float64, length(S), prod(S)}(undef))
+    end
+end
+
+function build_inplace(T, name, syms; format = identity)
+    # parallel map each symbolic to expr
+    defs = tmap(enumerate(syms)) do (i,x)
+        :(out[$i] = $(format(toexpr(x))))
+    end
+
+    return quote
+        function PRONTO.$name(out,θ::$T,x,u,t)
+            @inbounds begin
+                $(defs...)
+            end
+            return nothing
         end
     end |> clean
 end

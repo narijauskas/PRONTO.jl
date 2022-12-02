@@ -60,18 +60,17 @@ Qr(θ,x,u,t) = θ[2]*I(NX)
 
 
 
-MacroTools.prettify(ex)
+# PRONTO.define(f,Rr,Qr)
 
-
-
+generate_methods(f,Rr,Qr)
 
 
 ## ------------------------------- symbolic derivatives ------------------------------- ##
 using PRONTO: Jacobian
 using Base: invokelatest
 using PRONTO: now, crispr, clean
-using PRONTO: define, build_methods
-
+using PRONTO: define, build_expr
+using PRONTO: build_inplace
 
 
 # iinfo("initializing symbolics\n")
@@ -82,14 +81,22 @@ Jx,Ju = Jacobian.([x,u])
 
 
 
-
 # symbolic traces of model - how to import?
 f_trace = invokelatest(f,collect(θ),collect(x),collect(u),t)
 Rr_trace = invokelatest(Rr,collect(θ),collect(x),collect(u),t)
 Qr_trace = invokelatest(Qr,collect(θ),collect(x),collect(u),t)
 
-ex1 = build_pretty(:f, :SplitP, f_trace)
-ex2 = build_pretty(:fx, :SplitP, Jx(f_trace))
+
+T = :SplitP
+M = [
+    build_inplace(T, :f!, f_trace),
+    build(Size(NX), T, :f, f_trace),
+    build(Size(NX,NX), T, :Ar, Jx(f_trace)),
+    build(Size(NX,NU), T, :Br, Ju(f_trace)),
+    build(Size(NX,NX), T, :Qr, Qr_trace),
+    build(Size(NU,NU), T, :Rr, Rr_trace)
+];
+
 
 
 
@@ -97,7 +104,6 @@ ex2 = build_pretty(:fx, :SplitP, Jx(f_trace))
 
 fname = tempname()*".jl"
 hdr = "#= this file was machine generated at $(now()) - DO NOT MODIFY =#\n\n"
-M = [ex1;ex2]
 write(fname, hdr*prod(string.(M).*"\n\n"))
     
 
@@ -108,7 +114,66 @@ ex = crispr(ex, :ˍ₋out, :out) |> clean
 
 # can separate this ex into args[1] - function arguments, and args[2] - body
 
-## ------------------------------- symbolic derivatives ------------------------------- ##
+
+
+## ------------------------------- testing ------------------------------- ##
+
+α = 10
+ω = 0.5
+n = 5
+v = -α/4
+H0 = SymTridiagonal([4.0i^2 for i in -n:n], v*ones(2n))
+w = eigvecs(H0)
+x0 = SVector{NX}(kron([1;0],w[:,1]))
+xf = SVector{NX}(kron([1;0],w[:,2]))
+u0 = 0.2
+t0,tf = (0,10)
+
+θ = SplitP(1,1)
+μ = @closure t->SizedVector{1}(0.2)
+
+α = ODE(dx_dt!, xf, (t0,tf), (θ,u_ol(θ,μ,t)), Size(x0))
+x = ODE(dx_dt!, x0, (t0,tf), (θ,u_ol(θ,μ,t)), Size(x0))
+u = @closure t->u_ol(θ,μ,t)
+
+Prf = SizedMatrix{NX,NX}(I(nx(θ)))
+Pr = ODE(dPr_dt!, Prf, (tf,t0), (θ,α,μ), Size(NX,NX))
+
+x = ODE(dx_dt!, x0, (t0,tf), (θ,α,μ,Pr), Size(x0))
+
+
+# dx = similar(collect(x0))
+# dx_dt!(dx,x0,(θ,μ(t0)),t0)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 @capture(ex, :(function (args__) body_ end))
