@@ -125,8 +125,8 @@ function dPr_dt!(dPr,Pr,(θ,α,μ),t)#(M, out, θ, t, φ, Pr)
 end
 
 # forced
-function dx_dt_ol!(dx,x,(θ,u),t)
-    u = μ
+function dx_dt_ol!(dx,x,(θ,μ),t)
+    u = μ(t)
     f!(dx,θ,x,u,t)
 end
 
@@ -142,6 +142,8 @@ export u_ol,u_cl
 # ----------------------------------- pronto loop ----------------------------------- #
 
 export dx_dt!
+export dx_dt_ol!
+
 
 # solves for x(t),u(t)
 function pronto(θ::Model{NX,NU,NΘ}, x0::StaticVector, α, μ, (t0,tf);

@@ -62,7 +62,7 @@ Qr(θ,x,u,t) = θ[2]*I(NX)
 
 # PRONTO.define(f,Rr,Qr)
 
-generate_methods(f,Rr,Qr)
+generate_methods(SplitP,f,Rr,Qr)
 
 
 ## ------------------------------- symbolic derivatives ------------------------------- ##
@@ -124,6 +124,8 @@ n = 5
 v = -α/4
 H0 = SymTridiagonal([4.0i^2 for i in -n:n], v*ones(2n))
 w = eigvecs(H0)
+xg = i -> SVector{NX}(kron([1;0],w[:,i]))
+
 x0 = SVector{NX}(kron([1;0],w[:,1]))
 xf = SVector{NX}(kron([1;0],w[:,2]))
 u0 = 0.2
@@ -147,6 +149,13 @@ x = ODE(dx_dt!, x0, (t0,tf), (θ,α,μ,Pr), Size(x0))
 
 
 
+
+# this is insanely cool:
+μ = @closure t->SizedVector{1}(0.1)
+
+for x0 in xg.(1:11)
+    show(ODE(dx_dt_ol!, x0, (t0,tf), (θ,μ), Size(x0)))
+end
 
 
 

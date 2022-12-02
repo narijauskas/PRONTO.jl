@@ -65,9 +65,10 @@ function Base.show(io::IO, ode::ODE)
 end
 
 function preview(ode::ODE)
+    k = 7
     T = domain(ode)
     x = [ode(t)[i] for t in T, i in 1:length(ode)]
-    lineplot(T, x; height=30, width=120, labels=false)
+    lineplot(T, x; height=k*10, width=k*50, labels=false)
 end
 
 export domain, preview
