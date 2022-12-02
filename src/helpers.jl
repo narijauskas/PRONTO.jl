@@ -36,3 +36,6 @@ macro clock(name=:(_))
     ms = :(($_tock - $_tick)/1e6)
     :("$($:(round($ms; digits=3))) ms")
 end
+
+
+# barplot(["dPr/dt","dx/dt"],rand(2), width=72, color=:magenta,title="Runtime Stats")

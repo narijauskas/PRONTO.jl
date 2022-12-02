@@ -460,7 +460,7 @@ function rename_args(def,args)::Expr
         end
         # otherwise, leave the expression unchanged
         return ex
-    end.args[2]
+    end.args[2] #MAYBE: move .args[2]
 end
 
 # generate method definitions to add to PRONTO
@@ -487,7 +487,7 @@ end
 # insert the `new` expression at each matching `tgt` in the `src`
 function crispr(src,tgt,new)
     postwalk(src) do ex
-        return @capture(ex, tgt) ? new : ex
+        return @capture(ex, $tgt) ? new : ex
     end
 end
 

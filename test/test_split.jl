@@ -1,5 +1,5 @@
 #
-
+#
 using PRONTO
 using StaticArrays
 using Symbolics
@@ -107,6 +107,7 @@ def = define(f_trace,θ,ξ,t)
 append!(M,build_methods(:f,T,[NX],[:θ,:ξ,:t],def))
 
 def = PRONTO.define(Jx(f_trace),θ,t,ξ)
+# def = PRONTO.strip(build_function(Jx(f_trace),θ,t,ξ)[1])
 append!(M,PRONTO.build_methods(:Ar,T,[NX,NX],[:θ,:t,:ξ],def))
 
 def = PRONTO.define(Ju(f_trace),θ,t,ξ)
@@ -123,35 +124,48 @@ hdr = "#= this file was machine generated at $(now()) - DO NOT MODIFY =#\n\n"
 write(fname, hdr*prod(string.(M).*"\n\n"))
 include(fname)
 
-
-# ξ0 = SizedVector{23}([mdl.xf; 0])
-ξ0 = [mdl.xf; 0]
+## -------------------------------  ------------------------------- ##
+ξ0 = SVector{23}([mdl.xf; 0])
 g = @closure t->SizedVector{1}(0.2)
 θ = Split()
-φg = ODE(PRONTO.forced_dynamics!, collect(ξ0), (0,10), (θ,g), Buffer{Tuple{NX+NU}}(); dae = dae(θ))
 Pr = SizedMatrix{NX,NX}(collect(1.0*I(NX)))
-ξ = ODE(PRONTO.regulated_dynamics!, collect(ξ0), (0,10), (θ,φg,Pr), Buffer{Tuple{NX+NU}}(); dae = dae(θ))
+
+x0 = mdl.xf
+φg = @closure t -> ξ0
+xode = ODE(PRONTO.dynamics!, x0, (0,10), (θ,φg,Pr), Size(NX))
+
+
+
+
+φg = ODE(PRONTO.forced_dynamics!, collect(ξ0), (0,10), (θ,g), Buffer{Tuple{NX+NU}}(); dae = dae(θ))
+ξ = ODE(PRONTO.regulated_dynamics!, ξ0, (0,10), (θ,φg,Pr), Buffer{Tuple{NX+NU}}(); dae = dae(θ))
 
 PRONTO.regulated_dynamics!(buf,ξ,(θ,φg,Pr),t)
 ##
+xt =  ODE(PRONTO.dynamics!,x0,(0,10),(θ,φg,Pr),Buffer{Tuple{NX}}())
+φg = @closure t -> ξ0
+xode = solve(ODEProblem(PRONTO.dynamics!,x0,(0,10),(θ,φg,Pr)); reltol=1e-7, saveat=0.001)
+
+
+x0 = mdl.xf
+φg = @closure t -> ξ0
+xode = ODE(PRONTO.dynamics!, x0, (0,10), (θ,φg,Pr), Size(NX))
+
+
+# ODE{22,22}
 
 
 
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
+@benchmark MVector{22,Float64}(undef)
+@benchmark zeros(MVector{22,Float64})
+@benchmark begin
+    buf = MVector{22,Float64}(undef)
+    fill!(buf, 0)
+    return SVector(buf)
+end
 
 
 
