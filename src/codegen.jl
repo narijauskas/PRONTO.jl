@@ -24,7 +24,7 @@ function generate_model(T, user_f, user_l, user_p, user_Q, user_R)
 
     Jx,Ju = Jacobian.([x,u])
 
-    iinfo("tracing functions...\n")
+    iinfo("tracing functions for $T...\n")
     f = invokelatest(user_f, x, u, t, θ)
     l = invokelatest(user_l, x, u, t, θ)
     p = invokelatest(user_p, x, u, t, θ)
@@ -40,15 +40,15 @@ function generate_model(T, user_f, user_l, user_p, user_Q, user_R)
     fu = Ju(f)
 
     build(Size(NX), :(f(x,u,t,θ::$T)), f)
-    build(Size(NX,NU), :(fx(x,u,t,θ::$T)), fx)
-    build(Size(NU,NU), :(fu(x,u,t,θ::$T)), fu)
+    build(Size(NX,NX), :(fx(x,u,t,θ::$T)), fx)
+    build(Size(NX,NU), :(fu(x,u,t,θ::$T)), fu)
 
     lx = reshape(Jx(l),NX)
     lu = reshape(Ju(l),NU)
 
     build(Size(1), :(l(x,u,t,θ::$T)), l)
-    build(Size(NX,NU), :(lx(x,u,t,θ::$T)), lx)
-    build(Size(NU,NU), :(lu(x,u,t,θ::$T)), lu)
+    build(Size(NX), :(lx(x,u,t,θ::$T)), lx)
+    build(Size(NU), :(lu(x,u,t,θ::$T)), lu)
 
     lxx = Jx(lx)
     lxu = Ju(lx)
@@ -75,6 +75,7 @@ function generate_model(T, user_f, user_l, user_p, user_Q, user_R)
     build(Size(1), :(p(x,u,t,θ::$T)), p)
     build(Size(NX), :(px(x,u,t,θ::$T)), px)
     build(Size(NX,NX), :(pxx(x,u,t,θ::$T)), Jx(px))
+    iinfo("done!\n")
     nothing
 end
 
@@ -111,15 +112,18 @@ SType(::Val{2}, sz::Size{S}) where {S} = SMatrix{S..., Float64}
 SType(::Val, sz::Size{S}) where {S} = SArray{Tuple{S...}, Float64, length(S), prod(S)}
 
 
-
+#MAYBE: do we want to save the whole model to a file?
 function build(sz, hdr, sym; format = identity, file=nothing)
     body = tmap(enumerate(sym)) do (i,x)
         :(out[$i] = $(format(toexpr(x))))
     end
     @capture(hdr, name_(args__))
     ex = _build(sz, name, args, body)
+    file = tempname()*".jl"
+    write(file,string(clean(ex)))
+    Base.include(Main, file)
     iiinfo("generated $hdr\n")
-    eval(ex)
+    # eval(ex)
 end
 
 function _build(sz::Size, name, args, body)

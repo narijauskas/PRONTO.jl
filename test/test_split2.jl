@@ -43,7 +43,7 @@ struct SplitP <: Model{22,1,3}
 end
 
 
-function ff(x,u,t,θ)
+function dynamics(x,u,t,θ)
     ω = 1.0
     n = 5
     α = θ[1]
@@ -74,7 +74,7 @@ function x_eig(i)
     v = -α/4
     H0 = SymTridiagonal(promote([4.0i^2 for i in -n:n], v*ones(2n))...)
     w = eigvecs(collect(H0)) # symbolic doesn't work here
-    x_eig = kron([1;0],w[:,2])
+    x_eig = kron([1;0],w[:,i])
 end
 
 function pp(x,u,t,θ)
@@ -84,155 +84,9 @@ end
 
 
 ## ------------------------------- symbolic derivatives ------------------------------- ##
-# (Jx,Ju,f,l,p,R,Q) = 
-PRONTO.generate_model(SplitP,ff,ll,pp,Rr,Qr)
+PRONTO.generate_model(SplitP, dynamics, ll, pp, Qr, Rr)
 
-T = SplitP
 
-build(Size(NX,NX), :(Q(x,u,t,θ::$T)), Q)
-build(Size(NU,NU), :(R(x,u,t,θ::$T)), R)
-
-build(InPlace(), :(f!(out,x,u,t,θ::$T)), f)
-
-build(Size(NX), :(f(x,u,t,θ::$T)), f)
-build(Size(NX,NU), :(fx(x,u,t,θ::$T)), Jx(f))
-build(Size(NU,NU), :(fu(x,u,t,θ::$T)), Ju(f))
-
-lx = reshape(Jx(l),NX)
-lu = reshape(Ju(l),1)
-
-build(Size(1), :(l(x,u,t,θ::$T)), l)
-build(Size(NX,NU), :(lx(x,u,t,θ::$T)), lx)
-build(Size(NU,NU), :(lu(x,u,t,θ::$T)), lu)
-
-lxx = Jx(reshape(Jx(l),NX))
-lxu = Ju(reshape(Jx(l),NX))
-luu = Ju(reshape(Ju(l),1))
-
-build(Size(NX,NX), :(lxx(x,u,t,θ::$T)), lxx)
-build(Size(NX,NU), :(lxu(x,u,t,θ::$T)), lxu)
-build(Size(NU,NU), :(luu(x,u,t,θ::$T)), luu)
-
-fxx = Jx(Jx(f))
-fxu = Ju(Jx(f))
-fuu = Ju(Ju(f))
-
-Lxx = lxx + sum(λ[k]*fxx[k,:,:] for k in 1:NX)
-Lxu = lxu + sum(λ[k]*fxu[k,:,:] for k in 1:NX)
-Luu = luu + sum(λ[k]*fuu[k,:,:] for k in 1:NX)
-
-build(Size(NX,NX), :(Lxx(λ,x,u,t,θ::$T)), Lxx)
-build(Size(NX,NU), :(Lxu(λ,x,u,t,θ::$T)), Lxu)
-build(Size(NU,NU), :(Luu(λ,x,u,t,θ::$T)), Luu)
-
-
-build(Size(1), :(p(x,u,t,θ::$T)), p)
-build(Size(NX), :(px(x,u,t,θ::$T)), Jx(p))
-build(Size(NX,NX), :(pxx(x,u,t,θ::$T)), Jx(Jx(p)))
-
-
-function appendto!(filename, str)
-    write(io, "hello")
-end
-
-build(Size(NX,NU), :(Lxu(λ,x,u,t,θ::$T)), Lxu)
-
-build(Size(NX,NX), :(fx(x,u,t,θ::$T)), Jx(f_sym))
-
-
-ex = :(PRONTO.fx(x,u,t,θ::SplitP) = Jx(f_sym))
-
-
-
-    # # generate method definitions for PRONTO functions
-    # iinfo("differentiating model dynamics\n")
-    # build_defs!(M, :f, T, (θ, t, ξ), f)
-    # build_defs!(M, :fx, T, (θ, t, ξ), Jx(f))
-    # build_defs!(M, :fu, T, (θ, t, ξ), Ju(f))
-    # build_defs!(M, :fxx, T, (θ, t, ξ), Jx(Jx(f)))
-    # build_defs!(M, :fxu, T, (θ, t, ξ), Ju(Jx(f)))
-    # build_defs!(M, :fuu, T, (θ, t, ξ), Ju(Ju(f)))
-
-    # iinfo("differentiating stage cost\n")
-    # build_defs!(M, :l, T, (θ, t, ξ), l)
-    # build_defs!(M, :lx, T, (θ, t, ξ), l |> Jx |> lx->reshape(lx,NX))
-    # build_defs!(M, :lu, T, (θ, t, ξ), l |> Ju |> lu->reshape(lu,NU))
-    # build_defs!(M, :lxx, T, (θ, t, ξ), l |> Jx |> lx->reshape(lx,NX) |> Jx)
-    # build_defs!(M, :lxu, T, (θ, t, ξ), l |> Jx |> lx->reshape(lx,NX) |> Ju)
-    # build_defs!(M, :luu, T, (θ, t, ξ), l |> Ju |> lu->reshape(lu,NU) |> Ju)
-    # # @build lx(θ,t,ξ)->reshape(l|>Jx,NX)
-
-    # iinfo("differentiating terminal cost\n")
-    # build_defs!(M, :p, T, (θ, t, ξ), p)
-    # build_defs!(M, :px, T, (θ, t, ξ), p |> Jx |> px->reshape(px,NX))
-    # build_defs!(M, :pxx, T, (θ, t, ξ), p |> Jx |> px->reshape(px,NX) |> Jx)
-
-    # iinfo("building regulator functions\n")
-    # build_defs!(M, :Qrr, T, (θ, t, ξ), Qr)
-    # build_defs!(M, :Rrr, T, (θ, t, ξ), Rr)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-using PRONTO: Jacobian
-using Base: invokelatest
-using PRONTO: now, crispr, clean
-using PRONTO: define, build_expr
-using PRONTO: build_inplace
-
-
-# iinfo("initializing symbolics\n")
-# create symbolic variables & operators
-@variables x[1:22] u[1:1] θ[1:2] t
-# @variables x[1:NX] u[1:NU] θ[1:NΘ] t
-Jx,Ju = Jacobian.([x,u])
-
-
-
-# symbolic traces of model - how to import?
-f_trace = invokelatest(f,collect(θ),collect(x),collect(u),t)
-Rr_trace = invokelatest(Rr,collect(θ),collect(x),collect(u),t)
-Qr_trace = invokelatest(Qr,collect(θ),collect(x),collect(u),t)
-
-
-T = :SplitP
-
-
-
-
-
-tmap(f_trace) do x
-    prettify(toexpr(x))
-end
 
 
 # fname = tempname()*"_$T.jl"
@@ -243,37 +97,22 @@ write(fname, hdr*prod(string.(M).*"\n\n"))
     
 
 
-ex = build_function(f_trace,θ,x,u,t)[2]
-#todo - select inplace, [2] is unreliable
-ex = crispr(ex, :ˍ₋out, :out) |> clean
-
-# can separate this ex into args[1] - function arguments, and args[2] - body
-
-
-
 ## ------------------------------- testing ------------------------------- ##
 
-α = 10
-ω = 0.5
-n = 5
-v = -α/4
-H0 = SymTridiagonal([4.0i^2 for i in -n:n], v*ones(2n))
-w = eigvecs(H0)
-x_eig = i -> SVector{NX}(kron([1;0],w[:,i]))
+x0 = SVector{NX}(x_eig(1))
+xf = SVector{NX}(x_eig(2))
 
-x0 = SVector{NX}(kron([1;0],w[:,1]))
-xf = SVector{NX}(kron([1;0],w[:,2]))
 u0 = 0.2
 t0,tf = (0,10)
 
-θ = SplitP(1,1)
+θ = SplitP(10,1,1)
 μ = @closure t->SizedVector{1}(0.2)
 
-α = ODE(dx_dt_ol!, xf, (t0,tf), (θ,μ), Size(x0))
+α = ODE(dx_dt_ol!, xf, (t0,tf), (θ,μ), Size(xf))
 x = ODE(dx_dt_ol!, x0, (t0,tf), (θ,μ), Size(x0))
-u = @closure t->u_ol(θ,μ,t)
+# u = @closure t->u_ol(θ,μ,t)
 
-Prf = SizedMatrix{NX,NX}(I(nx(θ)))
+Prf = SizedMatrix{NX,NX}(diagm(rand(0.9:0.001:1.1,NX)))
 Pr = ODE(dPr_dt!, Prf, (tf,t0), (θ,α,μ), Size(NX,NX))
 
 x = ODE(dx_dt!, x0, (t0,tf), (θ,α,μ,Pr), Size(x0))
@@ -283,6 +122,29 @@ x = ODE(dx_dt!, x0, (t0,tf), (θ,α,μ,Pr), Size(x0))
 # dx_dt!(dx,x0,(θ,μ(t0)),t0)
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+PRONTO.fx(α(t0),μ(t0),t0,θ)
+
+PRONTO.Kr(α(tf),μ(tf),Prf,tf,θ)
+
+dPr = zeros(NX,NX)
+dPr_dt!(dPr,collect(Prf),(θ,α,μ),t0)
+
+PRONTO.Q(α(tf),μ(tf),tf,θ)
 
 
 # this is insanely cool:

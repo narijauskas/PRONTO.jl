@@ -64,7 +64,14 @@ function Base.show(io::IO, ode::ODE)
     # return nothing
 end
 
-function preview(ode::ODE)
+function preview(fn,t0,tf)
+    k = 3
+    T = LinRange(t0,tf,240)
+    x = [fn(t)[1] for t in T]
+    lineplot(T, x; height=k*10, width=k*40, labels=false)
+end
+
+function preview(ode)
     k = 3
     T = domain(ode)
     x = [ode(t)[i] for t in T, i in 1:length(ode)]

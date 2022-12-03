@@ -9,6 +9,7 @@ export @closure
 # lu = PRONTO.lu
 # function lu end
 import LinearAlgebra
+using LinearAlgebra: mul!
 using UnicodePlots
 using MacroTools
 using SparseArrays
@@ -132,7 +133,7 @@ include("codegen.jl") # takes derivatives
 
 # ----------------------------------- #. components ----------------------------------- #
 
-Kr(α,μ,Pr,t,θ) = Rr(α,μ,t,θ)\(Br(α,μ,t,θ)'Pr)
+Kr(α,μ,Pr,t,θ) = R(α,μ,t,θ)\(fu(α,μ,t,θ)'Pr)
 
 
 
@@ -154,7 +155,13 @@ end
 function dPr_dt!(dPr,Pr,(θ,α,μ),t)#(M, out, θ, t, φ, Pr)
     α = α(t)
     μ = μ(t)
-    riccati!(dPr, Ar(α,μ,t,θ), Kr(α,μ,Pr,t,θ), Pr, Qr(α,μ,t,θ), Rr(α,μ,t,θ))
+    Ar = fx(α,μ,t,θ)
+    Qr = Q(α,μ,t,θ)
+    Rr = R(α,μ,t,θ)
+    K = Kr(α,μ,Pr,t,θ)
+    
+    dPr .= riccati(Ar,K,Pr,Qr,Rr)
+    # riccati!(dPr, fx(α,μ,t,θ), Kr(α,μ,Pr,t,θ), Pr, Q(α,μ,t,θ), R(α,μ,t,θ))
 end
 
 # forced
@@ -182,6 +189,7 @@ end
 
 export dx_dt!
 export dx_dt_ol!
+export dPr_dt!
 
 
 # solves for x(t),u(t)
