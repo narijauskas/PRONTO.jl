@@ -1,5 +1,84 @@
 # the tools for automatically building model derivatives
 
+using Base: invokelatest
+using MacroTools: striplines, prettify, postwalk, @capture
+
+
+# builds buffered versions by default, for an in-place version, use:
+struct InPlace end
+
+export generate_model, InPlace
+export build
+
+#FUTURE: options to make pretty (or add other postprocessing), save to file, etc.
+function generate_model(T, user_f, user_l, user_p, user_Q, user_R)
+    iinfo("initializing symbolics...\n")
+    NX = nx(T); NU = nu(T)
+    @variables x[1:NX] u[1:NU] t θ[1:nθ(T)] λ[1:NX]
+    # θ_sym = T(θ...) # the model instantiated with symbolic θs
+    x = collect(x)
+    u = collect(u)
+    t = t
+    θ = collect(θ)
+    λ = collect(λ)
+
+    Jx,Ju = Jacobian.([x,u])
+
+    iinfo("tracing functions...\n")
+    f = invokelatest(user_f, x, u, t, θ)
+    l = invokelatest(user_l, x, u, t, θ)
+    p = invokelatest(user_p, x, u, t, θ)
+    Q = invokelatest(user_Q, x, u, t, θ)
+    R = invokelatest(user_R, x, u, t, θ)
+
+    build(InPlace(), :(f!(out,x,u,t,θ::$T)), f)
+
+    build(Size(NX,NX), :(Q(x,u,t,θ::$T)), Q)
+    build(Size(NU,NU), :(R(x,u,t,θ::$T)), R)
+
+    fx = Jx(f)
+    fu = Ju(f)
+
+    build(Size(NX), :(f(x,u,t,θ::$T)), f)
+    build(Size(NX,NU), :(fx(x,u,t,θ::$T)), fx)
+    build(Size(NU,NU), :(fu(x,u,t,θ::$T)), fu)
+
+    lx = reshape(Jx(l),NX)
+    lu = reshape(Ju(l),NU)
+
+    build(Size(1), :(l(x,u,t,θ::$T)), l)
+    build(Size(NX,NU), :(lx(x,u,t,θ::$T)), lx)
+    build(Size(NU,NU), :(lu(x,u,t,θ::$T)), lu)
+
+    lxx = Jx(lx)
+    lxu = Ju(lx)
+    luu = Ju(lu)
+
+    build(Size(NX,NX), :(lxx(x,u,t,θ::$T)), lxx)
+    build(Size(NX,NU), :(lxu(x,u,t,θ::$T)), lxu)
+    build(Size(NU,NU), :(luu(x,u,t,θ::$T)), luu)
+
+    fxx = Jx(Jx(f))
+    fxu = Ju(Jx(f))
+    fuu = Ju(Ju(f))
+
+    Lxx = lxx .+ sum(λ[k]*fxx[k,:,:] for k in 1:NX)
+    Lxu = lxu .+ sum(λ[k]*fxu[k,:,:] for k in 1:NX)
+    Luu = luu .+ sum(λ[k]*fuu[k,:,:] for k in 1:NX)
+
+    build(Size(NX,NX), :(Lxx(λ,x,u,t,θ::$T)), Lxx)
+    build(Size(NX,NU), :(Lxu(λ,x,u,t,θ::$T)), Lxu)
+    build(Size(NU,NU), :(Luu(λ,x,u,t,θ::$T)), Luu)
+
+    px = reshape(Jx(p),NX)
+
+    build(Size(1), :(p(x,u,t,θ::$T)), p)
+    build(Size(NX), :(px(x,u,t,θ::$T)), px)
+    build(Size(NX,NX), :(pxx(x,u,t,θ::$T)), Jx(px))
+    nothing
+end
+
+
 
 # append ! to a symbol, eg. :name -> :name!
 _!(ex) = Symbol(String(ex)*"!")
@@ -20,53 +99,52 @@ end
 # isnothing(force_dims) || (fx_sym = reshape(fx_sym, force_dims...))
 
 
+# SType(::Size{S}) where {S} = MVector{S..., Float64}
+MType(sz::Size{S}) where {S} = MType(Val(length(S)), sz)
+MType(::Val{1}, sz::Size{S}) where {S} = MVector{S..., Float64}
+MType(::Val{2}, sz::Size{S}) where {S} = MMatrix{S..., Float64}
+MType(::Val, sz::Size{S}) where {S} = MArray{Tuple{S...}, Float64, length(S), prod(S)}
 
-# build_pretty(name, T, syms) = build_expr(name, T, syms; postprocess = prettify)
+SType(sz::Size{S}) where {S} = SType(Val(length(S)), sz)
+SType(::Val{1}, sz::Size{S}) where {S} = SVector{S..., Float64}
+SType(::Val{2}, sz::Size{S}) where {S} = SMatrix{S..., Float64}
+SType(::Val, sz::Size{S}) where {S} = SArray{Tuple{S...}, Float64, length(S), prod(S)}
 
-# options for format: identity, MacroTools.prettify
-function build_expr(sz::Size, T, name, syms; format = identity)
-    # parallel map each symbolic to expr
-    defs = tmap(enumerate(syms)) do (i,x)
+
+
+function build(sz, hdr, sym; format = identity, file=nothing)
+    body = tmap(enumerate(sym)) do (i,x)
         :(out[$i] = $(format(toexpr(x))))
     end
+    @capture(hdr, name_(args__))
+    ex = _build(sz, name, args, body)
+    iiinfo("generated $hdr\n")
+    eval(ex)
+end
 
-    return quote
-        function PRONTO.$name(θ::$T,x,u,t)
-            # out = SizedArray{Tuple{S...}, Float64, length(S), prod(S)}(undef)
-            out = $(SizedBuffer(sz))
+function _build(sz::Size, name, args, body)
+    quote
+        function PRONTO.$name($(args...))
+            out = $(MType(sz))(undef)
             @inbounds begin
-                $(defs...)
+                $(body...)
             end
-            return out
+            return $(SType(sz))(out)
         end
-    end |> clean
-end
-
-function SizedBuffer(::Size{S}) where {S}
-    if 1 == length(S)
-        :(SizedVector{$(S...), Float64}(undef))
-    elseif 2 == length(S)
-        :(SizedMatrix{$(S...), Float64}(undef))
-    elseif 3 == length(S)
-        :(SizedArray{Tuple{$(S...)}, Float64, length(S), prod(S)}(undef))
     end
 end
 
-function build_inplace(T, name, syms; format = identity)
-    # parallel map each symbolic to expr
-    defs = tmap(enumerate(syms)) do (i,x)
-        :(out[$i] = $(format(toexpr(x))))
-    end
-
-    return quote
-        function PRONTO.$name(out,θ::$T,x,u,t)
+function _build(::InPlace, name, args, body)
+    quote
+        function PRONTO.$name($(args...))
             @inbounds begin
-                $(defs...)
+                $(body...)
             end
             return nothing
         end
-    end |> clean
+    end
 end
+
 
 
 # make a version of v with the sparsity pattern of fn

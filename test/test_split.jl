@@ -56,7 +56,7 @@ mdl = @model Split begin
     
     Ql = zeros(2*n,2*n)
     Rl = I
-    l(θ,t,x,u) = 1/2*x'*Ql*x + 1/2*u'*Rl*u
+    l(θ,t,x,u) = 1/2*x'Ql*x + 1/2*u'Rl*u
     
     Rr(θ,t,x,u) = diagm(ones(1))
     Qr(θ,t,x,u) = diagm(ones(2*n))

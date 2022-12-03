@@ -2,6 +2,7 @@ using Pkg
 Pkg.activate(".")
 
 using Documenter
+# using PRONTO
 
 makedocs(
     sitename="PRONTO.jl",
