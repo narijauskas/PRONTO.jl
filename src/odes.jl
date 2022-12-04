@@ -1,11 +1,15 @@
-
+using Memoization
 
 struct ODE{T}
     wrap::FunctionWrapper{T, Tuple{Float64}}
     soln::SciMLBase.AbstractODESolution
+    #MAYBE:
+    # domain
+    # buffer
 end
 
 (ode::ODE)(t) = ode.wrap(t)
+
 
 # try to infer size from the *type* of the initial condition - must use StaticArray
 ODE(fn::Function, ic, ts, p; kw...) = ODE(fn::Function, ic, ts, p, Size(ic); kw...)
@@ -36,7 +40,7 @@ Base.size(::ODE{T}) where {T} = size(T)
 Base.length(::ODE{T}) where {T} = length(T)
 Base.eltype(::Type{ODE{T}}) where {T} = T
 Base.extrema(ode::ODE) = extrema(ode.soln.t)
-domain(ode::ODE; n=240) = LinRange(extrema(ode)..., n)
+domain(ode::ODE; n=240) = extrema(ode)
 
 # stats(ode)
 # retcode(ode)
@@ -64,18 +68,13 @@ function Base.show(io::IO, ode::ODE)
     # return nothing
 end
 
-function preview(fn,t0,tf)
-    k = 3
-    T = LinRange(t0,tf,240)
-    x = [fn(t)[1] for t in T]
-    lineplot(T, x; height=k*10, width=k*40, labels=false)
-end
 
-function preview(ode)
-    k = 3
-    T = domain(ode)
+preview(ode; kw...) = preview(ode, domain(ode)...; kw...)
+preview(fn, t0, tf; kw...) = preview(fn, LinRange(t0, tf, 240); kw...)
+
+function preview(ode, T; height = 30, width = 120, labels = false, kw...)
     x = [ode(t)[i] for t in T, i in 1:length(ode)]
-    lineplot(T, x; height=k*10, width=k*40, labels=false)
+    lineplot(T, x; height, width, labels, kw...)
 end
 
 export domain, preview

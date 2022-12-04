@@ -86,14 +86,6 @@ end
 ## ------------------------------- symbolic derivatives ------------------------------- ##
 PRONTO.generate_model(SplitP, dynamics, ll, pp, Qr, Rr)
 
-
-
-
-# fname = tempname()*"_$T.jl"
-
-fname = tempname()*".jl"
-hdr = "#= this file was machine generated at $(now()) - DO NOT MODIFY =#\n\n"
-write(fname, hdr*prod(string.(M).*"\n\n"))
     
 
 
@@ -113,6 +105,7 @@ x = ODE(dx_dt_ol!, x0, (t0,tf), (θ,μ), Size(x0))
 # u = @closure t->u_ol(θ,μ,t)
 
 Prf = SizedMatrix{NX,NX}(diagm(rand(0.9:0.001:1.1,NX)))
+
 Pr = ODE(dPr_dt!, Prf, (tf,t0), (θ,α,μ), Size(NX,NX))
 
 x = ODE(dx_dt!, x0, (t0,tf), (θ,α,μ,Pr), Size(x0))
@@ -120,6 +113,206 @@ x = ODE(dx_dt!, x0, (t0,tf), (θ,α,μ,Pr), Size(x0))
 
 # dx = similar(collect(x0))
 # dx_dt!(dx,x0,(θ,μ(t0)),t0)
+
+
+
+## ------------------------------- test regulator ------------------------------- ##
+
+function test_Kr1(α,μ,Pr,θ)
+    t = rand(0.:10.)
+    PRONTO.Kr(α(t),μ(t),Pr(t),t,θ)
+end
+
+
+function test_Kr2(K)
+    t = rand(0.:10.)
+    K(t)
+end
+
+
+
+test1(fn) = fn(rand(0.:10.))
+
+@benchmark test1($α)
+@benchmark test1($μ)
+@benchmark test1($Pr)
+
+test_Kr1(α,μ,Pr,θ)
+@time test_Kr1(α,μ,Pr,θ)
+@benchmark test_Kr1($α,$μ,$Pr,$θ)
+
+
+t = rand(0.:10.)
+
+@benchmark Kr2 = Regulator(θ,α,μ,Pr)
+
+
+test_Kr2(Kr2)
+@time test_Kr2(Kr2)
+@benchmark test_Kr2($Kr2)
+
+
+@btime α(1)
+
+
+Pf = SMatrix{NX,NX,Float64}(I(NX))
+
+@benchmark ODE(dPr_dt!, Pf, (T.tf,T.t0), (θ,α,μ), Size(Pf))
+
+T = TimeDomain(t0,tf)
+@benchmark Regulator(θ,T,α,μ)
+
+
+
+
+struct Trajectory{M}
+    θ
+    T
+    α
+    μ
+end
+
+struct Projection{M,T1} <: Timeseries
+    θ
+    T
+    x
+    u #closure holding α,μ,Kr
+    # or directly:
+    # α
+    # μ
+    # Kr
+end
+
+ξ.x
+ξ.u
+
+
+
+
+try
+    second_order(...,λ)
+catch e
+    if e isa InstabilityException
+        first_order(...,λ)
+    else
+        rethrow(e)
+    end
+end
+
+
+
+
+# φ = Guess(x,[u]) # arbitrary curve
+# Timeseries
+# AbstractTimeseries
+
+# Projection,OLTrajectory,SearchDirection <: Trajectory
+
+φ = OLTrajectory(x0,[u]) # open loop
+Kr = Regulator(φ)
+# Regulator(α,μ)
+
+Projection(φ) = Projection(φ, Regulator(φ))
+Projection(α,μ) = Projection(α, μ, Regulator(α,μ))
+
+ξ = Projection(φ, Kr::Regulator) # closed loop -> return trajectory object
+ξ = Projection(α, μ, Kr::Regulator) # closed loop around arbitrary curve
+
+ζ = SearchDirection(ξ)
+    # FirstOrderSearch()
+    # SecondOrderSearch()
+    # Ko = Optimizer()
+
+# armijo:
+    # create candidate trajectory
+    η = Projection(ξ,γ,ζ,Kr) # closed loop armijo
+    # evaluate cost
+    u = 
+
+φ = η
+
+
+# search direction
+λ = ODE(...)
+P = ODE(...)
+r = ODE(...)
+
+
+
+
+
+Pf = SMatrix{NX,NX,Float64}(I(NX))
+Pr = ODE(dPr_dt!, Pf, (T.tf,T.t0), (θ,α,μ), Size(Pf))
+
+@benchmark ODE(dx_dt!, x0, (t0,tf), (θ,α,μ,Pr), Size(x0))
+
+Kr = Regulator(θ,T,α,μ)
+
+@benchmark ODE(dx_dt2!, x0, (t0,tf), (θ,α,μ,Kr), Size(x0))
+
+
+
+
+
+
+
+
+
+
+
+println()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

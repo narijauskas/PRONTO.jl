@@ -140,6 +140,7 @@ Kr(α,μ,Pr,t,θ) = R(α,μ,t,θ)\(fu(α,μ,t,θ)'Pr)
 # ----------------------------------- #. ode functions ----------------------------------- #
 
 
+# ----------------------------------- #. regulator  ----------------------------------- #
 
 
 riccati(A,K,P,Q,R) = -A'P - P*A + K'R*K - Q
@@ -152,17 +153,6 @@ function riccati!(out,A,K,P,Q,R)
     out .+= K'*R*K
 end
 
-function dPr_dt!(dPr,Pr,(θ,α,μ),t)#(M, out, θ, t, φ, Pr)
-    α = α(t)
-    μ = μ(t)
-    Ar = fx(α,μ,t,θ)
-    Qr = Q(α,μ,t,θ)
-    Rr = R(α,μ,t,θ)
-    K = Kr(α,μ,Pr,t,θ)
-    
-    dPr .= riccati(Ar,K,Pr,Qr,Rr)
-    # riccati!(dPr, fx(α,μ,t,θ), Kr(α,μ,Pr,t,θ), Pr, Q(α,μ,t,θ), R(α,μ,t,θ))
-end
 
 # forced
 function dx_dt_ol!(dx,x,(θ,μ),t)
@@ -178,8 +168,36 @@ function dx_dt!(dx,x,(θ,α,μ,Pr),t)
     f!(dx,x,u,t,θ)
 end
 
-function dλ_dt!()
-    # A = fx()
+function dx_dt2!(dx,x,(θ,α,μ,Kr),t)
+    α = α(t)
+    μ = μ(t)
+    u = μ - Kr(t)*(x-α)
+    f!(dx,x,u,t,θ)
+end
+
+
+# ----------------------------------- #. search direction ----------------------------------- #
+
+
+# dλ_dt!(dλ, λ, (θ,ξ,Kr), t) = dλ_dt!(dλ, λ, ξ(t)..., Kr(t), t, θ)
+# function dλ_dt!(dλ,λ,x,u,Kr,t,θ)
+
+function dλ_dt!(dλ, λ, (θ,ξ,Kr), t)
+    Kr = Kr(t)
+    x,u = ξ(t)
+
+    A = fx(x,u,t,θ)
+    B = fu(x,u,t,θ)
+    a = lx(x,u,t,θ)
+    b = lu(x,u,t,θ)
+
+    dλ .= -(A - B*Kr)'λ .- a .+ Kr'b
+end
+
+function dr_dt!(dr, r, (θ,ξ), t)
+end
+
+function dP_dt!(dP, P, (θ,ξ), t)
 end
 
 # u_ol(θ,μ,t) = μ(t)
@@ -188,6 +206,7 @@ end
 # ----------------------------------- pronto loop ----------------------------------- #
 
 export dx_dt!
+# export dx_dt_2o!
 export dx_dt_ol!
 export dPr_dt!
 
@@ -207,7 +226,7 @@ function pronto(θ::Model{NX,NU,NΘ}, x0::StaticVector, α, μ, (t0,tf); tol = 1
     # u = ControlInput(α,μ,Kr) # initializes with missing 
     # x0 is always the same
     x = ODE(dx_dt!, x0, (t0,tf), (θ,α,μ,Pr), Size(x0))
-    u = @closure t -> μ - Kr(α(t),μ(t),Pr(t),t,θ)*(x-α(t))
+    u = @closure t -> μ - Kr(α(t), μ(t), Pr(t), t, θ)*(x - α(t))
     
     # -------------- search direction -------------- #
     # Kr,x,u -> z,v
@@ -228,15 +247,33 @@ end
 
 
 
+# Regulator(θ,T,α,μ)
+
+
+using LinearAlgebra: I
+
 # alternatively:
 
 #bonus: these, along with ODE, can share trait or timeseries supertype
-# struct Regulator{NX,NU,NΘ,T} <: Timeseries{NU,NX}
-#     θ::Model{NX,NU,NΘ,T}
+# struct Regulator{NX,NU,NΘ} <: Timeseries{NU,NX}
+#     θ::Model{NX,NU,NΘ}
 #     α::Timeseries{NX}
 #     μ::Timeseries{NU}
 #     Pr::Timeseries{NX,NX}
 # end
+
+export TimeDomain
+struct TimeDomain{T}
+    t0::T
+    tf::T
+end
+
+domain(T::TimeDomain) = (T.t0,T.tf)
+
+
+
+
+export Regulator
 
 # struct Regulator{T,T1,T2,T3}
 #     θ::T
@@ -245,15 +282,82 @@ end
 #     Pr::T3
 # end
 
+abstract type Timeseries end
+Base.show(io::IO, x::Timeseries) = println(io, preview(x))
+domain(x::Timeseries) = domain(x.T)
 
-# function (Kr::Regulator)(t)
-#     α = Kr.α(t)
-#     μ = Kr.μ(t)
-#     Rr = R(θ,α,μ,t)
-#     Qr = Q(θ,α,μ,t)
-#     Rr(θ,α,μ,t)\(Br(θ,α,μ,t)'Pr(t))
-# end
+struct Regulator{M,T1,T2,T3} <: Timeseries
+    θ::M
+    T::TimeDomain
+    α::T1
+    μ::T2
+    Pr::T3
+end
 
+
+
+
+
+function (Kr::Regulator)(t)
+    α = Kr.α(t)
+    μ = Kr.μ(t)
+    θ = Kr.θ
+
+    Pr = Kr.Pr(t)
+    Rr = R(α,μ,t,θ)
+    Br = fu(α,μ,t,θ)
+
+    Rr\Br'Pr
+end
+
+Base.length(Kr::Regulator) = nu(Kr.θ)*nx(Kr.θ)
+# domain(Kr::Regulator)
+
+#TODO: time domain?
+
+# design the regulator, solving dPr_dt
+function Regulator(θ::Model{NX,NU}, T::TimeDomain, α, μ) where {NX,NU}
+    #FUTURE: Pf provided by user or auto-generated as P(α,μ,θ)
+    Pf = SMatrix{NX,NX,Float64}(I(NX))
+    Pr = ODE(dPr_dt!, Pf, (T.tf,T.t0), (θ,α,μ), Size(Pf))
+    Regulator(θ,T,α,μ,Pr)
+end
+
+
+
+function dPr_dt!(dPr,Pr,(θ,α,μ),t)#(M, out, θ, t, φ, Pr)
+    α = α(t)
+    μ = μ(t)
+
+    Ar = fx(α,μ,t,θ)
+    Br = fu(α,μ,t,θ)
+    Qr = Q(α,μ,t,θ)
+    Rr = R(α,μ,t,θ)
+    
+    dPr .= .- Ar'Pr .- Pr*Ar .+ Pr'Br*(Rr\Br'Pr) .- Qr
+end
+
+
+
+# Ko = Ro\(So' + Bo'Po)
+
+
+function dPo_dt!(dPo,Po,(θ,x,u),t)#(M, out, θ, t, φ, Po)
+    α = α(t)
+    μ = μ(t)
+
+    Ao = fx(α,μ,t,θ)
+    Bo = fu(α,μ,t,θ)
+    Qo = lxx(α,μ,t,θ)
+    So = lxu(α,μ,t,θ)
+    Ro = luu(α,μ,t,θ)
+    
+    dPo .= .- Ao'Po .- Po*Ao .+ (Po'Bo+So)*Ro\(So'+Bo'Po) .- Qo
+end
+
+
+# Ko ~ x,u,Po
+# Kr ~ α,μ,Pr
 
 
 # Kr = Regulator(θ,α,μ,Pr) # captures pointers to α,μ,Pr
