@@ -14,19 +14,18 @@ end
 # try to infer size from the *type* of the initial condition - must use StaticArray
 ODE(fn::Function, ic, ts, p; kw...) = ODE(fn::Function, ic, ts, p, Size(ic); kw...)
 # constructor basically wraps ODEProblem, should make algorithm available for tuning
-function ODE(fn::Function, ic, ts, p, ::Size{S}; alg = nothing, kw...) where {S}
+function ODE(fn::Function, ic, ts, p, ::Size{S}; kw...) where {S}
 
-    soln = solve(ODEProblem(fn, collect(ic), ts, p; kw...),
-            alg;
-            reltol=1e-7,
-            saveat=0.001)
+    soln = solve(ODEProblem(fn, collect(ic), ts, p),
+            Tsit5();
+            reltol=1e-7, kw...)
 
     T = SArray{Tuple{S...}, Float64, length(S), prod(S)}
 
     wrap = FunctionWrapper{T, Tuple{Float64}}() do t
-        out = MArray{Tuple{S...}, Float64, length(S), prod(S)}(undef)
-        soln(out,t)
-        return SArray{Tuple{S...}, Float64, length(S), prod(S)}(out)
+            out = MArray{Tuple{S...}, Float64, length(S), prod(S)}(undef)
+            soln(out,t)
+            return SArray{Tuple{S...}, Float64, length(S), prod(S)}(out)
     end
 
     ODE{T}(wrap,soln)
@@ -48,25 +47,25 @@ domain(ode::ODE; n=240) = extrema(ode)
 
 
 # T = LinRange(extrema(ode.soln.t)..., 240)
-
+Base.show(io::IO, ode::ODE) = print(io, typeof(ode))
 #TODO: more info
-function Base.show(io::IO, ode::ODE)
-    compact = get(io, :compact, false)
-    if compact
-        print(io, typeof(ode))
-    else
-        println(io)
-        print(io, preview(ode))
-        println(io)
-    end
-    return nothing
-    # print(io, typeof(ode))
-    # if !compact
-    #     println(io)
-    #     print(io, preview(ode))
-    # end
-    # return nothing
-end
+# function Base.show(io::IO, ode::ODE)
+#     compact = get(io, :compact, false)
+#     if compact
+#         print(io, typeof(ode))
+#     else
+#         println(io)
+#         print(io, preview(ode))
+#         println(io)
+#     end
+#     return nothing
+#     # print(io, typeof(ode))
+#     # if !compact
+#     #     println(io)
+#     #     print(io, preview(ode))
+#     # end
+#     # return nothing
+# end
 
 
 preview(ode; kw...) = preview(ode, domain(ode)...; kw...)

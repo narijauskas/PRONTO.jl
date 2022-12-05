@@ -165,13 +165,6 @@ T = TimeDomain(t0,tf)
 
 
 
-struct Trajectory{M}
-    θ
-    T
-    α
-    μ
-end
-
 struct Projection{M,T1} <: Timeseries
     θ
     T
@@ -187,8 +180,27 @@ end
 ξ.u
 
 
+u0 = μ(0)-Kr0(0)*(x0-α(0))
+T = TimeDomain(0,10)
+Kr = Regulator(θ,T,α,μ)
+@benchmark Regulator(θ,T,α,μ) # 88 ms
+@benchmark Kr(rand()) # 3.3 μs ~ 5μs
+x = ODE(dx_dt2!, x0, (t0,tf), (θ,α,μ,Kr), Size(x0))
+@benchmark ODE(dx_dt2!, x0, (t0,tf), (θ,α,μ,Kr), Size(x0)) # 19 ms
+@benchmark x(rand()) # 839 ns ~ 2μs
+@benchmark ODE(dae, ξ0, (t0,tf), (θ,α,μ,Kr), Size(ξ0)) # 232 ms # 10x worse!
 
 
+u = t -> (μ(t) - Kr(t)*(x(t)-α(t)))
+@benchmark u(rand()) # 4.8 μs ~ 8.8 μs
+@benchmark [u(t) for t in ts] # 81 ms
+@benchmark [x(t) for t in ts] # 17 ms
+us = [u(t) for t in ts] # would be saved values from ode... hopefully cheap
+@benchmark linear_interpolation(ts, us) # 11 μs
+
+massmatrix(M) = cat(diagm(ones(nx(M))), zeros(nu(M)); dims=(1,2))
+dae = ODEFunction(dξ_dt!, mass_matrix = massmatrix(θ))
+ξ = ODE(dae, ξ0, (t0,tf), (θ,timed_α,timed_μ,Kr0), Size(ξ0))
 try
     second_order(...,λ)
 catch e
@@ -198,10 +210,44 @@ catch e
         rethrow(e)
     end
 end
+using FunctionWrappers: FunctionWrapper
 
+using TimerOutputs
+const clk = TimerOutput()
 
+a(t) = @timeit clk "α" α(t)
 
+timed_α = clk(α, "α")
+timed_μ = clk(μ, "μ")
 
+v = [timed_α(t) for t in t]
+@time QuadraticSpline(v,t);
+
+u_fxn(x,α,μ,Kr,t) = u_fxn(x(t),α(t),μ(t),Kr(t))
+u_fxn(x,α,μ,Kr) = μ - Kr*(x-α)
+@btime u_fxn(x,α,μ,Kr,t0)
+
+# @btime begin
+    Kr0 = Regulator(θ,T,α,μ);
+    x1 = ODE(dx_dt2!, x0, (t0,tf), (θ,α,μ,Kr0), Size(x0));
+    # u1 = t -> (μ(t) - Kr0(t)*(x1(t)-α(t)))
+    u1 = cubic_spline_interpolation(ts, [u_fxn(x1,α,μ,Kr0,t) for t in ts]);
+# @time begin
+    Kr1 = Regulator(θ,T,x1,u1);
+    x2 = ODE(dx_dt2!, x0, (t0,tf), (θ,x1,u1,Kr1), Size(x0));
+    # u2 = t -> (u1(t) - Kr1(t)*(x2(t)-x1(t)))
+    u2 = linear_interpolation(ts, [u_fxn(x2,x1,u1,Kr1,t) for t in ts]);
+
+    Kr2 = Regulator(θ,T,x2,u2);
+    x3 = ODE(dx_dt2!, x0, (t0,tf), (θ,x2,u2,Kr1), Size(x0));
+    # u3 = t -> (u2(t) - Kr2(t)*(x3(t)-x2(t)))
+# end
+
+reset_timer!(clk)
+u3(1)
+clk
+
+Base.length(::var"#21#22") = 1
 # φ = Guess(x,[u]) # arbitrary curve
 # Timeseries
 # AbstractTimeseries
@@ -251,25 +297,117 @@ Kr = Regulator(θ,T,α,μ)
 @benchmark ODE(dx_dt2!, x0, (t0,tf), (θ,α,μ,Kr), Size(x0))
 
 
+dt = 0.001
+using DiffEqCallbacks
+const XBUF = Vector{SVector{22,Float64}}()
+const xbuf = Vector{MVector{22,Float64}}()
+
+for _ in TT
+    push!(xbuf, zeros(MVector{22}))
+end
+
+const TT = t0:dt:tf
+
+@benchmark ODE(dx_dt2!, x0, (t0,tf), (θ,α,μ,Kr), Size(x0); callback = cb)
+
+
+@btime [zeros(MVector{NX+NU}) for _ in TT] # 9ms
+@btime map(t->zeros(MVector{NX+NU}), TT) # 9ms
+
+@btime begin
+    buf = Vector{MVector{22,Float64}}()
+    for _ in TT
+        push!(buf, zeros(MVector{22}))
+    end
+    return buf
+end
+
+cb = FunctionCallingCallback(update_ξ;
+        funcat=TT,
+        func_start = false)
+
+        ODE(dx_dt2!, x0, (t0,tf), (θ,α,μ,Kr), Size(x0); callback = cb)
+
+φ = (α=α,μ=μ)
 
 
 
 
+function projection(x0,φ,Kr,T,θ::Model{NX,NU}) where {NX,NU}
+    xbuf = Vector{SVector{NX,Float64}}()
+    ubuf = Vector{SVector{NU,Float64}}()
+
+    cb = FunctionCallingCallback(funcat=TT, func_start = false) do x,t,integrator
+        (_,φ,Kr) = integrator.p
+        # ix = trunc(Int, (t-t0)/dt) + 1
+        # xbuf[ix] .= u+
+        α = φ.α(t)
+        μ = φ.μ(t)
+        Kr = Kr(α,μ,t)
+        u = μ - Kr*(x-α)
+        push!(xbuf, SVector{NX,Float64}(x))
+        push!(ubuf, SVector{NU,Float64}(u))
+    end
+
+    # x = ODE(dxdt, x0, domain(T), (θ,φ,Kr); callback = cb)
+    soln = solve(ODEProblem(dxdt, x0, domain(T), (θ,φ,Kr)),
+            Tsit5();
+            reltol=1e-7,
+            callback=cb)
 
 
+    wrap = FunctionWrapper{SVector{NX, Float64}, Tuple{Float64}}() do t
+            out = MVector{NX, Float64}(undef)
+            soln(out,t)
+            return SVector{NX, Float64}(out)
+    end
+
+    x = ODE{SVector{NX, Float64}}(wrap,soln)
+
+    # x = scale(interpolate(xbuf, BSpline(Linear())), TT)
+    u = scale(interpolate(ubuf, BSpline(Linear())), TT)
+
+    return Trajectory(θ,T,x,u,soln)
+end
 
 
+function dxdt(x,(θ,φ,Kr),t)
+    α = φ.α(t)
+    μ = φ.μ(t)
+    Kr = Kr(α,μ,t)
+    u = μ - Kr*(x-α)
+    PRONTO.f(x,u,t,θ)
+end
 
-println()
+x0 = SVector{NX}(x_eig(1))
+@benchmark solve(ODEProblem(dxdt, x0, (t0,tf), (θ,α,μ,Kr)),Tsit5(); reltol=1e-7, callback = cb)
+@benchmark solve(ODEProblem(dxdt!, collect(x0), (t0,tf), (θ,α,μ,Kr)),Tsit5(); reltol=1e-7, callback = cb)
+
+function dxdt!(dx,x,(θ,α,μ,Kr),t)
+    α = α(t)
+    μ = μ(t)
+    Kr = Kr(α,μ,t)
+    u = μ - Kr*(x-α)
+    PRONTO.f!(dx,x,u,t,θ)
+end
+ODE(dx_dt2!, x0, (t0,tf), (θ,α,μ,Kr), Size(x0); callback = cb)
 
 
+@code_warntype scale(interpolate(XBUF, BSpline(Linear())), TT)
 
 
+struct Trajectory{M,X,U}
+    θ::M
+    T::TimeDomain
+    x::X
+    u::U
+    soln
+end
 
+(ξ::Trajectory)(t) = ξ.x(t),ξ.u(t)
+Base.show(io::IO, ξ::Trajectory) = print(io, "Trajectory")
 
-
-
-
+nothing
 
 
 
@@ -366,8 +504,6 @@ fetch.(tsk)
 θ = SplitP(1, 1)
 Pr = @closure t->Prf
 x = ODE(dx_dt!, x0, (t0,tf), (θ,α,μ,Pr), Size(x0))
-
-
 
 
 

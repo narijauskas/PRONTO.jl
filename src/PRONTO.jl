@@ -68,7 +68,7 @@ include("helpers.jl")
 
 
 #YO: can I actually deprecate this? :)
-# views(::Model{NX,NU,NΘ},ξ) where {NX,NU,NΘ} = (@view ξ[1:NX]),(@view ξ[NX+1:end])
+views(::Model{NX,NU,NΘ},ξ) where {NX,NU,NΘ} = (@view ξ[1:NX]),(@view ξ[NX+1:end])
 
 
 include("odes.jl") # ODE solution handling
@@ -171,9 +171,21 @@ end
 function dx_dt2!(dx,x,(θ,α,μ,Kr),t)
     α = α(t)
     μ = μ(t)
-    u = μ - Kr(t)*(x-α)
+    Kr = Kr(α,μ,t)
+    u = μ - Kr*(x-α)
     f!(dx,x,u,t,θ)
 end
+
+function dξ_dt!(dξ, ξ, (θ,α,μ,Kr), t)
+    α = α(t)
+    μ = μ(t)
+    x,u = views(θ, ξ)
+    dx,du = views(θ, dξ)
+    f!(dx,x,u,t,θ)
+    du .= μ - Kr(t)*(x-α) - u
+end
+
+export dξ_dt!
 
 
 # ----------------------------------- #. search direction ----------------------------------- #
@@ -265,12 +277,13 @@ using LinearAlgebra: I
 export TimeDomain
 struct TimeDomain{T}
     t0::T
+    # dt::T
     tf::T
 end
 
 domain(T::TimeDomain) = (T.t0,T.tf)
 
-
+#TODO: iterate
 
 
 export Regulator
@@ -294,15 +307,14 @@ struct Regulator{M,T1,T2,T3} <: Timeseries
     Pr::T3
 end
 
+using TimerOutputs
+const CLK = TimerOutput()
 
 
+(Kr::Regulator)(t) = Kr(Kr.α(t), Kr.μ(t), t)
+(Kr::Regulator)(α,μ,t) = Kr(α, μ, t, Kr.θ)
 
-
-function (Kr::Regulator)(t)
-    α = Kr.α(t)
-    μ = Kr.μ(t)
-    θ = Kr.θ
-
+function (Kr::Regulator)(α,μ,t,θ)
     Pr = Kr.Pr(t)
     Rr = R(α,μ,t,θ)
     Br = fu(α,μ,t,θ)
