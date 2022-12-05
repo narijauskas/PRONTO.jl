@@ -1,3 +1,34 @@
+# plot handling
+
+
+PLOT_HEIGHT::Int = 30
+PLOT_WIDTH::Int = 120
+sample_time(t0,tf) = LinRange(t0,tf,4*PLOT_WIDTH)
+sample_time(x) = sample_time(extrema(x)...)
+
+function set_plot_scale(height, width)
+    global PLOT_HEIGHT = convert(Int, height)
+    global PLOT_WIDTH = convert(Int, width)
+end
+
+function _preview(x,t; kw...)
+    lineplot(t,x;
+        height = PLOT_HEIGHT,
+        width = PLOT_WIDTH,
+        labels = false,
+        kw...)
+end
+
+
+preview(x, τ, idx; kw...) = lineplot(τ, [x(t)[i] for t∈τ, i∈idx];
+                                height = PLOT_HEIGHT,
+                                width = PLOT_WIDTH,
+                                labels = false,
+                                kw...)
+
+
+
+
 
 struct ODE{T}
     wrap::FunctionWrapper{T, Tuple{Float64}}
@@ -64,13 +95,13 @@ Base.show(io::IO, ode::ODE) = print(io, typeof(ode))
 # end
 
 
-preview(ode; kw...) = preview(ode, domain(ode)...; kw...)
-preview(fn, t0, tf; kw...) = preview(fn, LinRange(t0, tf, 240); kw...)
+# preview(ode; kw...) = preview(ode, domain(ode)...; kw...)
+# preview(fn, t0, tf; kw...) = preview(fn, LinRange(t0, tf, 240); kw...)
 
-function preview(ode, T; height = 30, width = 120, labels = false, kw...)
-    x = [ode(t)[i] for t in T, i in 1:length(ode)]
-    lineplot(T, x; height, width, labels, kw...)
-end
+# function preview(ode, T; height = 30, width = 120, labels = false, kw...)
+#     x = [ode(t)[i] for t in T, i in 1:length(ode)]
+#     lineplot(T, x; height, width, labels, kw...)
+# end
 
 export domain, preview
 

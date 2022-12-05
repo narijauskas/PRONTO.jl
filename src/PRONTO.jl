@@ -9,7 +9,7 @@ export @closure
 # lu = PRONTO.lu
 # function lu end
 import LinearAlgebra
-using LinearAlgebra: mul!
+using LinearAlgebra: mul!, I
 using UnicodePlots
 using MacroTools
 using SparseArrays
@@ -144,6 +144,7 @@ include("odes.jl") # ODE solution handling
 
 
 # ----------------------------------- #. regulator  ----------------------------------- #
+include("regulator.jl")
 export regulator
 
 struct Regulator{M,T1,T2,T3}
@@ -200,101 +201,22 @@ function dPr_dt(Pr,(θ,α,μ),t)#(M, out, θ, t, φ, Pr)
     - Ar'Pr - Pr*Ar + Pr'Br*(Rr\Br'Pr) - Qr
 end
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # ----------------------------------- #. projection ----------------------------------- #
-
-export zero_input, open_loop, projection
-
-
-struct Trajectory{M,X,U}
-    θ::M
-    x::X
-    u::U
-end
-
-(ξ::Trajectory)(t) = ξ.x(t),ξ.u(t)
-# Base.show(io::IO, ξ::Trajectory) = print(io, "Trajectory")
-nx(ξ::Trajectory) = nx(ξ.θ)
-nu(ξ::Trajectory) = nu(ξ.θ)
-Base.extrema(ξ::Trajectory) = extrema(ξ.x)
-
-PLOT_HEIGHT::Int = 30
-PLOT_WIDTH::Int = 120
-sample_time(t0,tf) = LinRange(t0,tf,4*PLOT_WIDTH)
-sample_time(x) = sample_time(extrema(x)...)
-
-function plot_scale!(height, width)
-    global PLOT_HEIGHT = convert(Int, height)
-    global PLOT_WIDTH = convert(Int, width)
-end
-
-function preview(ξ::Trajectory)
-    T = sample_time(ξ)
-    x = [ξ.x(t)[i] for t in T, i in 1:nx(ξ)]
-    _preview(x,T)
-    # u = [ξ.u(t)[i] for t in T, i in 1:nu(ξ)]
-    # lineplot()
-end
-
-function _preview(x,t; kw...)
-    lineplot(t,x;
-        height = PLOT_HEIGHT,
-        width = PLOT_WIDTH,
-        labels = false,
-        kw...)
-end
-
-
-
-
-# ix = trunc(Int, (t-t0)/dt) + 1
-function zero_input(θ::Model{NX,NU}, x0, t0, tf) where {NX,NU}
-    μ = t -> zeros(SVector{NU})
-    open_loop(θ, x0, μ, t0, tf)
-end
-
-function open_loop(θ::Model{NX,NU}, x0, μ, t0, tf) where {NX,NU}
-    α = t -> zeros(SVector{NX})
-    Kr = (α,μ,t) -> zeros(SMatrix{NU,NX})
-    projection(θ, x0, α, μ, Kr, t0, tf)
-end
-
-projection(θ::Model,x0,φ,Kr,t0,tf) = projection(θ,x0,φ.x,φ.u,Kr,t0,tf)
-
-function projection(θ::Model{NX,NU},x0,α,μ,Kr,t0,tf; dt=0.001) where {NX,NU}
-    # xbuf = Vector{SVector{NX,Float64}}()
-    ubuf = Vector{SVector{NU,Float64}}()
-    T = t0:dt:tf
-
-    cb = FunctionCallingCallback(funcat = T, func_start = false) do x,t,integrator
-        (_,α,μ,Kr) = integrator.p
-
-        α = α(t)
-        μ = μ(t)
-        Kr = Kr(α,μ,t)
-        u = μ - Kr*(x-α)
-        # push!(xbuf, SVector{NX,Float64}(x))
-        push!(ubuf, SVector{NU,Float64}(u))
-    end
-
-    x = ODE(dxdt, x0, (t0,tf), (θ,α,μ,Kr); callback = cb, saveat = T)
-    # x = scale(interpolate(xbuf, BSpline(Linear())), T)
-    u = scale(interpolate(ubuf, BSpline(Linear())), T)
-
-    return Trajectory(θ,x,u)
-end
-
-
-function dxdt(x,(θ,α,μ,Kr),t)
-    α = α(t)
-    μ = μ(t)
-    Kr = Kr(α,μ,t)
-    u = μ - Kr*(x-α)
-    f(x,u,t,θ)
-end
-
-
-
-
+include("projection.jl")
 
 
 
@@ -362,9 +284,42 @@ end
 # dλ_dt!(dλ, λ, (θ,ξ,Kr), t) = dλ_dt!(dλ, λ, ξ(t)..., Kr(t), t, θ)
 # function dλ_dt!(dλ,λ,x,u,Kr,t,θ)
 
+
+function dP_dt(P,(θ,x,u),t)#(M, out, θ, t, φ, Po)
+    x = x(t); u = u(t)
+
+    A = fx(x,u,t,θ)
+    B = fu(x,u,t,θ)
+    Q = lxx(x,u,t,θ)
+    S = lxu(x,u,t,θ)
+    R = luu(x,u,t,θ)
+    
+    - A'P - P*A + (P'B+S)*R\(S'+B'P) - Q
+end
+
+# struct Optimizer{M,T1}
+#     θ::M
+#     x
+#     u
+# end
+
+
+function dP_dt(P,(θ,x,u,λ),t)#(M, out, θ, t, φ, Po)
+    x = x(t)
+    u = u(t)
+    λ = λ(t)
+
+    A = fx(x,u,t,θ)
+    B = fu(x,u,t,θ)
+    Q = Lxx(x,u,λ,t,θ)
+    S = Lxu(x,u,λ,t,θ)
+    R = Luu(x,u,λ,t,θ)
+    
+    - A'P - P*A + (P'B+S)*R\(S'+B'P) - Q
+end
+
 function dλ_dt(λ, (θ,x,u,Kr), t)
-    Kr = Kr(t)
-    x,u = ξ(t)
+    x = x(t); u = u(t); Kr = Kr(t)
 
     A = fx(x,u,t,θ)
     B = fu(x,u,t,θ)
@@ -374,24 +329,19 @@ function dλ_dt(λ, (θ,x,u,Kr), t)
     -(A - B*Kr)'λ - a + Kr'b
 end
 
-function dr_dt!(dr, r, (θ,ξ), t)
-end
-
-function dP_dt!(dP, P, (θ,ξ), t)
-end
-
-function dPo_dt!(dPo,Po,(θ,x,u),t)#(M, out, θ, t, φ, Po)
+function dr_dt(r, (θ,x,u,Ko), t)
     x = x(t)
     u = u(t)
+    Ko = Ko(x,u,t)
 
-    Ao = fx(x,u,t,θ)
-    Bo = fu(x,u,t,θ)
-    Qo = lxx(x,u,t,θ)
-    So = lxu(x,u,t,θ)
-    Ro = luu(x,u,t,θ)
-    
-    dPo .= .- Ao'Po .- Po*Ao .+ (Po'Bo+So)*Ro\(So'+Bo'Po) .- Qo
+    A = fx(x,u,t,θ)
+    B = fu(x,u,t,θ)
+    a = lx(x,u,t,θ)
+    b = lu(x,u,t,θ)
+
+    -(A - B*Ko)'r - a + Ko'b
 end
+
 
 
 # u_ol(θ,μ,t) = μ(t)
@@ -405,22 +355,15 @@ end
 # export dPr_dt!
 
 
-# solves for x(t),u(t)
-function pronto(θ::Model{NX,NU,NΘ}, x0::StaticVector, α, μ, (t0,tf); tol = 1e-5, maxiters = 20) where {NX,NU,NΘ}
-    
-
+# solves for x(t),u(t)'
+function pronto(θ::Model{NX,NU,NΘ}, x0::StaticVector, α, μ, τ; tol = 1e-5, maxiters = 20) where {NX,NU,NΘ}
+    t0,tf = τ
 
     # -------------- build regulator -------------- #
     # α,μ -> Kr,x,u
 
-    #FUTURE: provided by user as P
-    Pf = StaticMatrix{NX,NX}(I(nx(θ)))
-    Pr = ODE(dPr_dt!, Pf, (tf,t0), (θ,α,μ), Size(NX,NX))
-
-    # u = ControlInput(α,μ,Kr) # initializes with missing 
-    # x0 is always the same
-    x = ODE(dx_dt!, x0, (t0,tf), (θ,α,μ,Pr), Size(x0))
-    u = @closure t -> μ - Kr(α(t), μ(t), Pr(t), t, θ)*(x - α(t))
+    Kr = regulator(θ, φ, τ)
+    ξ = projection(θ, x0, φ, Kr, τ)
     
     # -------------- search direction -------------- #
     # Kr,x,u -> z,v
@@ -444,7 +387,7 @@ end
 # Regulator(θ,T,α,μ)
 
 
-using LinearAlgebra: I
+# using LinearAlgebra: I
 
 # alternatively:
 
