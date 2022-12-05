@@ -38,11 +38,11 @@ using Dates: now
 using MacroTools
 using MacroTools: @capture
 
-
+using Interpolations
 # using MakieCore
 # MakieCore.convert_arguments(P::PointBased, x::MyType) = convert_arguments(P, time vector, vector of sampled vectors)
 
-
+import Base: extrema
 
 # ----------------------------------- #. preliminaries & typedefs ----------------------------------- #
 
@@ -69,11 +69,6 @@ include("helpers.jl")
 
 #YO: can I actually deprecate this? :)
 views(::Model{NX,NU,NΘ},ξ) where {NX,NU,NΘ} = (@view ξ[1:NX]),(@view ξ[NX+1:end])
-
-
-include("odes.jl") # ODE solution handling
-
-
 
 
 # ----------------------------------- #. model functions ----------------------------------- #
@@ -133,59 +128,232 @@ include("codegen.jl") # takes derivatives
 
 # ----------------------------------- #. components ----------------------------------- #
 
-Kr(α,μ,Pr,t,θ) = R(α,μ,t,θ)\(fu(α,μ,t,θ)'Pr)
+
+
+
+include("odes.jl") # ODE solution handling
+
+
+
+
+
+# Kr(α,μ,Pr,t,θ) = R(α,μ,t,θ)\(fu(α,μ,t,θ)'Pr)
+
+
+
+
+
+# ----------------------------------- #. regulator  ----------------------------------- #
+export regulator
+
+struct Regulator{M,T1,T2,T3}
+    θ::M
+    α::T1
+    μ::T2
+    Pr::T3
+end
+
+nx(Kr::Regulator) = nx(Kr.θ)
+nu(Kr::Regulator) = nu(Kr.θ)
+extrema(Kr::Regulator) = extrema(Kr.Pr)
+
+# using TimerOutputs
+# const CLK = TimerOutput()
+
+
+(Kr::Regulator)(t) = Kr(Kr.α(t), Kr.μ(t), t)
+(Kr::Regulator)(α, μ, t) = Kr(α, μ, t, Kr.θ)
+
+function (Kr::Regulator)(α, μ, t, θ)
+    Pr = Kr.Pr(t)
+    Rr = R(α,μ,t,θ)
+    Br = fu(α,μ,t,θ)
+
+    Rr\Br'Pr
+end
+
+Base.length(Kr::Regulator) = nu(Kr.θ)*nx(Kr.θ)
+# domain(Kr::Regulator)
+
+#TODO: time domain?
+
+regulator(θ,φ,t0,tf) = regulator(θ,φ.x,φ.u,t0,tf)
+# design the regulator, solving dPr_dt
+function regulator(θ::Model{NX,NU}, α, μ, t0, tf) where {NX,NU}
+    #FUTURE: Pf provided by user or auto-generated as P(α,μ,θ)
+    Pf = SMatrix{NX,NX,Float64}(I(NX))
+    Pr = ODE(dPr_dt, Pf, (tf,t0), (θ,α,μ), Size(Pf))
+    Regulator(θ,α,μ,Pr)
+end
+
+
+
+function dPr_dt(Pr,(θ,α,μ),t)#(M, out, θ, t, φ, Pr)
+    α = α(t)
+    μ = μ(t)
+
+    Ar = fx(α,μ,t,θ)
+    Br = fu(α,μ,t,θ)
+    Qr = Q(α,μ,t,θ)
+    Rr = R(α,μ,t,θ)
+    
+    - Ar'Pr - Pr*Ar + Pr'Br*(Rr\Br'Pr) - Qr
+end
+
+# ----------------------------------- #. projection ----------------------------------- #
+
+export zero_input, open_loop, projection
+
+
+struct Trajectory{M,X,U}
+    θ::M
+    x::X
+    u::U
+end
+
+(ξ::Trajectory)(t) = ξ.x(t),ξ.u(t)
+# Base.show(io::IO, ξ::Trajectory) = print(io, "Trajectory")
+nx(ξ::Trajectory) = nx(ξ.θ)
+nu(ξ::Trajectory) = nu(ξ.θ)
+Base.extrema(ξ::Trajectory) = extrema(ξ.x)
+
+PLOT_HEIGHT::Int = 30
+PLOT_WIDTH::Int = 120
+sample_time(t0,tf) = LinRange(t0,tf,4*PLOT_WIDTH)
+sample_time(x) = sample_time(extrema(x)...)
+
+function plot_scale!(height, width)
+    global PLOT_HEIGHT = convert(Int, height)
+    global PLOT_WIDTH = convert(Int, width)
+end
+
+function preview(ξ::Trajectory)
+    T = sample_time(ξ)
+    x = [ξ.x(t)[i] for t in T, i in 1:nx(ξ)]
+    _preview(x,T)
+    # u = [ξ.u(t)[i] for t in T, i in 1:nu(ξ)]
+    # lineplot()
+end
+
+function _preview(x,t; kw...)
+    lineplot(t,x;
+        height = PLOT_HEIGHT,
+        width = PLOT_WIDTH,
+        labels = false,
+        kw...)
+end
+
+
+
+
+# ix = trunc(Int, (t-t0)/dt) + 1
+function zero_input(θ::Model{NX,NU}, x0, t0, tf) where {NX,NU}
+    μ = t -> zeros(SVector{NU})
+    open_loop(θ, x0, μ, t0, tf)
+end
+
+function open_loop(θ::Model{NX,NU}, x0, μ, t0, tf) where {NX,NU}
+    α = t -> zeros(SVector{NX})
+    Kr = (α,μ,t) -> zeros(SMatrix{NU,NX})
+    projection(θ, x0, α, μ, Kr, t0, tf)
+end
+
+projection(θ::Model,x0,φ,Kr,t0,tf) = projection(θ,x0,φ.x,φ.u,Kr,t0,tf)
+
+function projection(θ::Model{NX,NU},x0,α,μ,Kr,t0,tf; dt=0.001) where {NX,NU}
+    # xbuf = Vector{SVector{NX,Float64}}()
+    ubuf = Vector{SVector{NU,Float64}}()
+    T = t0:dt:tf
+
+    cb = FunctionCallingCallback(funcat = T, func_start = false) do x,t,integrator
+        (_,α,μ,Kr) = integrator.p
+
+        α = α(t)
+        μ = μ(t)
+        Kr = Kr(α,μ,t)
+        u = μ - Kr*(x-α)
+        # push!(xbuf, SVector{NX,Float64}(x))
+        push!(ubuf, SVector{NU,Float64}(u))
+    end
+
+    x = ODE(dxdt, x0, (t0,tf), (θ,α,μ,Kr); callback = cb, saveat = T)
+    # x = scale(interpolate(xbuf, BSpline(Linear())), T)
+    u = scale(interpolate(ubuf, BSpline(Linear())), T)
+
+    return Trajectory(θ,x,u)
+end
+
+
+function dxdt(x,(θ,α,μ,Kr),t)
+    α = α(t)
+    μ = μ(t)
+    Kr = Kr(α,μ,t)
+    u = μ - Kr*(x-α)
+    f(x,u,t,θ)
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
 # ----------------------------------- #. ode functions ----------------------------------- #
 
 
-# ----------------------------------- #. regulator  ----------------------------------- #
+# riccati(A,K,P,Q,R) = -A'P - P*A + K'R*K - Q
+
+# function riccati!(out,A,K,P,Q,R)
+#     out .= .- Q
+#     mul!(out, A', P, -1, 1) # -A'P
+#     mul!(out, P, A, -1, 1) # -P*A
+#     # can we more efficiently solve: P'B*(R\B'P) ?
+#     out .+= K'*R*K
+# end
 
 
-riccati(A,K,P,Q,R) = -A'P - P*A + K'R*K - Q
+# # forced
+# function dx_dt_ol!(dx,x,(θ,μ),t)
+#     u = μ(t)
+#     f!(dx,x,u,t,θ)
+# end
 
-function riccati!(out,A,K,P,Q,R)
-    out .= .- Q
-    mul!(out, A', P, -1, 1) # -A'P
-    mul!(out, P, A, -1, 1) # -P*A
-    # can we more efficiently solve: P'B*(R\B'P) ?
-    out .+= K'*R*K
-end
+# # regulated
+# function dx_dt!(dx,x,(θ,α,μ,Pr),t)
+#     α = α(t)
+#     μ = μ(t)
+#     u = μ - Kr(α,μ,Pr(t),t,θ)*(x-α)
+#     f!(dx,x,u,t,θ)
+# end
 
+# function dx_dt2!(dx,x,(θ,α,μ,Kr),t)
+#     α = α(t)
+#     μ = μ(t)
+#     Kr = Kr(α,μ,t)
+#     u = μ - Kr*(x-α)
+#     f!(dx,x,u,t,θ)
+# end
 
-# forced
-function dx_dt_ol!(dx,x,(θ,μ),t)
-    u = μ(t)
-    f!(dx,x,u,t,θ)
-end
+# function dξ_dt!(dξ, ξ, (θ,α,μ,Kr), t)
+#     α = α(t)
+#     μ = μ(t)
+#     x,u = views(θ, ξ)
+#     dx,du = views(θ, dξ)
+#     f!(dx,x,u,t,θ)
+#     du .= μ - Kr(t)*(x-α) - u
+# end
 
-# regulated
-function dx_dt!(dx,x,(θ,α,μ,Pr),t)
-    α = α(t)
-    μ = μ(t)
-    u = μ - Kr(α,μ,Pr(t),t,θ)*(x-α)
-    f!(dx,x,u,t,θ)
-end
-
-function dx_dt2!(dx,x,(θ,α,μ,Kr),t)
-    α = α(t)
-    μ = μ(t)
-    Kr = Kr(α,μ,t)
-    u = μ - Kr*(x-α)
-    f!(dx,x,u,t,θ)
-end
-
-function dξ_dt!(dξ, ξ, (θ,α,μ,Kr), t)
-    α = α(t)
-    μ = μ(t)
-    x,u = views(θ, ξ)
-    dx,du = views(θ, dξ)
-    f!(dx,x,u,t,θ)
-    du .= μ - Kr(t)*(x-α) - u
-end
-
-export dξ_dt!
+# export dξ_dt!
 
 
 # ----------------------------------- #. search direction ----------------------------------- #
@@ -194,7 +362,7 @@ export dξ_dt!
 # dλ_dt!(dλ, λ, (θ,ξ,Kr), t) = dλ_dt!(dλ, λ, ξ(t)..., Kr(t), t, θ)
 # function dλ_dt!(dλ,λ,x,u,Kr,t,θ)
 
-function dλ_dt!(dλ, λ, (θ,ξ,Kr), t)
+function dλ_dt(λ, (θ,x,u,Kr), t)
     Kr = Kr(t)
     x,u = ξ(t)
 
@@ -203,7 +371,7 @@ function dλ_dt!(dλ, λ, (θ,ξ,Kr), t)
     a = lx(x,u,t,θ)
     b = lu(x,u,t,θ)
 
-    dλ .= -(A - B*Kr)'λ .- a .+ Kr'b
+    -(A - B*Kr)'λ - a + Kr'b
 end
 
 function dr_dt!(dr, r, (θ,ξ), t)
@@ -212,15 +380,29 @@ end
 function dP_dt!(dP, P, (θ,ξ), t)
 end
 
+function dPo_dt!(dPo,Po,(θ,x,u),t)#(M, out, θ, t, φ, Po)
+    x = x(t)
+    u = u(t)
+
+    Ao = fx(x,u,t,θ)
+    Bo = fu(x,u,t,θ)
+    Qo = lxx(x,u,t,θ)
+    So = lxu(x,u,t,θ)
+    Ro = luu(x,u,t,θ)
+    
+    dPo .= .- Ao'Po .- Po*Ao .+ (Po'Bo+So)*Ro\(So'+Bo'Po) .- Qo
+end
+
+
 # u_ol(θ,μ,t) = μ(t)
 # u_cl(θ,x,α,μ,Pr,t) = μ - Kr(θ,α,μ,Pr,t)*(x-α)
 
 # ----------------------------------- pronto loop ----------------------------------- #
 
-export dx_dt!
-# export dx_dt_2o!
-export dx_dt_ol!
-export dPr_dt!
+# export dx_dt!
+# # export dx_dt_2o!
+# export dx_dt_ol!
+# export dPr_dt!
 
 
 # solves for x(t),u(t)
@@ -274,14 +456,14 @@ using LinearAlgebra: I
 #     Pr::Timeseries{NX,NX}
 # end
 
-export TimeDomain
-struct TimeDomain{T}
-    t0::T
-    # dt::T
-    tf::T
-end
+# export TimeDomain
+# struct TimeDomain{T}
+#     t0::T
+#     # dt::T
+#     tf::T
+# end
 
-domain(T::TimeDomain) = (T.t0,T.tf)
+# domain(T::TimeDomain) = (T.t0,T.tf)
 
 #TODO: iterate
 
@@ -299,73 +481,9 @@ abstract type Timeseries end
 Base.show(io::IO, x::Timeseries) = println(io, preview(x))
 domain(x::Timeseries) = domain(x.T)
 
-struct Regulator{M,T1,T2,T3} <: Timeseries
-    θ::M
-    T::TimeDomain
-    α::T1
-    μ::T2
-    Pr::T3
-end
-
-using TimerOutputs
-const CLK = TimerOutput()
-
-
-(Kr::Regulator)(t) = Kr(Kr.α(t), Kr.μ(t), t)
-(Kr::Regulator)(α,μ,t) = Kr(α, μ, t, Kr.θ)
-
-function (Kr::Regulator)(α,μ,t,θ)
-    Pr = Kr.Pr(t)
-    Rr = R(α,μ,t,θ)
-    Br = fu(α,μ,t,θ)
-
-    Rr\Br'Pr
-end
-
-Base.length(Kr::Regulator) = nu(Kr.θ)*nx(Kr.θ)
-# domain(Kr::Regulator)
-
-#TODO: time domain?
-
-# design the regulator, solving dPr_dt
-function Regulator(θ::Model{NX,NU}, T::TimeDomain, α, μ) where {NX,NU}
-    #FUTURE: Pf provided by user or auto-generated as P(α,μ,θ)
-    Pf = SMatrix{NX,NX,Float64}(I(NX))
-    Pr = ODE(dPr_dt!, Pf, (T.tf,T.t0), (θ,α,μ), Size(Pf))
-    Regulator(θ,T,α,μ,Pr)
-end
-
-
-
-function dPr_dt!(dPr,Pr,(θ,α,μ),t)#(M, out, θ, t, φ, Pr)
-    α = α(t)
-    μ = μ(t)
-
-    Ar = fx(α,μ,t,θ)
-    Br = fu(α,μ,t,θ)
-    Qr = Q(α,μ,t,θ)
-    Rr = R(α,μ,t,θ)
-    
-    dPr .= .- Ar'Pr .- Pr*Ar .+ Pr'Br*(Rr\Br'Pr) .- Qr
-end
-
-
 
 # Ko = Ro\(So' + Bo'Po)
 
-
-function dPo_dt!(dPo,Po,(θ,x,u),t)#(M, out, θ, t, φ, Po)
-    α = α(t)
-    μ = μ(t)
-
-    Ao = fx(α,μ,t,θ)
-    Bo = fu(α,μ,t,θ)
-    Qo = lxx(α,μ,t,θ)
-    So = lxu(α,μ,t,θ)
-    Ro = luu(α,μ,t,θ)
-    
-    dPo .= .- Ao'Po .- Po*Ao .+ (Po'Bo+So)*Ro\(So'+Bo'Po) .- Qo
-end
 
 
 # Ko ~ x,u,Po

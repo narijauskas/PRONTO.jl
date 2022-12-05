@@ -83,8 +83,8 @@ function pp(x,u,t,θ)
 end
 
 
-## ------------------------------- symbolic derivatives ------------------------------- ##
 PRONTO.generate_model(SplitP, dynamics, ll, pp, Qr, Rr)
+## ------------------------------- symbolic derivatives ------------------------------- ##
 
     
 
@@ -98,7 +98,18 @@ u0 = 0.2
 t0,tf = (0,10)
 
 θ = SplitP(10,1,1)
-μ = @closure t->SizedVector{1}(0.2)
+μ = @closure t->SizedVector{1}(sin(t))
+
+φ = open_loop(θ,xf,μ,t0,tf)
+preview(φ)
+
+Kr = regulator(θ,φ,t0,tf)
+ξ = projection(θ,x0,φ,Kr,t0,tf)
+
+
+
+
+
 
 α = ODE(dx_dt_ol!, xf, (t0,tf), (θ,μ), Size(xf))
 x = ODE(dx_dt_ol!, x0, (t0,tf), (θ,μ), Size(x0))
@@ -333,52 +344,6 @@ cb = FunctionCallingCallback(update_ξ;
 
 
 
-function projection(x0,φ,Kr,T,θ::Model{NX,NU}) where {NX,NU}
-    xbuf = Vector{SVector{NX,Float64}}()
-    ubuf = Vector{SVector{NU,Float64}}()
-
-    cb = FunctionCallingCallback(funcat=TT, func_start = false) do x,t,integrator
-        (_,φ,Kr) = integrator.p
-        # ix = trunc(Int, (t-t0)/dt) + 1
-        # xbuf[ix] .= u+
-        α = φ.α(t)
-        μ = φ.μ(t)
-        Kr = Kr(α,μ,t)
-        u = μ - Kr*(x-α)
-        push!(xbuf, SVector{NX,Float64}(x))
-        push!(ubuf, SVector{NU,Float64}(u))
-    end
-
-    # x = ODE(dxdt, x0, domain(T), (θ,φ,Kr); callback = cb)
-    soln = solve(ODEProblem(dxdt, x0, domain(T), (θ,φ,Kr)),
-            Tsit5();
-            reltol=1e-7,
-            callback=cb)
-
-
-    wrap = FunctionWrapper{SVector{NX, Float64}, Tuple{Float64}}() do t
-            out = MVector{NX, Float64}(undef)
-            soln(out,t)
-            return SVector{NX, Float64}(out)
-    end
-
-    x = ODE{SVector{NX, Float64}}(wrap,soln)
-
-    # x = scale(interpolate(xbuf, BSpline(Linear())), TT)
-    u = scale(interpolate(ubuf, BSpline(Linear())), TT)
-
-    return Trajectory(θ,T,x,u,soln)
-end
-
-
-function dxdt(x,(θ,φ,Kr),t)
-    α = φ.α(t)
-    μ = φ.μ(t)
-    Kr = Kr(α,μ,t)
-    u = μ - Kr*(x-α)
-    PRONTO.f(x,u,t,θ)
-end
-
 x0 = SVector{NX}(x_eig(1))
 @benchmark solve(ODEProblem(dxdt, x0, (t0,tf), (θ,α,μ,Kr)),Tsit5(); reltol=1e-7, callback = cb)
 @benchmark solve(ODEProblem(dxdt!, collect(x0), (t0,tf), (θ,α,μ,Kr)),Tsit5(); reltol=1e-7, callback = cb)
@@ -395,17 +360,6 @@ ODE(dx_dt2!, x0, (t0,tf), (θ,α,μ,Kr), Size(x0); callback = cb)
 
 @code_warntype scale(interpolate(XBUF, BSpline(Linear())), TT)
 
-
-struct Trajectory{M,X,U}
-    θ::M
-    T::TimeDomain
-    x::X
-    u::U
-    soln
-end
-
-(ξ::Trajectory)(t) = ξ.x(t),ξ.u(t)
-Base.show(io::IO, ξ::Trajectory) = print(io, "Trajectory")
 
 nothing
 

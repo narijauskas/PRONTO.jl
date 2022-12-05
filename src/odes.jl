@@ -1,11 +1,7 @@
-using Memoization
 
 struct ODE{T}
     wrap::FunctionWrapper{T, Tuple{Float64}}
     soln::SciMLBase.AbstractODESolution
-    #MAYBE:
-    # domain
-    # buffer
 end
 
 (ode::ODE)(t) = ode.wrap(t)
@@ -16,7 +12,7 @@ ODE(fn::Function, ic, ts, p; kw...) = ODE(fn::Function, ic, ts, p, Size(ic); kw.
 # constructor basically wraps ODEProblem, should make algorithm available for tuning
 function ODE(fn::Function, ic, ts, p, ::Size{S}; kw...) where {S}
 
-    soln = solve(ODEProblem(fn, collect(ic), ts, p),
+    soln = solve(ODEProblem(fn, ic, ts, p),
             Tsit5();
             reltol=1e-7, kw...)
 
