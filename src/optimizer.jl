@@ -192,29 +192,32 @@ is2ndorder(::Any) = false
 
 
 
-# function dP_dt_2o(P, (θ,x,u,λ), t)#(M, out, θ, t, φ, Po)
-#     x = x(t)
-#     u = u(t)
-#     λ = λ(t)
+function search_direction(θ::Model{NX,NU},ξ,Ko,vo,τ; dt=0.001) where {NX,NU}
+    t0,tf = τ
+    ts = t0:dt:tf
+    vbuf = Vector{SVector{NU,Float64}}()
 
-#     A = fx(x,u,t,θ)
-#     B = fu(x,u,t,θ)
-#     Q = Lxx(λ,x,u,t,θ)
-#     S = Lxu(λ,x,u,t,θ)
-#     R = Luu(λ,x,u,t,θ)
-    
-#     - A'P - P*A + (P'B+S)*R\(S'+B'P) - Q
-# end
+    cb = FunctionCallingCallback(funcat = ts) do z,t,integrator
+        (_,ξ,Ko,vo) = integrator.p
 
+        x = ξ.x(t)
+        u = ξ.u(t)
+        v = vo(x,u,t) - Ko(x,u,t)*z
 
-# function dP_dt_1o(P, (θ,x,u), t)#(M, out, θ, t, φ, Po)
-#     x = x(t); u = u(t)
+        push!(vbuf, SVector{NU,Float64}(v))
+    end
+    z0 = zeros(SVector{NX,Float64})
+    z = ODE(dz_dt, z0, (t0,tf), (θ,ξ,Ko,vo); callback = cb, saveat = ts)
+    v = Interpolant(scale(interpolate(vbuf, BSpline(Linear())), ts))
 
-#     A = fx(x,u,t,θ)
-#     B = fu(x,u,t,θ)
-#     Q = lxx(x,u,t,θ)
-#     S = lxu(x,u,t,θ)
-#     R = luu(x,u,t,θ)
-    
-#     - A'P - P*A + (P'B+S)*R\(S'+B'P) - Q
-# end
+    return Trajectory(θ,z,v)
+end
+
+function dz_dt(z, (θ,ξ,Ko,vo), t)
+    x = ξ.x(t)
+    u = ξ.u(t)
+    A = fx(x,u,t,θ)
+    B = fu(x,u,t,θ)
+    v = vo(x,u,t) - Ko(x,u,t)*z
+    return A*z + B*v
+end

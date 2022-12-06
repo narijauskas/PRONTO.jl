@@ -108,6 +108,9 @@ Kr = regulator(θ,φ,τ)
 λ = PRONTO.lagrangian(θ,ξ,φ,Kr,τ)
 Ko = PRONTO.optimizer(θ,λ,ξ,φ,τ)
 vo = PRONTO.costate(θ,λ,ξ,φ,Ko,τ)
+
+
+ζ = PRONTO.search_direction(θ,ξ,Ko,vo)
 nothing
 ## ------------------------------- testing ------------------------------- ##
 
@@ -126,6 +129,9 @@ x = ODE(dx_dt!, x0, (t0,tf), (θ,α,μ,Pr), Size(x0))
 
 # dx = similar(collect(x0))
 # dx_dt!(dx,x0,(θ,μ(t0)),t0)
+using SciMLBase, DifferentialEquations
+Base.show(io::IO, ::Type{<:SciMLBase.ODEProblem}) = print(io, "ODEProblem{...}")
+Base.show(io::IO, ::Type{<:OrdinaryDiffEq.ODEIntegrator}) = print(io, "ODEIntegrator{...}")
 
 
 

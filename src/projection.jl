@@ -41,10 +41,9 @@ end
 projection(θ::Model, x0, φ, Kr, τ) = projection(θ, x0, φ.x, φ.u, Kr, τ)
 
 
+#TODO: a function that returns buf,cb
+
 function projection(θ::Model{NX,NU}, x0, α, μ, Kr, (t0,tf); dt=0.001) where {NX,NU}
-    # t0,tf = τ
-    # α = φ.α
-    # μ = φ.μ
     # xbuf = Vector{SVector{NX,Float64}}()
     ubuf = Vector{SVector{NU,Float64}}()
     ts = t0:dt:tf
@@ -61,7 +60,6 @@ function projection(θ::Model{NX,NU}, x0, α, μ, Kr, (t0,tf); dt=0.001) where {
     end
 
     x = ODE(dxdt, x0, (t0,tf), (θ,α,μ,Kr); callback = cb, saveat = ts)
-    # x = scale(interpolate(xbuf, BSpline(Linear())), ts)
     u = Interpolant(scale(interpolate(ubuf, BSpline(Linear())), ts))
 
     return Trajectory(θ,x,u)
