@@ -12,6 +12,7 @@ export build
 
 #FUTURE: options to make pretty (or add other postprocessing), save to file, etc.
 function generate_model(T, user_f, user_l, user_p, user_Q, user_R)
+    info("generating the $T model")
     iinfo("initializing symbolics...\n")
     NX = nx(T); NU = nu(T)
     @variables x[1:NX] u[1:NU] t θ[1:nθ(T)] λ[1:NX]

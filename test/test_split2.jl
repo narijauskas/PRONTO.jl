@@ -89,7 +89,7 @@ PRONTO.generate_model(SplitP, dynamics, ll, pp, Qr, Rr)
     
 
 
-## ------------------------------- testing ------------------------------- #
+## ------------------------------- testing ------------------------------- ##
 
 x0 = SVector{NX}(x_eig(1))
 xf = SVector{NX}(x_eig(2))
@@ -105,8 +105,10 @@ t0,tf = τ = (0,10)
 Kr = regulator(θ,φ,τ)
 ξ = projection(θ,x0,φ,Kr,τ)
 
-
-
+λ = PRONTO.lagrangian(θ,ξ,φ,Kr,τ)
+Ko = PRONTO.optimizer(θ,λ,ξ,φ,τ)
+vo = PRONTO.costate(θ,λ,ξ,φ,Ko,τ)
+nothing
 ## ------------------------------- testing ------------------------------- ##
 
 
