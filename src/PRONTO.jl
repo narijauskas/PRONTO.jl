@@ -41,8 +41,8 @@ using MacroTools: @capture
 using Interpolations
 # using MakieCore
 # MakieCore.convert_arguments(P::PointBased, x::MyType) = convert_arguments(P, time vector, vector of sampled vectors)
-
-import Base: extrema
+using Base: OneTo
+import Base: extrema, length, eachindex, show, size, eltype
 
 # ----------------------------------- #. preliminaries & typedefs ----------------------------------- #
 
@@ -110,12 +110,12 @@ p(x,u,t,θ) = throw(ModelDefError(θ))
 px(x,u,t,θ) = throw(ModelDefError(θ))
 pxx(x,u,t,θ) = throw(ModelDefError(θ))
 
-# L(x,u,λ,t,θ) = throw(ModelDefError(θ))
-# Lx(x,u,λ,t,θ) = throw(ModelDefError(θ))
-# Lu(x,u,λ,t,θ) = throw(ModelDefError(θ))
-Lxx(x,u,λ,t,θ) = throw(ModelDefError(θ))
-Lxu(x,u,λ,t,θ) = throw(ModelDefError(θ))
-Luu(x,u,λ,t,θ) = throw(ModelDefError(θ))
+# L(λ,x,u,t,θ) = throw(ModelDefError(θ))
+# Lx(λ,x,u,t,θ) = throw(ModelDefError(θ))
+# Lu(λ,x,u,t,θ) = throw(ModelDefError(θ))
+Lxx(λ,x,u,t,θ) = throw(ModelDefError(θ))
+Lxu(λ,x,u,t,θ) = throw(ModelDefError(θ))
+Luu(λ,x,u,t,θ) = throw(ModelDefError(θ))
 
 
 
@@ -145,65 +145,6 @@ include("odes.jl") # ODE solution handling
 
 # ----------------------------------- #. regulator  ----------------------------------- #
 include("regulator.jl")
-export regulator
-
-struct Regulator{M,T1,T2,T3}
-    θ::M
-    α::T1
-    μ::T2
-    Pr::T3
-end
-
-nx(Kr::Regulator) = nx(Kr.θ)
-nu(Kr::Regulator) = nu(Kr.θ)
-extrema(Kr::Regulator) = extrema(Kr.Pr)
-
-# using TimerOutputs
-# const CLK = TimerOutput()
-
-
-(Kr::Regulator)(t) = Kr(Kr.α(t), Kr.μ(t), t)
-(Kr::Regulator)(α, μ, t) = Kr(α, μ, t, Kr.θ)
-
-function (Kr::Regulator)(α, μ, t, θ)
-    Pr = Kr.Pr(t)
-    Rr = R(α,μ,t,θ)
-    Br = fu(α,μ,t,θ)
-
-    Rr\Br'Pr
-end
-
-Base.length(Kr::Regulator) = nu(Kr.θ)*nx(Kr.θ)
-# domain(Kr::Regulator)
-
-#TODO: time domain?
-
-regulator(θ,φ,t0,tf) = regulator(θ,φ.x,φ.u,t0,tf)
-# design the regulator, solving dPr_dt
-function regulator(θ::Model{NX,NU}, α, μ, t0, tf) where {NX,NU}
-    #FUTURE: Pf provided by user or auto-generated as P(α,μ,θ)
-    Pf = SMatrix{NX,NX,Float64}(I(NX))
-    Pr = ODE(dPr_dt, Pf, (tf,t0), (θ,α,μ), Size(Pf))
-    Regulator(θ,α,μ,Pr)
-end
-
-
-
-function dPr_dt(Pr,(θ,α,μ),t)#(M, out, θ, t, φ, Pr)
-    α = α(t)
-    μ = μ(t)
-
-    Ar = fx(α,μ,t,θ)
-    Br = fu(α,μ,t,θ)
-    Qr = Q(α,μ,t,θ)
-    Rr = R(α,μ,t,θ)
-    
-    - Ar'Pr - Pr*Ar + Pr'Br*(Rr\Br'Pr) - Qr
-end
-
-
-
-
 
 
 
@@ -285,7 +226,7 @@ include("projection.jl")
 # function dλ_dt!(dλ,λ,x,u,Kr,t,θ)
 
 
-function dP_dt(P,(θ,x,u),t)#(M, out, θ, t, φ, Po)
+function dP_dt_1o(P, (θ,x,u), t)#(M, out, θ, t, φ, Po)
     x = x(t); u = u(t)
 
     A = fx(x,u,t,θ)
@@ -297,23 +238,97 @@ function dP_dt(P,(θ,x,u),t)#(M, out, θ, t, φ, Po)
     - A'P - P*A + (P'B+S)*R\(S'+B'P) - Q
 end
 
-# struct Optimizer{M,T1}
-#     θ::M
-#     x
-#     u
-# end
+
+abstract type SearchOrder end
+struct FirstOrder <: SearchOrder end
+struct SecondOrder <: SearchOrder end
+
+struct Optimizer{M,N,Λ,X,U}
+    θ::M
+    order::N
+    λ::Λ
+    x::X
+    u::U
+    P
+    r
+end
+
+(Ko::Optimizer)(t) = Ko(SearchOrder(Ko), t)
+
+function (Ko::Optimizer)(::FirstOrder, t)
+    P = Ko.P
+    B = fu(x,u,t,θ)
+    S = lxu(x,u,t,θ)
+    R = luu(x,u,t,θ)
+
+    Ko = R\(S' + B'P)
+    vo = -R\(B'r + b)
+    return (Ko,vo)
+end
+
+function asymmetry(A)
+    (m,n) = size(A)
+    @assert m == n "must be square matrix"
+    sum([0.5*abs(A[i,j]-A[j,i]) for i in 1:n, j in 1:n])
+end
+
+# ro_f = collect(px(M,θ,tf,φ(tf)))
+
+function optimizer(θ,ξ,Kr,(t0,tf))
+    αf = Kr.α(tf)
+    μf = Kr.μ(tf)
+
+    λf =px(αf, μf, tf, θ)
+    λ = ODE(dλ_dt!, λf, (tf,t0), (θ,ξ,Kr))
+
+    Pf = pxx(αf,μf,t,θ)
+    Po = ODE(dP_dt_2o, Pf, (tf,t0), (θ,x,u,λ))
+
+    if isstable(Po)
+        N = SecondOrder()
+    else
+        N = FirstOrder()
+    end
+
+    try 
+        ODE(dP_dt_2o, Pf, (tf,t0), (θ,x,u,λ))
+    catch
+        ODE(dP_dt_1o, Pf, (tf,t0), (θ,x,u))
+    end
+end
+
+function dP_dt(P, (θ,λ,x,u,N), t)
+    x = x(t)
+    u = u(t)
+
+    A = fx(θ,x,u,t)
+    B = fu(θ,x,u,t)
+
+    if N isa SecondOrder
+        λ = λ(t)
+        Q = Lxx(λ,x,u,t,θ)
+        S = Lxu(λ,x,u,t,θ)
+        R = Luu(λ,x,u,t,θ)
+    else # N isa FirstOrder
+        Q = lxx(x,u,t,θ)
+        S = lxu(x,u,t,θ)
+        R = luu(x,u,t,θ)
+    end
+
+    - A'P - P*A + (P'B+S)*R\(S'+B'P) - Q
+end
 
 
-function dP_dt(P,(θ,x,u,λ),t)#(M, out, θ, t, φ, Po)
+function dP_dt_2o(P, (θ,x,u,λ), t)#(M, out, θ, t, φ, Po)
     x = x(t)
     u = u(t)
     λ = λ(t)
 
     A = fx(x,u,t,θ)
     B = fu(x,u,t,θ)
-    Q = Lxx(x,u,λ,t,θ)
-    S = Lxu(x,u,λ,t,θ)
-    R = Luu(x,u,λ,t,θ)
+    Q = Lxx(λ,x,u,t,θ)
+    S = Lxu(λ,x,u,t,θ)
+    R = Luu(λ,x,u,t,θ)
     
     - A'P - P*A + (P'B+S)*R\(S'+B'P) - Q
 end
@@ -356,7 +371,7 @@ end
 
 
 # solves for x(t),u(t)'
-function pronto(θ::Model{NX,NU,NΘ}, x0::StaticVector, α, μ, τ; tol = 1e-5, maxiters = 20) where {NX,NU,NΘ}
+function pronto(θ::Model{NX,NU,NΘ}, x0::StaticVector, φ, τ; tol = 1e-5, maxiters = 20) where {NX,NU,NΘ}
     t0,tf = τ
 
     # -------------- build regulator -------------- #
@@ -369,7 +384,7 @@ function pronto(θ::Model{NX,NU,NΘ}, x0::StaticVector, α, μ, τ; tol = 1e-5, 
     # Kr,x,u -> z,v
 
     λf =px(α(tf), μ(tf), tf, θ)
-    λ = ODE(dλ_dt!, λf, (tf,t0), (M,θ,ξ,φ,Pr), Size(λf))
+    λ = ODE(dλ_dt!, λf, (tf,t0), (θ,ξ,Kr), Size(λf))
 
     # Po = ODE(Po_2_ode, Po_f, (tf,t0), (M,θ,ξ,λ), ODEBuffer{Tuple{NX,NX}}(); verbose=false, callback=cb)
     # ro = ODE(ro_2_ode, ro_f, (tf,t0), (M,θ,ξ,λ,Po), ODEBuffer{Tuple{NX}}())

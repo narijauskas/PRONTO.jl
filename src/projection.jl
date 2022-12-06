@@ -12,23 +12,13 @@ end
 # Base.show(io::IO, ξ::Trajectory) = print(io, "Trajectory")
 nx(ξ::Trajectory) = nx(ξ.θ)
 nu(ξ::Trajectory) = nu(ξ.θ)
-Base.extrema(ξ::Trajectory) = extrema(ξ.x)
+extrema(ξ::Trajectory) = extrema(ξ.x)
 
-
-preview(x::AbstractInterpolation) = preview(x, sample_time(x.ranges), 1:length(eltype(x)))
-# function 
-#     [x(t)[i] for t in τ, i in 1:length(eltype(x))]
-# end
-
-# function preview(ξ::Trajectory)
-#     T = sample_time(ξ)
-#     x = [ξ.x(t)[i] for t in T, i in 1:nx(ξ)]
-#     _preview(x,T)
-#     # u = [ξ.u(t)[i] for t in T, i in 1:nu(ξ)]
-#     # lineplot()
-# end
-
-
+function show(io::IO, ξ::Trajectory)
+    title = "A Trajectory of the $(typeof(ξ.θ)) System:"
+    println(io, preview(ξ.x; title = title))
+    println(io, preview(ξ.u))
+end
 
 
 
@@ -52,11 +42,14 @@ projection(θ::Model, x0, φ, Kr, τ) = projection(θ, x0, φ.x, φ.u, Kr, τ)
 
 
 function projection(θ::Model{NX,NU}, x0, α, μ, Kr, (t0,tf); dt=0.001) where {NX,NU}
+    # t0,tf = τ
+    # α = φ.α
+    # μ = φ.μ
     # xbuf = Vector{SVector{NX,Float64}}()
     ubuf = Vector{SVector{NU,Float64}}()
-    T = t0:dt:tf
+    ts = t0:dt:tf
 
-    cb = FunctionCallingCallback(funcat = T, func_start = false) do x,t,integrator
+    cb = FunctionCallingCallback(funcat = ts, func_start = false) do x,t,integrator
         (_,α,μ,Kr) = integrator.p
 
         α = α(t)
@@ -67,15 +60,15 @@ function projection(θ::Model{NX,NU}, x0, α, μ, Kr, (t0,tf); dt=0.001) where {
         push!(ubuf, SVector{NU,Float64}(u))
     end
 
-    x = ODE(dxdt, x0, (t0,tf), (θ,α,μ,Kr); callback = cb, saveat = T)
-    # x = scale(interpolate(xbuf, BSpline(Linear())), T)
-    u = scale(interpolate(ubuf, BSpline(Linear())), T)
+    x = ODE(dxdt, x0, (t0,tf), (θ,α,μ,Kr); callback = cb, saveat = ts)
+    # x = scale(interpolate(xbuf, BSpline(Linear())), ts)
+    u = Interpolant(scale(interpolate(ubuf, BSpline(Linear())), ts))
 
     return Trajectory(θ,x,u)
 end
 
 
-function dxdt(x,(θ,α,μ,Kr),t)
+function dxdt(x, (θ,α,μ,Kr), t)
     α = α(t)
     μ = μ(t)
     Kr = Kr(α,μ,t)

@@ -3,31 +3,38 @@
 
 PLOT_HEIGHT::Int = 30
 PLOT_WIDTH::Int = 120
-sample_time(t0,tf) = LinRange(t0,tf,4*PLOT_WIDTH)
-sample_time(x) = sample_time(extrema(x)...)
+t_plot(t0,tf) = LinRange(t0,tf,4*PLOT_WIDTH)
+t_plot(x) = t_plot(extrema(x)...)
 
 function set_plot_scale(height, width)
     global PLOT_HEIGHT = convert(Int, height)
     global PLOT_WIDTH = convert(Int, width)
 end
 
-function _preview(x,t; kw...)
-    lineplot(t,x;
+
+
+preview(x; kw...) = preview(x, t_plot(x), eachindex(x); kw...)
+
+function preview(x, ts, is; kw...)
+    lineplot(ts, [x(t)[i] for t∈ts, i∈is];
         height = PLOT_HEIGHT,
         width = PLOT_WIDTH,
         labels = false,
         kw...)
 end
 
+struct Interpolant{T}
+    itp::T
+end
+(x::Interpolant{T})(t) where {T} = x.itp(t)
+export Interpolant
 
-preview(x, τ, idx; kw...) = lineplot(τ, [x(t)[i] for t∈τ, i∈idx];
-                                height = PLOT_HEIGHT,
-                                width = PLOT_WIDTH,
-                                labels = false,
-                                kw...)
-
-
-
+show(io::IO, ::Type{Interpolant{T}}) where {T} = print(io, "Interpolant{$(eltype(T)),...}")
+show(io::IO, u::Interpolant) = print(io, preview(u))
+# Base.length(::Interpolant{T}) where {T} = length(eltype(T))
+eltype(::Interpolant{T}) where {T} = eltype(T)
+extrema(u::Interpolant) = extrema(first(u.itp.ranges))
+eachindex(::Interpolant{T}) where {T} = OneTo(length(eltype(T)))
 
 
 struct ODE{T}
@@ -64,9 +71,11 @@ StaticArrays.Size(::ODE{T}) where {T} = Size(T)
 StaticArrays.Size(::Type{ODE{T}}) where {T} = Size(T)
 Base.size(::ODE{T}) where {T} = size(T)
 Base.length(::ODE{T}) where {T} = length(T)
-Base.eltype(::Type{ODE{T}}) where {T} = T
-Base.extrema(ode::ODE) = extrema(ode.soln.t)
-domain(ode::ODE; n=240) = extrema(ode)
+
+eltype(::Type{ODE{T}}) where {T} = T
+extrema(ode::ODE) = extrema(ode.soln.t)
+eachindex(::ODE{T}) where {T} = OneTo(length(T))
+show(io::IO, ode::ODE) = println(io, preview(ode))
 
 # stats(ode)
 # retcode(ode)
@@ -74,7 +83,8 @@ domain(ode::ODE; n=240) = extrema(ode)
 
 
 # T = LinRange(extrema(ode.soln.t)..., 240)
-Base.show(io::IO, ode::ODE) = print(io, typeof(ode))
+# Base.show(io::IO, ode::ODE) = print(io, typeof(ode))
+
 #TODO: more info
 # function Base.show(io::IO, ode::ODE)
 #     compact = get(io, :compact, false)
@@ -106,7 +116,7 @@ Base.show(io::IO, ode::ODE) = print(io, typeof(ode))
 export domain, preview
 
 # this might be type piracy... but it prevents some obscenely long error messages
-function Base.show(io::IO, fn::FunctionWrapper{T,A}) where {T,A}
+function show(io::IO, fn::FunctionWrapper{T,A}) where {T,A}
     print(io, "FunctionWrapper: $A -> $T $(fn.ptr)")
 end
 

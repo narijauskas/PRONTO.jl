@@ -84,30 +84,30 @@ end
 
 
 PRONTO.generate_model(SplitP, dynamics, ll, pp, Qr, Rr)
-## ------------------------------- symbolic derivatives ------------------------------- ##
+# ------------------------------- symbolic derivatives ------------------------------- #
 
     
 
 
-## ------------------------------- testing ------------------------------- ##
+## ------------------------------- testing ------------------------------- #
 
 x0 = SVector{NX}(x_eig(1))
 xf = SVector{NX}(x_eig(2))
 
 u0 = 0.2
-t0,tf = (0,10)
+t0,tf = τ = (0,10)
 
 θ = SplitP(10,1,1)
-μ = @closure t->SizedVector{1}(sin(t))
+μ = @closure t->SizedVector{1}(u0)
 
-φ = open_loop(θ,xf,μ,t0,tf)
-preview(φ)
+φ = open_loop(θ,xf,μ,τ)
 
-Kr = regulator(θ,φ,t0,tf)
-ξ = projection(θ,x0,φ,Kr,t0,tf)
-
+Kr = regulator(θ,φ,τ)
+ξ = projection(θ,x0,φ,Kr,τ)
 
 
+
+## ------------------------------- testing ------------------------------- ##
 
 
 
