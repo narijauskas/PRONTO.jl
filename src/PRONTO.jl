@@ -226,7 +226,7 @@ include("projection.jl")
 # function dλ_dt!(dλ,λ,x,u,Kr,t,θ)
 include("optimizer.jl")
 
-
+include("armijo.jl")
 # u_ol(θ,μ,t) = μ(t)
 # u_cl(θ,x,α,μ,Pr,t) = μ - Kr(θ,α,μ,Pr,t)*(x-α)
 
@@ -236,36 +236,114 @@ include("optimizer.jl")
 # # export dx_dt_2o!
 # export dx_dt_ol!
 # export dPr_dt!
+fwd(τ) = extrema(τ)
+bkwd(τ) = reverse(fwd(τ))
 
+# solve_forward(fxn, x0, p, τ; kw...)
+# solve_backward(fxn, x0, p, τ; kw...)
 
 # solves for x(t),u(t)'
-function pronto(θ::Model{NX,NU,NΘ}, x0::StaticVector, φ, τ; tol = 1e-5, maxiters = 20) where {NX,NU,NΘ}
+function pronto(θ::Model{NX,NU,NΘ}, x0::StaticVector, φ, τ; tol = 1e-7, maxiters = 20) where {NX,NU,NΘ}
     t0,tf = τ
 
-    # -------------- build regulator -------------- #
-    # α,μ -> Kr,x,u
+    for i in 1:maxiters
+        info(i, "iteration")
+        # -------------- build regulator -------------- #
+        # α,μ -> Kr,x,u
+        iinfo("regulator")
+        Kr = regulator(θ, φ, τ)
+        iinfo("projection")
+        ξ = projection(θ, x0, φ, Kr, τ)
 
-    Kr = regulator(θ, φ, τ)
-    ξ = projection(θ, x0, φ, Kr, τ)
-    
-    # -------------- search direction -------------- #
-    # Kr,x,u -> z,v
-
-    λf =px(α(tf), μ(tf), tf, θ)
-    λ = ODE(dλ_dt!, λf, (tf,t0), (θ,ξ,Kr), Size(λf))
-
-    # Po = ODE(Po_2_ode, Po_f, (tf,t0), (M,θ,ξ,λ), ODEBuffer{Tuple{NX,NX}}(); verbose=false, callback=cb)
-    # ro = ODE(ro_2_ode, ro_f, (tf,t0), (M,θ,ξ,λ,Po), ODEBuffer{Tuple{NX}}())
-    # ζ = ODE(ζ_2_ode, ζ0, (t0,tf), (M,θ,ξ,λ,Po,ro), ODEBuffer{Tuple{NX+NU}}(); dae=dae(M))
+        # -------------- search direction -------------- #
+        # Kr,x,u -> z,v
 
 
-    # -------------- armijo step -------------- #
-    # x,u,Kr,z,v -> γ,x̂,û
-    #
+        iinfo("lagrangian")
+        λ = lagrangian(θ,ξ,φ,Kr,τ)
+        iinfo("optimizer")
+        Ko = optimizer(θ,λ,ξ,φ,τ)
+        iinfo("using $(is2ndorder(Ko) ? "2nd" : "1st") order search")
+        iinfo("costate")
+        vo = costate(θ,λ,ξ,φ,Ko,τ)
+        iinfo("search_direction")
+        ζ = search_direction(θ,ξ,Ko,vo,τ)
+
+        # -------------- cost/derivatives -------------- #
+        iinfo("cost/derivs")
+
+        Dh,D2g = cost_derivs(θ,λ,φ,ξ,ζ,τ)
+        
+        info("Dh = $Dh")
+        Dh > 0 && (info("increased cost - quitting"); (return φ))
+        -Dh < tol && (info(as_bold("PRONTO converged")); (return φ))
+
+        # compute cost
+        h = cost(ξ, τ)
+        # iinfo(as_bold("h = $(h)\n"))
+
+        # -------------- select γ -------------- #
+
+        γ = 0.7; aα=0.4; aβ=0.7
+        local η
+        while γ > aβ^25
+            iinfo("armijo γ = $(round(γ; digits=6))")
+            η = armijo_projection(θ,x0,ξ,ζ,γ,Kr,τ)
+            g = cost(η, τ)
+            h-g >= -aα*γ*Dh ? break : (γ *= aβ)
+        end
+        φ = η
+    end
 end
 
 
+# @build $T dφ̂_dt(M,θ,t,ξ,φ,ζ,φ̂,γ,Pr) -> vcat(
 
+#     PRONTO.f($M,θ,t,φ̂)...,
+#     ($u + γ*$v) - ($Kr)*($α̂ - ($x + γ*$z)) - $μ̂...
+# )
+# @build $T dh_dt(M,θ,t,ξ) -> PRONTO.l($M,θ,t,ξ)
+
+
+function cost_derivs(θ,λ,φ,ξ,ζ,τ)
+    t0,tf = τ
+
+    yf = solve(ODEProblem(dy_dt, 0, (t0,tf), (θ,ξ,ζ)), Tsit5(); reltol=1e-7)(tf)
+    yyf = solve(ODEProblem(dyy_dt, 0, (t0,tf), (θ,λ,ξ,ζ)), Tsit5(); reltol=1e-7)(tf)
+
+    zf = ζ.x(tf)
+    αf = φ.x(tf)
+    μf = φ.u(tf)
+    rf = px(αf,μf,tf,θ)
+    Pf = pxx(αf,μf,tf,θ)
+    Dh = yf + rf'zf
+    D2g = yyf + zf'Pf*zf
+    return Dh,D2g
+end
+
+function dy_dt(y, (θ,ξ,ζ), t)
+    x = ξ.x(t)
+    u = ξ.u(t)
+    z = ζ.x(t)
+    v = ζ.u(t)
+    a = lx(x,u,t,θ)
+    b = lu(x,u,t,θ)
+    return a'z + b'v
+end
+
+function dyy_dt(yy, (θ,λ,ξ,ζ), t)
+    x = ξ.x(t)
+    u = ξ.u(t)
+    z = ζ.x(t)
+    v = ζ.u(t)
+    λ = λ(t)
+    Q = Lxx(λ,x,u,t,θ)
+    S = Lxu(λ,x,u,t,θ)
+    R = Luu(λ,x,u,t,θ)
+    return z'Q*z + 2*z'S*v + v'R*v
+end
+
+#cost = integral(l(ξ(t))) + p(ξ(tf))
 
 # Regulator(θ,T,α,μ)
 
@@ -294,7 +372,7 @@ end
 #TODO: iterate
 
 
-export Regulator
+# export Regulator
 
 # struct Regulator{T,T1,T2,T3}
 #     θ::T
@@ -303,9 +381,9 @@ export Regulator
 #     Pr::T3
 # end
 
-abstract type Timeseries end
-Base.show(io::IO, x::Timeseries) = println(io, preview(x))
-domain(x::Timeseries) = domain(x.T)
+# abstract type Timeseries end
+# Base.show(io::IO, x::Timeseries) = println(io, preview(x))
+# domain(x::Timeseries) = domain(x.T)
 
 
 # Ko = Ro\(So' + Bo'Po)

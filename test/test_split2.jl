@@ -62,10 +62,10 @@ end
 #     return Q,R
 # end
 
-Rr(x,u,t,θ) = θ[2]*I(NU)
-Qr(x,u,t,θ) = θ[3]*I(NX)
+Rreg(x,u,t,θ) = θ[2]*I(NU)
+Qreg(x,u,t,θ) = θ[3]*I(NX)
 
-ll(x,u,t,θ) = 1/2 * collect(u')I*u
+stagecost(x,u,t,θ) = 1/2 * collect(u')I*u
 
 # get the ith eigenstate
 function x_eig(i)
@@ -77,14 +77,14 @@ function x_eig(i)
     x_eig = kron([1;0],w[:,i])
 end
 
-function pp(x,u,t,θ)
+function termcost(x,u,t,θ)
     P = I(NX) - inprod(x_eig(2))
     1/2 * collect(x')*P*x
 end
 
 
-PRONTO.generate_model(SplitP, dynamics, ll, pp, Qr, Rr)
-# ------------------------------- symbolic derivatives ------------------------------- #
+PRONTO.generate_model(SplitP, dynamics, stagecost, termcost, Qreg, Rreg)
+## ------------------------------- symbolic derivatives ------------------------------- ##
 
     
 
@@ -94,7 +94,7 @@ PRONTO.generate_model(SplitP, dynamics, ll, pp, Qr, Rr)
 x0 = SVector{NX}(x_eig(1))
 xf = SVector{NX}(x_eig(2))
 
-u0 = 0.2
+u0 = 0.0
 t0,tf = τ = (0,10)
 
 θ = SplitP(10,1,1)
@@ -110,7 +110,10 @@ Ko = PRONTO.optimizer(θ,λ,ξ,φ,τ)
 vo = PRONTO.costate(θ,λ,ξ,φ,Ko,τ)
 
 
-ζ = PRONTO.search_direction(θ,ξ,Ko,vo)
+ζ = PRONTO.search_direction(θ,ξ,Ko,vo,τ)
+γ = 0.7
+ξ1 = PRONTO.armijo_projection(θ,x0,ξ,ζ,γ,Kr,τ)
+
 nothing
 ## ------------------------------- testing ------------------------------- ##
 

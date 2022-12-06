@@ -15,11 +15,9 @@ nu(ξ::Trajectory) = nu(ξ.θ)
 extrema(ξ::Trajectory) = extrema(ξ.x)
 
 function show(io::IO, ξ::Trajectory)
-    title = "A Trajectory of the $(typeof(ξ.θ)) System:"
-    println(io, preview(ξ.x; title = title))
+    println(io, preview(ξ.x))
     println(io, preview(ξ.u))
 end
-
 
 
 
@@ -64,6 +62,7 @@ function projection(θ::Model{NX,NU}, x0, α, μ, Kr, (t0,tf); dt=0.001) where {
 
     return Trajectory(θ,x,u)
 end
+
 
 
 function dxdt(x, (θ,α,μ,Kr), t)

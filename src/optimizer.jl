@@ -131,7 +131,7 @@ end
 struct Costate{Tθ,Tλ,Tξ,Tr}
     N::SearchOrder
     θ::Tθ
-    λ::Tλ
+    λ::Tλ # ODE{SVector{NX,Float64}}
     ξ::Tξ
     r::Tr
 end
@@ -164,7 +164,6 @@ function dr_dt(r, (θ,λ,ξ,Ko), t)
 
     -(A - B*Ko)'r - a + Ko'b
 end
-
 
 function costate(θ,λ,ξ,φ,Ko,τ)
     t0,tf = τ
@@ -221,3 +220,13 @@ function dz_dt(z, (θ,ξ,Ko,vo), t)
     v = vo(x,u,t) - Ko(x,u,t)*z
     return A*z + B*v
 end
+
+
+# @build $T dy_dt(M,θ,t,ξ,ζ,λ) -> vcat(
+
+#     ($a)'*($z) + ($b)'*($v),
+#     ($z)'*($Qo_2)*($z) + 2*($z)'*($So_2)*($v) + ($v)'*($Ro_2)*($v)
+# )
+# @build $T _Dh(M,θ,t,φ,ζ,y) -> y[1] + (PRONTO.px($M,θ,t,φ))'*($z)
+# @build $T _D2g(M,θ,t,φ,ζ,y) -> y[2] + ($z)'*PRONTO.pxx($M,θ,t,φ)*($z)
+# @tock; println(@clock)
