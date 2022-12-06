@@ -83,7 +83,7 @@ end
 
 
 retcode(x::ODE) = x.soln.retcode
-isstable(x::ODE) = :Success == retcode(x)
+isstable(x::ODE) = retcode(x) == :Success
 
 
 function optimizer(θ,λ,ξ,φ,τ)
@@ -93,7 +93,7 @@ function optimizer(θ,λ,ξ,φ,τ)
     
     Pf = pxx(αf,μf,tf,θ)
     N = SecondOrder()
-    P2 = ODE(dP_dt, Pf, (tf,t0), (θ,λ,ξ,N); verbose=false)
+    P2 = ODE(dP_dt, Pf, (tf,t0), (θ,λ,ξ,N), verbose=false)
 
     if isstable(P2)
         P = P2
@@ -101,6 +101,19 @@ function optimizer(θ,λ,ξ,φ,τ)
         N = FirstOrder()
         P = ODE(dP_dt, Pf, (tf,t0), (θ,λ,ξ,N))
     end
+    return Optimizer(N,θ,λ,ξ,P)
+end
+
+
+function optimizer1(θ,λ,ξ,φ,τ)
+    t0,tf = τ
+    αf = φ.x(tf)
+    μf = φ.u(tf)
+    
+    Pf = pxx(αf,μf,tf,θ)
+    N = FirstOrder()
+    P = ODE(dP_dt, Pf, (tf,t0), (θ,λ,ξ,N))
+    
     return Optimizer(N,θ,λ,ξ,P)
 end
 

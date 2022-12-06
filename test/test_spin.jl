@@ -12,52 +12,49 @@ using LinearAlgebra
 NX = 4
 NU = 1
 NΘ = 0
-struct TwoSpin <: PRONTO.Model{NX,NU,NΘ}
+struct TwoSpin <: PRONTO.Model{4,1,2}
+    kr::Float64
+    kq::Float64
 end
 
-struct TwoSpinP <: PRONTO.Model{NX,NU,1}
-end
 
 # ----------------------------------- model definition ----------------------------------- ##
-
-let
-    # model dynamics
+function dynamics(x,u,t,θ)
     H0 = [0 0 1 0;0 0 0 -1;-1 0 0 0;0 1 0 0]
     H1 = [0 -1 0 0;1 0 0 0;0 0 0 -1;0 0 1 0]
-    f = (θ,t,x,u) -> collect((H0 + u[1]*H1)*x)
-
-
-    # stage cost
-    Ql = zeros(NX,NX)
-    Rl = [0.01]
-    l = (θ,t,x,u) -> (1/2*collect(x)'*Ql*collect(x) .+ 1/2*collect(u)'*Rl*collect(u))
-
-    # terminal cost
-    Pl = [0 0 0 0;0 1 0 0;0 0 0 0;0 0 0 1]
-    p = (θ,t,x,u) -> 1/2*collect(x)'*Pl*collect(x)
-
-    # regulator
-    Rr = (θ,t,x,u) -> diagm([1])*θ[1]
-    Qr = (θ,t,x,u) -> diagm([1,1,1,1])
-    # Pr(θ,t,x,u)
-
-    @derive TwoSpinP
+    (H0 + u[1]*H1)*x
 end
+
+Rreg(x,u,t,θ) = θ[1]*I(NU)
+Qreg(x,u,t,θ) = θ[2]*I(NX)
+
+function stagecost(x,u,t,θ)
+    Rl = [0.01;;]
+    1/2 * collect(u')*Rl*u
+end
+
+function termcost(x,u,t,θ)
+    Pl = [0 0 0 0;0 1 0 0;0 0 0 0;0 0 0 1]
+    1/2*collect(x')*Pl*x
+end
+
 
 # function PRONTO.preview(M::TwoSpin, ξ)
 # end
 
+PRONTO.generate_model(TwoSpin, dynamics, stagecost, termcost, Qreg, Rreg)
 
 ## ----------------------------------- tests ----------------------------------- ##
 
-M = TwoSpinP()
-θ = [1.0]
-t0 = 0.0
-tf = 10.0
-x0 = [0.0;1.0;0.0;0.0]
-xf = [1.0;0.0;0.0;0.0]
-u0 = [0.0]
+θ = TwoSpin(1,1)
+τ = t0,tf = 0,10
 
+x0 = @SVector [0.0, 1.0, 0.0, 0.0]
+xf = @SVector [1.0, 0.0, 0.0, 0.0]
+u0 = [0.0]
+μ = @closure t->SizedVector{1}(u0)
+φ = open_loop(θ,xf,μ,τ)
+pronto(θ,x0,φ,τ)
 
 ##
 φ = PRONTO.guess_zi(M,θ,xf,u0,t0,tf)

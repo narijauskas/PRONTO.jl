@@ -243,57 +243,58 @@ bkwd(τ) = reverse(fwd(τ))
 # solve_backward(fxn, x0, p, τ; kw...)
 
 # solves for x(t),u(t)'
-function pronto(θ::Model{NX,NU,NΘ}, x0::StaticVector, φ, τ; tol = 1e-7, maxiters = 20) where {NX,NU,NΘ}
+function pronto(θ::Model{NX,NU,NΘ}, x0::StaticVector, φ, τ; γmax=1.0,tol = 1e-5, maxiters = 20,verbose=true) where {NX,NU,NΘ}
     t0,tf = τ
 
     for i in 1:maxiters
         info(i, "iteration")
         # -------------- build regulator -------------- #
         # α,μ -> Kr,x,u
-        iinfo("regulator")
+        verbose && iinfo("regulator")
         Kr = regulator(θ, φ, τ)
-        iinfo("projection")
+        verbose && iinfo("projection")
         ξ = projection(θ, x0, φ, Kr, τ)
 
         # -------------- search direction -------------- #
         # Kr,x,u -> z,v
 
 
-        iinfo("lagrangian")
+        verbose && iinfo("lagrangian")
         λ = lagrangian(θ,ξ,φ,Kr,τ)
-        iinfo("optimizer")
+        verbose && iinfo("optimizer")
         Ko = optimizer(θ,λ,ξ,φ,τ)
-        iinfo("using $(is2ndorder(Ko) ? "2nd" : "1st") order search")
-        iinfo("costate")
+        verbose && iinfo("using $(is2ndorder(Ko) ? "2nd" : "1st") order search")
+        verbose && iinfo("costate")
         vo = costate(θ,λ,ξ,φ,Ko,τ)
-        iinfo("search_direction")
+        verbose && iinfo("search_direction")
         ζ = search_direction(θ,ξ,Ko,vo,τ)
 
         # -------------- cost/derivatives -------------- #
-        iinfo("cost/derivs")
+        verbose && iinfo("cost/derivs")
 
         Dh,D2g = cost_derivs(θ,λ,φ,ξ,ζ,τ)
         
-        info("Dh = $Dh")
         Dh > 0 && (info("increased cost - quitting"); (return φ))
         -Dh < tol && (info(as_bold("PRONTO converged")); (return φ))
 
         # compute cost
         h = cost(ξ, τ)
-        # iinfo(as_bold("h = $(h)\n"))
+        # verbose && iinfo(as_bold("h = $(h)\n"))
+        info("Dh = $Dh, h = $h")
 
         # -------------- select γ -------------- #
 
-        γ = 0.7; aα=0.4; aβ=0.7
+        γ = γmax; aα=0.4; aβ=0.7
         local η
         while γ > aβ^25
-            iinfo("armijo γ = $(round(γ; digits=6))")
+            verbose && iinfo("armijo γ = $(round(γ; digits=6))")
             η = armijo_projection(θ,x0,ξ,ζ,γ,Kr,τ)
             g = cost(η, τ)
             h-g >= -aα*γ*Dh ? break : (γ *= aβ)
         end
         φ = η
     end
+    return φ
 end
 
 

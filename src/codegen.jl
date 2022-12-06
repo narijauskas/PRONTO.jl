@@ -12,8 +12,8 @@ export build
 
 #FUTURE: options to make pretty (or add other postprocessing), save to file, etc.
 function generate_model(T, user_f, user_l, user_p, user_Q, user_R)
-    info("generating the $T model")
-    iinfo("initializing symbolics...\n")
+    info("generating the $(as_bold(T)) model")
+    iinfo("initializing symbolics...")
     NX = nx(T); NU = nu(T)
     @variables x[1:NX] u[1:NU] t θ[1:nθ(T)] λ[1:NX]
     # θ_sym = T(θ...) # the model instantiated with symbolic θs
@@ -25,7 +25,7 @@ function generate_model(T, user_f, user_l, user_p, user_Q, user_R)
 
     Jx,Ju = Jacobian.([x,u])
 
-    iinfo("tracing functions for $T...\n")
+    iinfo("tracing functions for $T...")
     f = invokelatest(user_f, x, u, t, θ)
     l = invokelatest(user_l, x, u, t, θ)
     p = invokelatest(user_p, x, u, t, θ)
@@ -76,7 +76,7 @@ function generate_model(T, user_f, user_l, user_p, user_Q, user_R)
     build(Size(1), :(p(x,u,t,θ::$T)), p)
     build(Size(NX), :(px(x,u,t,θ::$T)), px)
     build(Size(NX,NX), :(pxx(x,u,t,θ::$T)), Jx(px))
-    iinfo("done!\n")
+    iinfo("done!")
     nothing
 end
 
@@ -123,7 +123,7 @@ function build(sz, hdr, sym; format = identity, file=nothing)
     file = tempname()*".jl"
     write(file,string(clean(ex)))
     Base.include(Main, file)
-    iiinfo("generated $hdr\n")
+    iiinfo("generated $hdr")
     # eval(ex)
 end
 

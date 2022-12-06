@@ -90,6 +90,7 @@ PRONTO.generate_model(SplitP, dynamics, stagecost, termcost, Qreg, Rreg)
 
 
 ## ------------------------------- testing ------------------------------- ##
+NX = 22; NU = 1
 
 x0 = SVector{NX}(x_eig(1))
 xf = SVector{NX}(x_eig(2))
@@ -101,6 +102,7 @@ t0,tf = τ = (0,10)
 μ = @closure t->SizedVector{1}(u0)
 
 φ = open_loop(θ,xf,μ,τ)
+pronto(θ,x0,φ,τ)
 
 Kr = regulator(θ,φ,τ)
 ξ = projection(θ,x0,φ,Kr,τ)
