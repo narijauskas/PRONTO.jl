@@ -4,14 +4,14 @@
 clr_0 = parse(RGBAf, "#00000000") # transparent
 
 # dark theme
-# clr_bg = parse(RGBAf, "#272822") # background
-# clr_mg = parse(RGBAf, "#8E8A73") # mid-ground
-# clr_fg = RGBAf(1,1,1)
+clr_bg = parse(RGBAf, "#272822") # background
+clr_mg = parse(RGBAf, "#8E8A73") # mid-ground
+clr_fg = RGBAf(1,1,1)
 
 # light theme
-clr_bg = parse(RGBAf, "#ffffff") # background
-clr_mg = parse(RGBAf, "#8E8A73") # mid-ground
-clr_fg = parse(RGBAf, "#000000")
+# clr_bg = parse(RGBAf, "#ffffff") # background
+# clr_mg = parse(RGBAf, "#8E8A73") # mid-ground
+# clr_fg = parse(RGBAf, "#000000")
 
 clr = [
     parse(RGBAf, "#0072BD"), # blue

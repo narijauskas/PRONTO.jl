@@ -39,8 +39,7 @@ using MacroTools
 using MacroTools: @capture
 
 using Interpolations
-# using MakieCore
-# MakieCore.convert_arguments(P::PointBased, x::MyType) = convert_arguments(P, time vector, vector of sampled vectors)
+
 using Base: OneTo
 import Base: extrema, length, eachindex, show, size, eltype
 
@@ -280,6 +279,7 @@ function pronto(θ::Model{NX,NU,NΘ}, x0::StaticVector, φ, τ; γmax=1.0,tol = 
         # compute cost
         h = cost(ξ, τ)
         # verbose && iinfo(as_bold("h = $(h)\n"))
+        # print(ξ)
         info("Dh = $Dh, h = $h")
 
         # -------------- select γ -------------- #

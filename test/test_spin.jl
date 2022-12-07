@@ -44,18 +44,27 @@ end
 
 PRONTO.generate_model(TwoSpin, dynamics, stagecost, termcost, Qreg, Rreg)
 
-## ----------------------------------- tests ----------------------------------- ##
+# ----------------------------------- tests ----------------------------------- ##
 
 θ = TwoSpin(1,1)
 τ = t0,tf = 0,10
 
 x0 = @SVector [0.0, 1.0, 0.0, 0.0]
 xf = @SVector [1.0, 0.0, 0.0, 0.0]
-u0 = [0.0]
+u0 = [0.1]
 μ = @closure t->SizedVector{1}(u0)
 φ = open_loop(θ,xf,μ,τ)
-pronto(θ,x0,φ,τ)
+ξ = pronto(θ,x0,φ,τ)
 
 ##
-φ = PRONTO.guess_zi(M,θ,xf,u0,t0,tf)
-@time ξ = pronto(M,θ,t0,tf,x0,u0,φ)
+# φ = PRONTO.guess_zi(M,θ,xf,u0,t0,tf)
+# @time ξ = pronto(M,θ,t0,tf,x0,u0,φ)
+
+
+using GLMakie
+fig = Figure(); ax = Axis(fig[1,1])
+ts = LinRange(t0,tf,10001)
+is = eachindex(ξ.x)
+xs = [ξ.x(t)[i] for t∈ts, i∈is]
+foreach(i->lines!(ax, ts, xs[:,i]), is)
+display(fig)

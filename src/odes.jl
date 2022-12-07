@@ -123,7 +123,14 @@ end
 
 
 
-
+# using MakieCore
+# function MakieCore.convert_arguments(P::MakieCore.PointBased, x::ODE, i)
+#     ts = LinRange(extrema(x)...,1001)
+#     # is = eachindex(x)
+#     xs = [x(t)[i] for t∈ts]
+#     (MakieCore.convert_arguments(P, collect(ts), xs),
+#     MakieCore.convert_arguments(P, collect(ts), xs))
+# end
 
 
 

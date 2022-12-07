@@ -41,36 +41,6 @@ end
 PRONTO.generate_model(InvPend, dynamics, stagecost, termcost, Qreg, Rreg)
 ##
 
-##
-let
-    g = 9.81
-    L = 2
-
-    f = (θ,t,x,u) -> [
-        x[2],
-        g/L*sin(x[1])-u[1]*cos(x[1])/L
-    ]
-    
-    Ql = I
-    Rl = I
-    l = (θ,t,x,u) -> 1/2*collect(x)'*Ql*collect(x) + 1/2*collect(u)'*Rl*collect(u)
-    
-    Rr = (θ,t,x,u) -> diagm([1e-3])
-    Qr = (θ,t,x,u) -> diagm([10, 1])
-    
-    p = (θ,t,x,u) -> begin
-        # P,_ = arec(fx(θ,t,ξ_eq), fu(θ,t,ξ_eq)*inv(Rr(θ,t,x_eq,u_eq))*fu(θ,t,ξ_eq)', Qr(θ,t,x_eq,u_eq))
-        # P,_ = arec(fx(θ,t,ξ_eq), fu(θ,t,ξ_eq), luu(θ,t,ξ_eq), lxx(θ,t,ξ_eq), lxu(θ,t,ξ_eq))
-        P = [
-            88.0233 39.3414;
-            39.3414 17.8531;
-        ]
-        1/2*collect(x)'*P*collect(x)
-    end
-
-    @derive InvPend
-end
-
 
 
 ##
@@ -85,9 +55,11 @@ smooth(t, x0, xf, tf) = @. (xf - x0)*(tanh((2π/tf)*t - π) + 1)/2 + x0
 φ = PRONTO.Trajectory(θ,α,μ);
 Kr = regulator(θ,φ,τ)
 φ = projection(θ,x0,φ,Kr,τ)
-φ = open_loop(θ,xf,μ,τ)
-φ = zero_input(θ,x0,τ)
-pronto(θ,x0,φ,τ; maxiters=1000, verbose=false)
+
+x0 = @SVector [2π/3;0]
+# φ = open_loop(θ,xf,μ,τ)
+φ = zero_input(θ,xf,τ)
+@time pronto(θ,x0,φ,τ; maxiters=1000, verbose=false)
 # M = InvPend()
 # θ = Float64[]
 # x0 = [2π/3;0]

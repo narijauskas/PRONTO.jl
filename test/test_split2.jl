@@ -95,14 +95,14 @@ NX = 22; NU = 1
 x0 = SVector{NX}(x_eig(1))
 xf = SVector{NX}(x_eig(2))
 
-u0 = 0.0
+u0 = 0.2
 t0,tf = τ = (0,10)
 
 θ = SplitP(10,1,1)
 μ = @closure t->SizedVector{1}(u0)
 
 φ = open_loop(θ,xf,μ,τ)
-pronto(θ,x0,φ,τ)
+@time ξ = pronto(θ,x0,φ,τ; γmax = 0.7)
 
 Kr = regulator(θ,φ,τ)
 ξ = projection(θ,x0,φ,Kr,τ)
@@ -118,6 +118,24 @@ vo = PRONTO.costate(θ,λ,ξ,φ,Ko,τ)
 
 nothing
 ## ------------------------------- testing ------------------------------- ##
+
+
+using GLMakie
+fig = Figure(); ax = Axis(fig[1,1])
+ts = LinRange(t0,tf,10001)
+is = eachindex(ξ.x)
+xs = [ξ.x(t)[i] for t∈ts, i∈is]
+foreach(i->lines!(ax, ts, xs[:,i]), is)
+display(fig)
+
+
+
+
+
+
+
+
+
 
 
 
