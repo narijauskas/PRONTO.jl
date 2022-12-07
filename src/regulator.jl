@@ -32,7 +32,8 @@ show(io::IO, Kr::Regulator) = println(io, preview(Kr))
 function regulator(θ::Model{NX,NU}, φ, τ) where {NX,NU}
     t0,tf = τ
     #FUTURE: Pf provided by user or auto-generated as P(α,μ,θ)
-    Pf = SMatrix{NX,NX,Float64}(I(NX))
+    # α 
+    Pf = SMatrix{NX,NX,Float64}(I(NX) - φ.x(tf)*(φ.x(tf))')
     Pr = ODE(dPr_dt, Pf, (tf,t0), (θ,φ))
     Regulator(θ,φ,Pr)
 end

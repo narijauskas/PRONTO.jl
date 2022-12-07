@@ -284,7 +284,10 @@ function pronto(θ::Model{NX,NU,NΘ}, x0::StaticVector, φ, τ; γmax=1.0,tol = 
 
         # -------------- select γ -------------- #
 
-        γ = γmax; aα=0.4; aβ=0.7
+        # γ = γmax; 
+        aα=0.4; aβ=0.7
+        γ = min(1, 1/maximum(maximum(ζ.x(t) for t in t0:0.0001:tf)))
+
         local η
         while γ > aβ^25
             verbose && iinfo("armijo γ = $(round(γ; digits=6))")

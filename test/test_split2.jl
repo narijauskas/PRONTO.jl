@@ -46,7 +46,7 @@ end
 function dynamics(x,u,t,θ)
     ω = 1.0
     n = 5
-    α = θ[1]
+    α = 10
     v = -α/4
     H0 = SymTridiagonal(promote([4.0i^2 for i in -n:n], v*ones(2n))...)
     H1 = v*im*Tridiagonal(ones(2n), zeros(2n+1), -ones(2n))
@@ -63,9 +63,9 @@ end
 # end
 
 Rreg(x,u,t,θ) = θ[2]*I(NU)
-Qreg(x,u,t,θ) = θ[3]*I(NX)
+Qreg(x,u,t,θ) = θ[3]*(I(NX) - x*x')
 
-stagecost(x,u,t,θ) = 1/2 * collect(u')I*u
+stagecost(x,u,t,θ) = 1/2 *θ[1]*collect(u')I*u
 
 # get the ith eigenstate
 function x_eig(i)
@@ -78,7 +78,7 @@ function x_eig(i)
 end
 
 function termcost(x,u,t,θ)
-    P = I(NX) - inprod(x_eig(2))
+    P = I(NX) - inprod(x_eig(4))
     1/2 * collect(x')*P*x
 end
 
@@ -93,16 +93,16 @@ PRONTO.generate_model(SplitP, dynamics, stagecost, termcost, Qreg, Rreg)
 NX = 22; NU = 1
 
 x0 = SVector{NX}(x_eig(1))
-xf = SVector{NX}(x_eig(2))
+xf = SVector{NX}(x_eig(4))
 
 u0 = 0.2
 t0,tf = τ = (0,10)
 
-θ = SplitP(10,1,1)
-μ = @closure t->SizedVector{1}(u0)
+θ = SplitP(0.05,1,1)
+μ = @closure t->SizedVector{1}(0.05*sin(t))
 
-φ = open_loop(θ,xf,μ,τ)
-@time ξ = pronto(θ,x0,φ,τ; γmax = 0.7)
+φ = open_loop(θ,x0,μ,τ)
+@time ξ = pronto(θ,x0,φ,τ; γmax = 1.0, tol = 1e-5, maxiters = 50)
 
 Kr = regulator(θ,φ,τ)
 ξ = projection(θ,x0,φ,Kr,τ)
@@ -121,20 +121,25 @@ nothing
 
 
 using GLMakie
-fig = Figure(); ax = Axis(fig[1,1])
+fig = Figure()
+ax = Axis(fig[1:2,1]; title="state")
 ts = LinRange(t0,tf,10001)
 is = eachindex(ξ.x)
 xs = [ξ.x(t)[i] for t∈ts, i∈is]
 foreach(i->lines!(ax, ts, xs[:,i]), is)
+
+
+ax = Axis(fig[1:2,2]; title="population")
+# x2 = xs.^2
+ps = ([I(11) I(11)] * (xs.^2)')'
+foreach(i->lines!(ax, ts, ps[:,i]), 1:11)
+
+ax = Axis(fig[3,1:2]; title="inputs")
+is = eachindex(ξ.u)
+us = [ξ.u(t)[i] for t∈ts, i∈is]
+foreach(i->lines!(ax, ts, us[:,i]), is)
 display(fig)
-
-
-
-
-
-
-
-
+##
 
 
 

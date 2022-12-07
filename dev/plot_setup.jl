@@ -4,14 +4,14 @@
 clr_0 = parse(RGBAf, "#00000000") # transparent
 
 # dark theme
-clr_bg = parse(RGBAf, "#272822") # background
-clr_mg = parse(RGBAf, "#8E8A73") # mid-ground
-clr_fg = RGBAf(1,1,1)
+# clr_bg = parse(RGBAf, "#272822") # background
+# clr_mg = parse(RGBAf, "#8E8A73") # mid-ground
+# clr_fg = RGBAf(1,1,1)
 
 # light theme
-# clr_bg = parse(RGBAf, "#ffffff") # background
-# clr_mg = parse(RGBAf, "#8E8A73") # mid-ground
-# clr_fg = parse(RGBAf, "#000000")
+clr_bg = parse(RGBAf, "#ffffff") # background
+clr_mg = parse(RGBAf, "#8E8A73") # mid-ground
+clr_fg = parse(RGBAf, "#000000")
 
 clr = [
     parse(RGBAf, "#0072BD"), # blue
@@ -31,10 +31,10 @@ set_theme!(
         resolution = (1500, 1000),
         # resolution = (1200, 800),
         textcolor = clr_fg,
-        linewidth = 2,
+        linewidth = 1.5,
         markersize = 21,
-        fontsize = 22,
-        font = "Inter Light",
+        # fontsize = 22,
+        # font = "Inter Light",
         color = clr_fg,
         # colormap = cmap,
         palette = (
@@ -43,7 +43,7 @@ set_theme!(
         markercolor = clr_fg,
         backgroundcolor = clr_bg,
         Axis = (
-            titlesize = 35,
+            # titlesize = 35,
             backgroundcolor = :transparent,
             xgridvisible = false,
             ygridvisible = false,

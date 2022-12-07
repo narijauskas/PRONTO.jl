@@ -48,10 +48,10 @@ end
 # try to infer size from the *type* of the initial condition - must use StaticArray
 ODE(fn::Function, ic, ts, p; kw...) = ODE(fn::Function, ic, ts, p, Size(ic); kw...)
 # constructor basically wraps ODEProblem, should make algorithm available for tuning
-function ODE(fn::Function, ic, ts, p, ::Size{S}; kw...) where {S}
+function ODE(fn::Function, ic, ts, p, ::Size{S}; alg=Tsit5(), kw...) where {S}
 
     soln = solve(ODEProblem(fn, ic, ts, p),
-            Tsit5();
+            alg;
             reltol=1e-7, kw...)
 
     T = SArray{Tuple{S...}, Float64, length(S), prod(S)}
