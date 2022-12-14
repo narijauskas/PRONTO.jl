@@ -81,6 +81,9 @@ regR(x,u,t,θ) = θ.kr*I(1)
 regQ(x,u,t,θ) = θ[3]*(I(22) - x*x')
 
 
+PRONTO.Pf(α,μ,tf,θ::Split2) = SMatrix{22,22,Float64}(I(22) - α*α')
+PRONTO.Pf(α,μ,tf,θ::Split4) = SMatrix{22,22,Float64}(I(22) - α*α')
+
 # ------------------------------- generate model and derivatives ------------------------------- ##
 
 PRONTO.generate_model(Split2, dynamics, stagecost, termcost2, regQ, regR)

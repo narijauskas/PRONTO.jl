@@ -3,8 +3,8 @@ using PRONTO
 using LinearAlgebra, StaticArrays
 
 
-
-@kwdef struct LaneChange <: PRONTO.Model{6,2,17}
+NX = 6; NU = 2
+@kwdef struct LaneChange3 <: PRONTO.Model{6,2,17}
     M::Float64 = 2041    # [kg]     Vehicle mass
     J::Float64 = 4964    # [kg m^2] Vehicle inertia (yaw)
     g::Float64 = 9.81    # [m/s^2]  Gravity acceleration
@@ -14,14 +14,17 @@ using LinearAlgebra, StaticArrays
     b::Float64 = 12      # []       Tire parameter (Pacejka model)
     c::Float64 = 1.285   # []       Tire parameter (Pacejka model)
     s::Float64 = 30      # [m/s]    Vehicle speed
-    r1::Float64 = 0.1      # LQR
-    r2::Float64 = 0.1      # LQR
+    r1::Float64 = 0.1    # LQR
+    r2::Float64 = 0.1    # LQR
     q1::Float64 = 1      # LQR
     q2::Float64 = 0      # LQR
     q3::Float64 = 1      # LQR
     q4::Float64 = 0      # LQR
     q5::Float64 = 0      # LQR
     q6::Float64 = 0      # LQR
+    # kr::SVector{2} = [0.1,0.1]      # LQR
+    # kq::SVector{6} = [1,0,1,0,0,0]  # LQR
+    # xeq::SVector{6} = zeros(6)      # equilibrium
 end
 
 # sideslip angles
@@ -44,17 +47,24 @@ function dynamics(x,u,t,θ)
 end
 
 stagecost(x,u,t,θ) = 1/2*collect(x')I*x + 1/2*collect(u')I*u
+
+# should be solution to DARE at desired equilibrium
+# ref = zeros(NX)
+# Pl,_ = ared(fx(ref,zeros(NU)), fu(ref,zeros(NU)), Rlqr, Qlqr)
 termcost(x,u,t,θ) = 1/2*collect(x')*x
 
 regR(x,u,t,θ) = diagm([θ.r1,θ.r2])
-regQ(x,u,t,θ) = diagm([θ.q1,θ.q2,θ.q3,θ.q4,θ.q5,])
+regQ(x,u,t,θ) = diagm([θ.q1,θ.q2,θ.q3,θ.q4,θ.q5,θ.q6])
 
-PRONTO.generate_model(LaneChange, dynamics, stagecost, termcost, regQ, regR)
+
+# regP(x,u,t,θ) = 
+
+PRONTO.generate_model(LaneChange3, dynamics, stagecost, termcost, regQ, regR)
 
 
 
 ## -------------------------------  ------------------------------- ##
-θ = LaneChange()
+θ = LaneChange3()
 x0 = SVector{6}(-5.0,zeros(5)...)
 xf = @SVector zeros(6)
 t0,tf = τ = (0,10)
@@ -70,15 +80,21 @@ t0,tf = τ = (0,10)
 
 
 
+struct Yeet <: FieldVector{4,Float64}
+    a::Float64
+    b::SVector{3,Float64}
+end
+
+yeet = Yeet(1,[2,3,4])
 
 
+@kwdef struct Yop <: FieldVector{2,Float64}
+    a::Float64
+    b::SVector{3,Float64} = [0.1,0.1,0.1]
+end
+yop = Yop(1,[2,3,4])
 
-
-
-
-
-
-
+yop = Yop(a=1)
 
 
 

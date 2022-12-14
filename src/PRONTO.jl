@@ -68,6 +68,37 @@ nθ(::Type{<:Model{NX,NU,NΘ}}) where {NX,NU,NΘ} = NΘ
 inv!(A) = LinearAlgebra.inv!(LinearAlgebra.cholesky!(Hermitian(A)))
 
 
+show(io::IO, ::T) where {T<:Model} = print(io, "$T model")
+
+iscompact(io) = get(io, :compact, false)
+function show(io::IO,::MIME"text/plain", θ::T) where {T<:Model}
+    if iscompact(io)
+        print(io, "$T model")
+    else
+        println(io, "$(as_bold(T)) model with parameter values:")
+        for name in fieldnames(T)
+            println(io, "  $name: $(getfield(θ,name))")
+        end
+    end
+end
+
+
+# typelength(::Type{<:Number}) = 1
+# typelength(::Type{T}) where {T} = length(T)
+
+# function Base.iterate(θ::Model, state=1)
+#     # go thru each the length of each type
+#     # if bigger than state
+
+#     (value, state+1)
+# end
+# function getindex(θ::Model, i)
+#     iterate thru until value
+# end
+
+
+
+
 struct SymbolicModel{T}
     vars
 end
@@ -109,6 +140,26 @@ f!(dx,x,u,t,θ) = throw(ModelDefError(θ))
 
 Q(α,μ,t,θ) = throw(ModelDefError(θ))
 R(α,μ,t,θ) = throw(ModelDefError(θ))
+function Pf(α,μ,tf,θ::Model{NX}) where {NX}
+    # xref = θ.ref
+    # uref = @SVector zeros(nu(θ))
+    Ar = fx(α, μ, tf, θ)
+    Br = fu(α, μ, tf, θ)
+    Qr = Q(α, μ, tf, θ)
+    Rr = R(α, μ, tf, θ)
+    Pf,_ = arec(Ar,Br*(Rr\Br'),Qr)
+    # Pf,_ = ared(Ar,Br,Rr,Qr)
+    return SMatrix{NX,NX,Float64}(Pf)
+end
+
+#     B*inv(R)*B'
+#    # solve algebraic riccati eq at time T to get terminal cost
+#    Pt,_ = arec(A(ξ,T), B(ξ,T)inv(Rr(T))B(ξ,T)', Qr(T))
+   
+
+# solution to DARE at desired equilibrium
+# ref = zeros(NX)
+# Pp,_ = ared(fx(ref,zeros(NU)), fu(ref,zeros(NU)), Rlqr, Qlqr)
 
 f(x,u,t,θ) = throw(ModelDefError(θ))
 fx(x,u,t,θ) = throw(ModelDefError(θ))
