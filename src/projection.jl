@@ -1,5 +1,6 @@
 
-export zero_input, open_loop, projection
+export zero_input, open_loop
+# export projection
 
 
 struct Trajectory{M,X,U}
@@ -55,7 +56,7 @@ function projection(θ::Model{NX,NU}, x0, α, μ, Kr, (t0,tf); dt=0.001) where {
         u = μ - Kr*(x-α)
         # push!(xbuf, SVector{NX,Float64}(x))
         push!(ubuf, SVector{NU,Float64}(u))
-    end
+    end  
 
     x = ODE(dxdt, x0, (t0,tf), (θ,α,μ,Kr); callback = cb, saveat = ts)
     u = Interpolant(scale(interpolate(ubuf, BSpline(Linear())), ts))

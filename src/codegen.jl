@@ -15,12 +15,12 @@ function generate_model(T, user_f, user_l, user_p, user_Q, user_R)
     info("generating the $(as_bold(T)) model")
     iinfo("initializing symbolics...")
     NX = nx(T); NU = nu(T)
-    @variables x[1:NX] u[1:NU] t θ[1:nθ(T)] λ[1:NX]
+    @variables x[1:NX] u[1:NU] t λ[1:NX]
     # θ_sym = T(θ...) # the model instantiated with symbolic θs
     x = collect(x)
     u = collect(u)
     t = t
-    θ = collect(θ)
+    θ = SymbolicModel(T)
     λ = collect(λ)
 
     Jx,Ju = Jacobian.([x,u])

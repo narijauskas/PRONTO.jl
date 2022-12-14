@@ -1,15 +1,93 @@
 # using Test
 using PRONTO
-using LinearAlgebra
+using LinearAlgebra, StaticArrays
 
 
 
-NX = 6
-NU = 2
-NΘ = 0
-
-struct LaneChange <: PRONTO.Model{NX,NU,NΘ}
+@kwdef struct LaneChange <: PRONTO.Model{6,2,17}
+    M::Float64 = 2041    # [kg]     Vehicle mass
+    J::Float64 = 4964    # [kg m^2] Vehicle inertia (yaw)
+    g::Float64 = 9.81    # [m/s^2]  Gravity acceleration
+    Lf::Float64 = 1.56   # [m]      CG distance, front
+    Lr::Float64 = 1.64   # [m]      CG distance, back
+    μ::Float64 = 0.8     # []       Coefficient of friction
+    b::Float64 = 12      # []       Tire parameter (Pacejka model)
+    c::Float64 = 1.285   # []       Tire parameter (Pacejka model)
+    s::Float64 = 30      # [m/s]    Vehicle speed
+    r1::Float64 = 0.1      # LQR
+    r2::Float64 = 0.1      # LQR
+    q1::Float64 = 1      # LQR
+    q2::Float64 = 0      # LQR
+    q3::Float64 = 1      # LQR
+    q4::Float64 = 0      # LQR
+    q5::Float64 = 0      # LQR
+    q6::Float64 = 0      # LQR
 end
+
+# sideslip angles
+αf(x,θ) = x[5] - atan((x[2] + θ.Lf*x[4])/θ.s)
+αr(x,θ) = x[6] - atan((x[2] - θ.Lr*x[4])/θ.s)
+
+# tire force
+F(α,θ) = θ.μ*θ.g*θ.M*sin(θ.c*atan(θ.b*α))
+
+# define model dynamics
+function dynamics(x,u,t,θ)
+    [
+        θ.s*sin(x[3]) + x[2]*cos(x[3]),
+        -θ.s*x[4] + ( F(αf(x,θ),θ)*cos(x[5]) + F(αr(x,θ),θ)*cos(x[6]) )/θ.M,
+        x[4],
+        ( F(αf(x,θ),θ)*cos(x[5])*θ.Lf - F(αr(x,θ),θ)*cos(x[6])*θ.Lr )/θ.J,
+        u[1],
+        u[2],
+    ]
+end
+
+stagecost(x,u,t,θ) = 1/2*collect(x')I*x + 1/2*collect(u')I*u
+termcost(x,u,t,θ) = 1/2*collect(x')*x
+
+regR(x,u,t,θ) = diagm([θ.r1,θ.r2])
+regQ(x,u,t,θ) = diagm([θ.q1,θ.q2,θ.q3,θ.q4,θ.q5,])
+
+PRONTO.generate_model(LaneChange, dynamics, stagecost, termcost, regQ, regR)
+
+
+
+## -------------------------------  ------------------------------- ##
+θ = LaneChange()
+x0 = SVector{6}(-5.0,zeros(5)...)
+xf = @SVector zeros(6)
+t0,tf = τ = (0,10)
+
+μ = @closure t->SVector{2}(zeros(2))
+φ = open_loop(θ,x0,μ,τ)
+@time ξ = pronto(θ,x0,φ,τ; tol = 1e-6, maxiters = 50)
+
+
+## -------------------------------  ------------------------------- ##
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# regulator
+Rr = (θ,t,x,u) -> 0.1*diagm([1,1])
+Qr = (θ,t,x,u) -> 1.0*diagm([1,0,1,0,0,0])
 
 let
 
@@ -44,20 +122,11 @@ let
 
 
     # define stage cost
-    Ql = I
-    Rl = I
 
-    #NOTE: need to collect() vector variables
-    l = (θ,t,x,u) -> 1/2*collect(x)'*Ql*collect(x) + 1/2*collect(u)'*Rl*collect(u)
 
-    # define terminal cost
-    p = (θ,t,x,u) -> 1/2*collect(x)'*collect(x)
-    
-    
     # regulator
     Rr = (θ,t,x,u) -> 0.1*diagm([1,1])
     Qr = (θ,t,x,u) -> 1.0*diagm([1,0,1,0,0,0])
-
 
     # template
     # f = (θ,t,x,u) ->

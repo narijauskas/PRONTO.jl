@@ -11,9 +11,10 @@ clearln() = print("\e[2K","\e[1G")
 info(str) = println(as_tag(crayon"magenta","PRONTO"), str)
 info(i, str) = println(as_tag(crayon"magenta","PRONTO[$i]"), str)
 iinfo(str) = println("    > ", str) # secondary-level
-iiinfo(str) = println("        > ", str) 
+iiinfo(str) = println("        > ", str) # tertiary level
 
-
+# info(v::A,str) = info(str)
+# info(v::B,str) = nothing
 
 # ----------------------------------- * code timing ----------------------------------- #
 

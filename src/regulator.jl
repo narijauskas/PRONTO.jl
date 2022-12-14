@@ -1,4 +1,4 @@
-export regulator
+# export regulator
 
 struct Regulator{M,Φ,P}
     θ::M
@@ -29,11 +29,12 @@ show(io::IO, Kr::Regulator) = println(io, preview(Kr))
 
 # regulator(θ,φ,τ) = regulator(θ, φ.x, φ.u, τ)
 # design the regulator, solving dPr_dt
-function regulator(θ::Model{NX,NU}, φ, τ) where {NX,NU}
+ function regulator(θ::Model{NX,NU}, φ, τ) where {NX,NU}
     t0,tf = τ
     #FUTURE: Pf provided by user or auto-generated as P(α,μ,θ)
     # α 
-    Pf = SMatrix{NX,NX,Float64}(I(NX) - φ.x(tf)*(φ.x(tf))')
+    # Pf = SMatrix{NX,NX,Float64}(I(NX) - φ.x(tf)*(φ.x(tf))')
+    Pf = SMatrix{NX,NX,Float64}(I(NX))
     Pr = ODE(dPr_dt, Pf, (tf,t0), (θ,φ))
     Regulator(θ,φ,Pr)
 end
