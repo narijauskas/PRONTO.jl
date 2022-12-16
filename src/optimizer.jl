@@ -94,14 +94,17 @@ function optimizer(θ,λ,ξ,φ,τ)
     μf = φ.u(tf)
     
     Pf = pxx(αf,μf,tf,θ)
-    N = SecondOrder()
+    # local P,N
     #FIX:
-    try
-        P2 = ODE(dP_dt, Pf, (tf,t0), (θ,λ,ξ,N), verbose=false)
-        !isstable(P2) && throw(InstabilityException())
+    P,N = try
+        N = SecondOrder()
+        P = ODE(dP_dt, Pf, (tf,t0), (θ,λ,ξ,N), verbose=false)
+        !isstable(P) && throw(InstabilityException())
+        (P,N)
     catch e
         N = FirstOrder()
         P = ODE(dP_dt, Pf, (tf,t0), (θ,λ,ξ,N))
+        (P,N)
     end
     # if isstable(P2)
     #     P = P2

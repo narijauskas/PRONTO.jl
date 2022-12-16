@@ -78,7 +78,13 @@ end
 
 stagecost(x,u,t,θ) = 1/2 *θ[1]*collect(u')I*u
 regR(x,u,t,θ) = θ.kr*I(1)
-regQ(x,u,t,θ) = θ[3]*(I(22) - x*x')
+function regQ(x,u,t,θ)
+    x_re = x[1:11]
+    x_im = x[12:22]
+    ψ = x_re + im*x_im
+    θ.kq*mprod(I(11) - ψ*ψ')
+end
+
 
 
 PRONTO.Pf(α,μ,tf,θ::Split2) = SMatrix{22,22,Float64}(I(22) - α*α')
@@ -95,10 +101,10 @@ PRONTO.generate_model(Split4, dynamics, stagecost, termcost4, regQ, regR)
 
 import Pkg: activate
 activate()
-using GLMakie
+using GLMakie, Statistics
 activate(".")
 include("../dev/plot_setup.jl")
-plot_split(ξ,τ)
+# plot_split(ξ,τ)
 
 function plot_split(ξ,τ)
     fig = Figure()
@@ -149,10 +155,10 @@ xf = SVector{22}(x_eig(4))
 t0,tf = τ = (0,10)
 
 
-θ = Split4(kl=0.05, kr=1, kq=1)
-μ = @closure t->SVector{1}(0.05*sin(t))
+θ = Split4(kl=0.01, kr=1, kq=1)
+μ = @closure t->SVector{1}(0.5*sin(t))
 φ = open_loop(θ,x0,μ,τ)
-@time ξ = pronto(θ,x0,φ,τ; tol = 1e-8, maxiters = 50, limitγ = true)
+@time ξ = pronto(θ,x0,φ,τ; tol = 1e-6, maxiters = 50, limitγ = true)
 
 plot_split(ξ,τ)
 
@@ -161,11 +167,11 @@ plot_split(ξ,τ)
 
 x0 = SVector{22}(x_eig(1))
 xf = SVector{22}(x_eig(4))
-t0,tf = τ = (0,2)
+t0,tf = τ = (0,2.55)
 
 
-θ = Split4(kl=0.01, kr=1, kq=1)
-μ = @closure t->SVector{1}(0.05*sin(t))
+θ = Split4(kl=0.02, kr=1, kq=1)
+μ = @closure t->SVector{1}(0.5*sin(t))
 φ = open_loop(θ,x0,μ,τ)
 @time ξ = pronto(θ,x0,φ,τ; tol = 1e-6, maxiters = 100, limitγ = true)
 
