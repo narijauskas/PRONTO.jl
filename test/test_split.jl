@@ -92,7 +92,7 @@ PRONTO.Pf(α,μ,tf,θ::Split4) = SMatrix{22,22,Float64}(I(22) - α*α')
 
 # ------------------------------- generate model and derivatives ------------------------------- ##
 
-# PRONTO.generate_model(Split2, dynamics, stagecost, termcost2, regQ, regR)
+PRONTO.generate_model(Split2, dynamics, stagecost, termcost2, regQ, regR)
 PRONTO.generate_model(Split4, dynamics, stagecost, termcost4, regQ, regR)
 
 
