@@ -85,6 +85,8 @@ end
 retcode(x::ODE) = x.soln.retcode
 isstable(x::ODE) = retcode(x) == :Success
 
+struct InstabilityException <: Exception
+end
 
 function optimizer(θ,λ,ξ,φ,τ)
     t0,tf = τ
@@ -93,14 +95,20 @@ function optimizer(θ,λ,ξ,φ,τ)
     
     Pf = pxx(αf,μf,tf,θ)
     N = SecondOrder()
-    P2 = ODE(dP_dt, Pf, (tf,t0), (θ,λ,ξ,N), verbose=false)
-
-    if isstable(P2)
-        P = P2
-    else
+    #FIX:
+    try
+        P2 = ODE(dP_dt, Pf, (tf,t0), (θ,λ,ξ,N), verbose=false)
+        !isstable(P2) && throw(InstabilityException())
+    catch e
         N = FirstOrder()
         P = ODE(dP_dt, Pf, (tf,t0), (θ,λ,ξ,N))
     end
+    # if isstable(P2)
+    #     P = P2
+    # else
+    #     N = FirstOrder()
+    #     P = ODE(dP_dt, Pf, (tf,t0), (θ,λ,ξ,N))
+    # end
     return Optimizer(N,θ,λ,ξ,P)
 end
 

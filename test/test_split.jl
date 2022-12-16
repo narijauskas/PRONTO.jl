@@ -72,7 +72,7 @@ function dynamics(x,u,t,θ)
     v = -α/4
     H0 = SymTridiagonal(promote([4.0i^2 for i in -n:n], v*ones(2n))...)
     H1 = v*im*Tridiagonal(ones(2n), zeros(2n+1), -ones(2n))
-    H2 = v*Tridiagonal(ones(2n), zeros(2n+1), -ones(2n))
+    H2 = v*Tridiagonal(-ones(2n), zeros(2n+1), -ones(2n))
     return mprod(-im*ω*(H0 + sin(u[1])*H1 + (1-cos(u[1]))*H2) )*x
 end
 
@@ -86,12 +86,12 @@ PRONTO.Pf(α,μ,tf,θ::Split4) = SMatrix{22,22,Float64}(I(22) - α*α')
 
 # ------------------------------- generate model and derivatives ------------------------------- ##
 
-PRONTO.generate_model(Split2, dynamics, stagecost, termcost2, regQ, regR)
+# PRONTO.generate_model(Split2, dynamics, stagecost, termcost2, regQ, regR)
 PRONTO.generate_model(Split4, dynamics, stagecost, termcost4, regQ, regR)
 
 
 
-# ------------------------------- plots ------------------------------- #
+## ------------------------------- plots ------------------------------- ##
 
 import Pkg: activate
 activate()
@@ -109,9 +109,13 @@ function plot_split(ξ,τ)
     xs = [ξ.x(t)[i] for t∈ts, i∈is]
     foreach(i->lines!(ax, ts, xs[:,i]), is)
     
-    ax = Axis(fig[1:2,2]; title="population")
-    ps = ([I(11) I(11)] * (xs.^2)')'
-    foreach(i->lines!(ax, ts, ps[:,i]), 1:11)
+    # ax = Axis(fig[1:2,2]; title="population")
+    # ps = ([I(11) I(11)] * (xs.^2)')'
+    # foreach(i->lines!(ax, ts, ps[:,i]), 1:11)
+
+    ax = Axis(fig[1:2,2]; title="fidelity")
+    fs = [ξ.x(t)'inprod(x_eig(i))*ξ.x(t) for t∈ts,i∈1:4]
+    foreach(i->lines!(ax, ts, fs[:,i]), 1:4)
 
     ax = Axis(fig[3,1:2]; title="inputs")
     is = eachindex(ξ.u)
@@ -122,7 +126,7 @@ function plot_split(ξ,τ)
 end
 
 
-# ------------------------------- demo: eigenstate 1->2 in 10s ------------------------------- #
+## ------------------------------- demo: eigenstate 1->2 in 10s ------------------------------- ##
 
 
 x0 = SVector{22}(x_eig(1))
@@ -130,8 +134,8 @@ xf = SVector{22}(x_eig(2))
 t0,tf = τ = (0,10)
 
 
-θ = Split2(kl=0.05, kr=1, kq=1)
-μ = @closure t->SVector{1}(0.05*sin(t))
+θ = Split2(kl=0.01, kr=1, kq=1)
+μ = @closure t->SVector{1}(0.4*sin(t))
 φ = open_loop(θ,x0,μ,τ)
 @time ξ = pronto(θ,x0,φ,τ; tol = 1e-6, maxiters = 50, limitγ = true)
 
@@ -148,7 +152,7 @@ t0,tf = τ = (0,10)
 θ = Split4(kl=0.05, kr=1, kq=1)
 μ = @closure t->SVector{1}(0.05*sin(t))
 φ = open_loop(θ,x0,μ,τ)
-@time ξ = pronto(θ,x0,φ,τ; tol = 1e-6, maxiters = 50, limitγ = true)
+@time ξ = pronto(θ,x0,φ,τ; tol = 1e-8, maxiters = 50, limitγ = true)
 
 plot_split(ξ,τ)
 
@@ -163,7 +167,7 @@ t0,tf = τ = (0,2)
 θ = Split4(kl=0.01, kr=1, kq=1)
 μ = @closure t->SVector{1}(0.05*sin(t))
 φ = open_loop(θ,x0,μ,τ)
-@time ξ = pronto(θ,x0,φ,τ; tol = 1e-6, maxiters = 50, limitγ = true)
+@time ξ = pronto(θ,x0,φ,τ; tol = 1e-6, maxiters = 100, limitγ = true)
 
 plot_split(ξ,τ)
 
