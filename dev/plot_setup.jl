@@ -1,4 +1,4 @@
-
+using Colors
 ## --------------------------------------- colors & themes ----------------------------------------- ##
 
 clr_0 = parse(RGBAf, "#00000000") # transparent
@@ -19,10 +19,29 @@ clrs = [
     parse(RGBAf, "#EDB120"), # yellow
     parse(RGBAf, "#7E2F8E"), # purple
     parse(RGBAf, "#8E8A73"), # gray
+    # parse(RGBAf, "#2F2F2F"), # gray
     # parse(RGBAf, "#009E737F"), # teal
 ]
 
-clr = vec(unique((a+b)/2 for a in clrs, b in clrs))
+# clr = vec(unique((a+b)/2 for a in clrs, b in clrs))
+c_hex = [
+    "#2072BD",
+    # "#6649A4",
+    "#AB208B",
+    # "#BB205C",
+    "#CB202C",
+    "#DC6926",
+    "#EDB120",
+    "#746B63",
+    "#272822",
+]
+cc = parse.(Colorant, c_hex)
+
+clr = vcat(
+    cc,
+    map(c->mean((c,cc[6])), cc[1:5]),
+    map(c->mean((c,cc[7])), cc[1:6]),
+)
 
 
 #FUTURE: use update_theme!(), separate eg. resolution/scale & color
@@ -82,7 +101,7 @@ set_theme!(
     )
 )
 
-blend(c1, c2) = [ (1-k)*c1 + k*c2 for k in 0:0.01:1 ]
+blend(c1, c2; n=101) = [ (1-k)*c1 + k*c2 for k in LinRange(0,1,n) ]
 # cmap1 = [blend(clr[1], clr_mg); blend(clr_mg, clr[3])]
 # cmap2 = [blend(clr[1], clr[5]); blend(clr[5], clr[3])]
 

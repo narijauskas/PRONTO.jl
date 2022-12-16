@@ -4,7 +4,7 @@ using LinearAlgebra, StaticArrays
 
 
 NX = 6; NU = 2
-@kwdef struct LaneChange3 <: PRONTO.Model{6,2,17}
+@kwdef struct LaneChange <: PRONTO.Model{6,2,17}
     M::Float64 = 2041    # [kg]     Vehicle mass
     J::Float64 = 4964    # [kg m^2] Vehicle inertia (yaw)
     g::Float64 = 9.81    # [m/s^2]  Gravity acceleration
@@ -59,100 +59,94 @@ regQ(x,u,t,θ) = diagm([θ.q1,θ.q2,θ.q3,θ.q4,θ.q5,θ.q6])
 
 # regP(x,u,t,θ) = 
 
-PRONTO.generate_model(LaneChange3, dynamics, stagecost, termcost, regQ, regR)
+PRONTO.generate_model(LaneChange, dynamics, stagecost, termcost, regQ, regR)
 
 
 
 ## -------------------------------  ------------------------------- ##
-θ = LaneChange3()
+θ = LaneChange()
 x0 = SVector{6}(-5.0,zeros(5)...)
 xf = @SVector zeros(6)
-t0,tf = τ = (0,10)
+t0,tf = τ = (0,4)
 
 μ = @closure t->SVector{2}(zeros(2))
 φ = open_loop(θ,x0,μ,τ)
 @time ξ = pronto(θ,x0,φ,τ; tol = 1e-6, maxiters = 50)
 
-
+# plot_lane_change(ξ,τ)
 ## -------------------------------  ------------------------------- ##
 
 
+function plot_lane_change(ξ,τ)
+    fig = Figure()
+    ts = LinRange(τ...,10001)+
+
+    ax = Axis(fig[1,1]; title = "state")
+    is = eachindex(ξ.x)
+    xs = [ξ.x(t)[i] for t∈ts, i∈is]
+    foreach(i->lines!(ax, ts, xs[:,i]), is)
+
+    ax = Axis(fig[2,1]; title = "inputs")
+    is = eachindex(ξ.u)
+    us = [ξ.u(t)[i] for t∈ts, i∈is]
+    foreach(i->lines!(ax, ts, us[:,i]), is)
+
+    return fig
+end
+display(fig)
 
 
 
-struct Yeet <: FieldVector{4,Float64}
-    a::Float64
-    b::SVector{3,Float64}
+
+
+
+
+## -------------------------------  ------------------------------- ##
+using Base.Threads: @spawn
+using ThreadTools
+
+x0 = SVector{6}(-5.0,zeros(5)...)
+xf = @SVector zeros(6)
+t0,tf = τ = (0,4)
+
+μ = @closure t->SVector{2}(zeros(2))
+φ = open_loop(θ,x0,μ,τ)
+
+
+tk = map([1,2,10]) do s
+    θ = LaneChange(s=s)
+    @spawn pronto(θ,x0,φ,τ; tol = 1e-6, maxiters = 50, verbose = false)
 end
 
-yeet = Yeet(1,[2,3,4])
+fetch.(tk)
+
+# just the inputs
+[ξ.x for ξ in fetch.(tk)]
 
 
-@kwdef struct Yop <: FieldVector{2,Float64}
-    a::Float64
-    b::SVector{3,Float64} = [0.1,0.1,0.1]
-end
-yop = Yop(1,[2,3,4])
-
-yop = Yop(a=1)
-
+# plot_lane_change(ξ,τ)
+PRONTO.set_plot_scale(15,80)
 
 
 
 
 
-# regulator
-Rr = (θ,t,x,u) -> 0.1*diagm([1,1])
-Qr = (θ,t,x,u) -> 1.0*diagm([1,0,1,0,0,0])
-
-let
-
-    # model parameters
-    M = 2041    # [kg]     Vehicle mass
-    J = 4964    # [kg m^2] Vehicle inertia (yaw)
-    g = 9.81    # [m/s^2]  Gravity acceleration
-    Lf = 1.56   # [m]      CG distance, front
-    Lr = 1.64   # [m]      CG distance, back
-    μ = 0.8     # []       Coefficient of friction
-    b = 12      # []       Tire parameter (Pacejka model)
-    c = 1.285   # []       Tire parameter (Pacejka model)
-    s = 30      # [m/s]    Vehicle speed
-
-    # sideslip angles
-    αf(x) = x[5] - atan((x[2] + Lf*x[4])/s)
-    αr(x) = x[6] - atan((x[2] - Lr*x[4])/s)
-
-    # tire force
-    F(α) = μ*g*M*sin(c*atan(b*α))
-
-    # define model dynamics
-    f = (θ,t,x,u) -> [
-
-            s*sin(x[3]) + x[2]*cos(x[3]),
-            -s*x[4] + ( F(αf(x))*cos(x[5]) + F(αr(x))*cos(x[6]) )/M,
-            x[4],
-            ( F(αf(x))*cos(x[5])*Lf - F(αr(x))*cos(x[6])*Lr )/J,
-            u[1],
-            u[2],
-        ]
 
 
-    # define stage cost
 
 
-    # regulator
-    Rr = (θ,t,x,u) -> 0.1*diagm([1,1])
-    Qr = (θ,t,x,u) -> 1.0*diagm([1,0,1,0,0,0])
 
-    # template
-    # f = (θ,t,x,u) ->
-    # l = (θ,t,x,u) ->
-    # p = (θ,t,x,u) ->
-    # Rr = (θ,t,x,u) ->
-    # Qr = (θ,t,x,u) ->
 
-    @derive LaneChange
-end
+
+
+
+
+
+
+
+
+
+
 
 
 

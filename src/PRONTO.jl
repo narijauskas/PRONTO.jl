@@ -213,11 +213,11 @@ bkwd(τ) = reverse(fwd(τ))
 # solve_backward(fxn, x0, p, τ; kw...)
 
 # solves for x(t),u(t)'
-function pronto(θ::Model{NX,NU,NΘ}, x0::StaticVector, φ, τ; γmax=1.0,tol = 1e-5, maxiters = 20,verbose=true) where {NX,NU,NΘ}
+function pronto(θ::Model{NX,NU,NΘ}, x0::StaticVector, φ, τ; limitγ=false, tol = 1e-5, maxiters = 20,verbose=true) where {NX,NU,NΘ}
     t0,tf = τ
 
     for i in 1:maxiters
-        info(i, "iteration")
+        # info(i, "iteration")
         # -------------- build regulator -------------- #
         # α,μ -> Kr,x,u
         verbose && iinfo("regulator")
@@ -251,13 +251,12 @@ function pronto(θ::Model{NX,NU,NΘ}, x0::StaticVector, φ, τ; γmax=1.0,tol = 
         h = cost(ξ, τ)
         # verbose && iinfo(as_bold("h = $(h)\n"))
         # print(ξ)
-        info("Dh = $Dh, h = $h")
 
         # -------------- select γ -------------- #
 
         # γ = γmax; 
         aα=0.4; aβ=0.7
-        γ = min(1, 1/maximum(maximum(ζ.x(t) for t in t0:0.0001:tf)))
+        γ = limitγ ? min(1, 1/maximum(maximum(ζ.x(t) for t in t0:0.0001:tf))) : 1.0
 
         local η
         while γ > aβ^25
@@ -266,6 +265,8 @@ function pronto(θ::Model{NX,NU,NΘ}, x0::StaticVector, φ, τ; γmax=1.0,tol = 
             g = cost(η, τ)
             h-g >= -aα*γ*Dh ? break : (γ *= aβ)
         end
+        verbose && info(i, "Dh = $Dh, h = $h, γ=$γ") #TODO: first/second order
+
         φ = η
     end
     return φ

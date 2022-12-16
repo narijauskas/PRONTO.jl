@@ -91,10 +91,14 @@ PRONTO.generate_model(Split4, dynamics, stagecost, termcost4, regQ, regR)
 
 
 
-## ------------------------------- plots ------------------------------- ##
+# ------------------------------- plots ------------------------------- #
 
+import Pkg: activate
+activate()
 using GLMakie
+activate(".")
 include("../dev/plot_setup.jl")
+plot_split(ξ,τ)
 
 function plot_split(ξ,τ)
     fig = Figure()
@@ -118,7 +122,7 @@ function plot_split(ξ,τ)
 end
 
 
-## ------------------------------- demo: eigenstate 1->2 in 10s ------------------------------- ##
+# ------------------------------- demo: eigenstate 1->2 in 10s ------------------------------- #
 
 
 x0 = SVector{22}(x_eig(1))
@@ -129,7 +133,7 @@ t0,tf = τ = (0,10)
 θ = Split2(kl=0.05, kr=1, kq=1)
 μ = @closure t->SVector{1}(0.05*sin(t))
 φ = open_loop(θ,x0,μ,τ)
-@time ξ = pronto(θ,x0,φ,τ; tol = 1e-6, maxiters = 50)
+@time ξ = pronto(θ,x0,φ,τ; tol = 1e-6, maxiters = 50, limitγ = true)
 
 plot_split(ξ,τ)
 
@@ -144,7 +148,7 @@ t0,tf = τ = (0,10)
 θ = Split4(kl=0.05, kr=1, kq=1)
 μ = @closure t->SVector{1}(0.05*sin(t))
 φ = open_loop(θ,x0,μ,τ)
-@time ξ = pronto(θ,x0,φ,τ; tol = 1e-6, maxiters = 50)
+@time ξ = pronto(θ,x0,φ,τ; tol = 1e-6, maxiters = 50, limitγ = true)
 
 plot_split(ξ,τ)
 
@@ -159,7 +163,7 @@ t0,tf = τ = (0,2)
 θ = Split4(kl=0.01, kr=1, kq=1)
 μ = @closure t->SVector{1}(0.05*sin(t))
 φ = open_loop(θ,x0,μ,τ)
-@time ξ = pronto(θ,x0,φ,τ; tol = 1e-6, maxiters = 50)
+@time ξ = pronto(θ,x0,φ,τ; tol = 1e-6, maxiters = 50, limitγ = true)
 
 plot_split(ξ,τ)
 
