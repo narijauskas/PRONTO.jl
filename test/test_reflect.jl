@@ -43,12 +43,17 @@ end
 
 
 function termcost4(x,u,t,θ)
-    P = I(22)
-    1/2 * collect(x')*P*x
+    ψ0 = zeros(11,1)
+    ψ0[1:5] = x_eig(4)[1:5]
+    ψf = zeros(11,1)
+    ψf[7:11] = x_eig(4)[7:11]
+    xf = vec([ψf;ψ0;0*ψf;0*ψ0])
+    P = I(44)
+    1/2 * collect((x-xf)')*P*(x-xf)
 end
 
 
-# ------------------------------- split system definitions ------------------------------- ##
+# ------------------------------- reflect system definitions ------------------------------- ##
 
 function dynamics(x,u,t,θ)
     ω = 1.0
@@ -56,29 +61,28 @@ function dynamics(x,u,t,θ)
     α = 10
     v = -α/4
     H0 = SymTridiagonal(promote([4.0i^2 for i in -n:n], v*ones(2n))...)
+    H00 = [H0 zeros(11,11);zeros(11,11) H0]
     H1 = v*im*Tridiagonal(ones(2n), zeros(2n+1), -ones(2n))
+    H11 = [H1 zeros(11,11);zeros(11,11) H1]      
     H2 = v*Tridiagonal(-ones(2n), zeros(2n+1), -ones(2n))
-    return mprod(-im*ω*(H0 + sin(u[1])*H1 + (1-cos(u[1]))*H2) )*x
+    H22 = [H2 zeros(11,11);zeros(11,11) H2]
+    return mprod(-im*ω*(H00 + sin(u[1])*H11 + (1-cos(u[1]))*H22) )*x
 end
 
-stagecost(x,u,t,θ) = 1/2 *θ[1]*collect(u')I*u
+stagecost(x,u,t,θ) = 1/2 *θ.kl*collect(u')I*u
+
 regR(x,u,t,θ) = θ.kr*I(1)
 function regQ(x,u,t,θ)
-    x_re = x[1:11]
-    x_im = x[12:22]
-    ψ = x_re + im*x_im
-    θ.kq*mprod(I(11) - ψ*ψ')
+    θ.kq*I(44)
 end
 
 
-
-PRONTO.Pf(α,μ,tf,θ::Split2) = SMatrix{22,22,Float64}(I(22) - α*α')
-PRONTO.Pf(α,μ,tf,θ::Split4) = SMatrix{22,22,Float64}(I(22) - α*α')
+PRONTO.Pf(α,μ,tf,θ::Reflect4) = SMatrix{44,44,Float64}(I(44))
 
 # ------------------------------- generate model and derivatives ------------------------------- ##
 
 # PRONTO.generate_model(Split2, dynamics, stagecost, termcost2, regQ, regR)
-PRONTO.generate_model(Split4, dynamics, stagecost, termcost4, regQ, regR)
+PRONTO.generate_model(Reflect4, dynamics, stagecost, termcost4, regQ, regR)
 
 
 
@@ -91,7 +95,7 @@ activate(".")
 include("../dev/plot_setup.jl")
 # plot_split(ξ,τ)
 
-function plot_split(ξ,τ)
+function plot_reflect(ξ,τ)
     fig = Figure()
     ts = LinRange(τ...,10001)
 
@@ -101,14 +105,14 @@ function plot_split(ξ,τ)
     foreach(i->lines!(ax, ts, xs[:,i]), is)
     
     # ax = Axis(fig[1:2,2]; title="population")
-    # ps = ([I(11) I(11)] * (xs.^2)')'
+    # ps = ([I(22) I(2)] * (xs.^2)')'
     # foreach(i->lines!(ax, ts, ps[:,i]), 1:11)
 
-    ax = Axis(fig[1:2,2]; title="fidelity")
-    fs = [ξ.x(t)'inprod(x_eig(i))*ξ.x(t) for t∈ts,i∈1:4]
-    foreach(i->lines!(ax, ts, fs[:,i]), 1:4)
+    # ax = Axis(fig[1:2,2]; title="fidelity")
+    # fs = [ξ.x(t)'inprod(x_eig(i))*ξ.x(t) for t∈ts,i∈1:4]
+    # foreach(i->lines!(ax, ts, fs[:,i]), 1:4)
 
-    ax = Axis(fig[3,1:2]; title="inputs")
+    ax = Axis(fig[1:2,2]; title="inputs")
     is = eachindex(ξ.u)
     us = [ξ.u(t)[i] for t∈ts, i∈is]
     foreach(i->lines!(ax, ts, us[:,i]), is)
@@ -117,79 +121,19 @@ function plot_split(ξ,τ)
 end
 
 
-## ------------------------------- demo: eigenstate 1->2 in 10s ------------------------------- ##
+## ------------------------------- demo: eigenstate 4->4 in 4 ------------------------------- ##
+
+ψ0 = zeros(11,1)
+ψ0[1:5] = x_eig(4)[1:5]
+ψf = zeros(11,1)
+ψf[7:11] = x_eig(4)[7:11]
+x0 = SVector{44}(vec([ψ0;ψf;0*ψ0;0*ψf]))
+t0,tf = τ = (0,4)
 
 
-x0 = SVector{22}(x_eig(1))
-xf = SVector{22}(x_eig(2))
-t0,tf = τ = (0,10)
-
-
-θ = Split2(kl=0.01, kr=1, kq=1)
-μ = @closure t->SVector{1}(0.4*sin(t))
+θ = Reflect4(kl=0.01, kr=1, kq=1)
+μ = @closure t->SVector{1}(1.0*sin(12*t))
 φ = open_loop(θ,x0,μ,τ)
-@time ξ = pronto(θ,x0,φ,τ; tol = 1e-6, maxiters = 50, limitγ = true)
+@time ξ = pronto(θ,x0,φ,τ; tol = 1e-4, maxiters = 50, limitγ = true)
 
-plot_split(ξ,τ)
-
-
-## ------------------------------- demo: eigenstate 1->4 in 10s ------------------------------- ##
-
-x0 = SVector{22}(x_eig(1))
-xf = SVector{22}(x_eig(4))
-t0,tf = τ = (0,10)
-
-
-θ = Split4(kl=0.01, kr=1, kq=1)
-μ = @closure t->SVector{1}(0.5*sin(t))
-φ = open_loop(θ,x0,μ,τ)
-@time ξ = pronto(θ,x0,φ,τ; tol = 1e-6, maxiters = 50, limitγ = true)
-
-plot_split(ξ,τ)
-
-
-## ------------------------------- demo: eigenstate 1->4 in 2s ------------------------------- ##
-
-x0 = SVector{22}(x_eig(1))
-xf = SVector{22}(x_eig(4))
-t0,tf = τ = (0,2.55)
-
-
-θ = Split4(kl=0.02, kr=1, kq=1)
-μ = @closure t->SVector{1}(0.5*sin(t))
-φ = open_loop(θ,x0,μ,τ)
-@time ξ = pronto(θ,x0,φ,τ; tol = 1e-6, maxiters = 100, limitγ = true)
-
-plot_split(ξ,τ)
-
-
-
-
-
-
-
-
-## ------------------------------- step-by-step debugging ------------------------------- ##
-
-Kr = PRONTO.regulator(θ,φ,τ)
-ξ = PRONTO.projection(θ,x0,φ,Kr,τ)
-
-λ = PRONTO.lagrangian(θ,ξ,φ,Kr,τ)
-Ko = PRONTO.optimizer(θ,λ,ξ,φ,τ)
-vo = PRONTO.costate(θ,λ,ξ,φ,Ko,τ)
-
-
-ζ = PRONTO.search_direction(θ,ξ,Ko,vo,τ)
-γ = 0.7
-ξ1 = PRONTO.armijo_projection(θ,x0,ξ,ζ,γ,Kr,τ)
-
-
-## ------------------------------- other ------------------------------- ##
-
-
-# shorter error messages:
-using SciMLBase, DifferentialEquations
-Base.show(io::IO, ::Type{<:SciMLBase.ODEProblem}) = print(io, "ODEProblem{...}")
-Base.show(io::IO, ::Type{<:OrdinaryDiffEq.ODEIntegrator}) = print(io, "ODEIntegrator{...}")
-
-
+plot_reflect(ξ,τ)
