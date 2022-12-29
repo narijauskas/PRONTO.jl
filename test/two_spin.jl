@@ -43,6 +43,7 @@ end
 # end
 
 PRONTO.generate_model(TwoSpin, dynamics, stagecost, termcost, Qreg, Rreg)
+PRONTO.Pf(α,μ,tf,θ::TwoSpin) = SMatrix{4,4,Float64}(I(4))
 
 # ----------------------------------- tests ----------------------------------- ##
 
@@ -61,10 +62,10 @@ u0 = [0.1]
 # @time ξ = pronto(M,θ,t0,tf,x0,u0,φ)
 
 
-using GLMakie
-fig = Figure(); ax = Axis(fig[1,1])
-ts = LinRange(t0,tf,10001)
-is = eachindex(ξ.x)
-xs = [ξ.x(t)[i] for t∈ts, i∈is]
-foreach(i->lines!(ax, ts, xs[:,i]), is)
-display(fig)
+# using GLMakie
+# fig = Figure(); ax = Axis(fig[1,1])
+# ts = LinRange(t0,tf,10001)
+# is = eachindex(ξ.x)
+# xs = [ξ.x(t)[i] for t∈ts, i∈is]
+# foreach(i->lines!(ax, ts, xs[:,i]), is)
+# display(fig)
