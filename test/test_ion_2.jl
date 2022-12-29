@@ -9,7 +9,7 @@ using StaticArrays, LinearAlgebra
 
 # ------------------------------- split system to eigenstate 2 ------------------------------- ##
 
-@kwdef struct ion <: Model{4,2,3}
+@kwdef struct ion2 <: Model{4,2,3}
     kl::Float64 # stage cost gain
     kr::Float64 # regulator r gain
     kq::Float64 # regulator q gain
@@ -34,7 +34,7 @@ function dynamics(x,u,t,θ)
     x2 = 1.0
      [
         x[2],
-        (-1/m)*(x[3]*m*ω^2*(x[1]-x1) + x[4]*m*ω^2*(x[1]-x2)),
+        (-1/m)*(x[3]*m*ω^2*((x[1]-x1)^2+1)^(-2)*(x[1]-x1) + x[4]*m*ω^2*((x[1]-x2)^2+1)^(-2)*(x[1]-x2)),
         u[1],
         u[2]
     ]
@@ -45,12 +45,12 @@ regR(x,u,t,θ) = θ.kr*I(2)
 regQ(x,u,t,θ) = θ.kq*I(4)
 
 
-PRONTO.Pf(α,μ,tf,θ::ion) = SMatrix{4,4,Float64}(I(4))
+PRONTO.Pf(α,μ,tf,θ::ion2) = SMatrix{4,4,Float64}(I(4))
 
 # ------------------------------- generate model and derivatives ------------------------------- ##
 
 # PRONTO.generate_model(Split2, dynamics, stagecost, termcost2, regQ, regR)
-PRONTO.generate_model(ion, dynamics, stagecost, termcost, regQ, regR)
+PRONTO.generate_model(ion2, dynamics, stagecost, termcost, regQ, regR)
 
 
 
@@ -94,10 +94,10 @@ end
 
 x0 = SVector{4}([0.0;0.0;1.0;0.0])
 xf = [1.0;0.0;0.0;1.0]
-t0,tf = τ = (0,2)
+t0,tf = τ = (0,5)
 
 
-θ = ion(kl=0.001, kr=1, kq=1)
+θ = ion2(kl=0.001, kr=1, kq=1)
 # μ = @closure t->SVector{2}([0.5*sin(t);0.5*sin(t)])
 μ = @closure t->SVector{2}(zeros(2))
 φ = open_loop(θ,x0,μ,τ)
@@ -106,10 +106,3 @@ t0,tf = τ = (0,2)
 plot_split(ξ,τ)
 
 ##
-using MAT
-ts = t0:0.001:tf
-is = eachindex(ξ.u)
-us = [ξ.u(t)[i] for t∈ts, i∈is]
-file = matopen("Uopt_ion.mat", "w")
-write(file, "Uopt", us)
-close(file)
