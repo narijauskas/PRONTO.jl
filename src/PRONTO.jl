@@ -262,6 +262,7 @@ function pronto(θ::Model{NX,NU,NΘ}, x0::StaticVector, φ, τ; γmax=1.0,tol = 
         local η
         while γ > aβ^25
             verbose && iinfo("armijo γ = $(round(γ; digits=6))")
+            #P(η)
             η = armijo_projection(θ,x0,ξ,ζ,γ,Kr,τ)
             g = cost(η, τ)
             h-g >= -aα*γ*Dh ? break : (γ *= aβ)
@@ -283,20 +284,20 @@ end
 function cost_derivs(θ,λ,φ,ξ,ζ,τ)
     t0,tf = τ
 
-    yf = solve(ODEProblem(dy_dt, 0, (t0,tf), (θ,ξ,ζ)), Tsit5(); reltol=1e-7)(tf)
-    yyf = solve(ODEProblem(dyy_dt, 0, (t0,tf), (θ,λ,ξ,ζ)), Tsit5(); reltol=1e-7)(tf)
+    🚲 = solve(ODEProblem(d🚲_dt, 0, (t0,tf), (θ,ξ,ζ)), Tsit5(); reltol=1e-7)(tf)
+    🚗 = solve(ODEProblem(d🚗_dt, 0, (t0,tf), (θ,λ,ξ,ζ)), Tsit5(); reltol=1e-7)(tf)
 
     zf = ζ.x(tf)
     αf = φ.x(tf)
     μf = φ.u(tf)
     rf = px(αf,μf,tf,θ)
     Pf = pxx(αf,μf,tf,θ)
-    Dh = yf + rf'zf
-    D2g = yyf + zf'Pf*zf
+    Dh = 🚲 + rf'zf
+    D2g = 🚗 + zf'Pf*zf
     return Dh,D2g
 end
 
-function dy_dt(y, (θ,ξ,ζ), t)
+function d🚲_dt(_, (θ,ξ,ζ), t)
     x = ξ.x(t)
     u = ξ.u(t)
     z = ζ.x(t)
@@ -306,7 +307,7 @@ function dy_dt(y, (θ,ξ,ζ), t)
     return a'z + b'v
 end
 
-function dyy_dt(yy, (θ,λ,ξ,ζ), t)
+function d🚗_dt(_, (θ,λ,ξ,ζ), t)
     x = ξ.x(t)
     u = ξ.u(t)
     z = ζ.x(t)

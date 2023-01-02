@@ -1,6 +1,7 @@
 # using Test
 using PRONTO
 using LinearAlgebra, StaticArrays
+using Base: @kwdef
 
 
 NX = 6; NU = 2
@@ -64,7 +65,7 @@ PRONTO.generate_model(LaneChange3, dynamics, stagecost, termcost, regQ, regR)
 
 
 ## -------------------------------  ------------------------------- ##
-θ = LaneChange3()
+θ = LaneChange(s=15)
 x0 = SVector{6}(-5.0,zeros(5)...)
 xf = @SVector zeros(6)
 t0,tf = τ = (0,10)

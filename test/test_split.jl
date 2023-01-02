@@ -39,6 +39,8 @@ end
     kl::Float64 # stage cost gain
     kr::Float64 # regulator r gain
     kq::Float64 # regulator q gain
+    #FUTURE:
+    # xeq::SVector{22,Float64}
 end
 
 
@@ -108,6 +110,11 @@ function plot_split(ξ,τ)
     ax = Axis(fig[1:2,2]; title="population")
     ps = ([I(11) I(11)] * (xs.^2)')'
     foreach(i->lines!(ax, ts, ps[:,i]), 1:11)
+
+    #TODO: terminal cost
+    # plot x(t)' P
+    # x(t)'inprod(x_eig(i))*x(t) for i in 1:4
+    # project state onto each eigenstate
 
     ax = Axis(fig[3,1:2]; title="inputs")
     is = eachindex(ξ.u)
