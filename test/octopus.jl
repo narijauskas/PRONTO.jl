@@ -90,7 +90,7 @@ A_tran = lr*wr
 
 
 ##
-using Symbolics
+using Symbolics, LinearAlgebra
 n = 4 # 2 segments
 @variables q[1:4n]
 
@@ -105,3 +105,24 @@ function qrow(q,j)
 end
 
 D = reduce(vcat, [qrow(q,j) for j in 1:n-1]')
+
+
+
+function δD_δq(D_ik,q_k)
+    if isequal(D_ik, q_k)
+        return 1
+    elseif isequal(-D_ik, q_k)
+        return -1
+    else
+        return 0
+    end
+end
+
+G = [sum([D[i,k] + δD_δq(D[i,k],q[k])*q[l] for k in 1:4n]) for i in 1:n-1, l in 1:4n]
+
+@variables m[1:4n]
+M = diagm(collect(m))
+
+Minv = inv(M'M)*M
+
+G*inv(M)
