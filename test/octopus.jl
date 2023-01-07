@@ -38,11 +38,8 @@ c_tan = 0.0256 # dimensionless tangential drag (experimental)
 # ----------------------------------- fc: hydrostat constraint ----------------------------------- #
 
 fc(x) = C*p(x)
-# C = ?? #TODO: matrix from lagrange
 p(x) = inv(G*inv(M)*C)*(γ-G*inv(M)*(fm(x) + fg(x) + fw(x)))
-#TODO: understand G matrix, which is a function of size
-#TODO: size vector
-
+# gamma?
 
 # ----------------------------------- fm: muscle forces ----------------------------------- #
 # fm: muscle forces
@@ -92,33 +89,57 @@ A_tran = lr*wr
 ##
 using Symbolics, LinearAlgebra
 n = 4 # 2 segments
-@variables q[1:4n]
+@variables q[1:8n]
+# q is q[1:4n]
+# dq is q[4n+1:8n]
+x_v(q,i) = q[1+4(i-1)]
+y_v(q,i) = q[2+4(i-1)]
+x_d(q,i) = q[3+4(i-1)]
+y_d(q,i) = q[4+4(i-1)]
+# closure version:
+x_v(i) = x_v(q,i)
+y_v(i) = y_v(q,i)
+x_d(i) = x_d(q,i)
+y_d(i) = y_d(q,i)
+dq(q,j) = q[4n+j]
 
-# block starting at index i for construction of D matrix
-function qblock(q,i)
-    qx = [4,3,8,7,2,1,6,5]
-    [iseven(j) ? -q[i-1+j] : q[i-1+j] for j in qx]
+# C matrix
+# λ_i-1 column
+Λ(i) = [
+    y_d(i) - y_v(i-1);
+    x_v(i-1) - x_d(i);
+    y_d(i-1) - y_v(i);
+    x_v(i) - x_d(i-1);
+]
+
+# λ_i column
+λ(i) = [
+    y_v(i+1) - y_d(i);
+    x_d(i) - x_v(i+1);
+    y_v(i) - y_d(i+1);
+    x_d(i+1) - x_v(i);
+]
+
+Cblock(i) = [zeros(4,i-2);; Λ(i);; λ(i);; zeros(4,n-1-i)]
+C = 1/2 .* [[λ(1);; zeros(4,n-2)]; [Cblock(i) for i in 2:n-1]...; [zeros(4,n-2);; Λ(n)]]
+
+# D:q->s
+# row block starting at index i for construction of D matrix
+function Dblock(i)
+    j = 4*(i-1)
+    qx = [4,3,8,7,2,1,6,5] # result of shoelace formula
+    1/2 .* [zeros(j); [iseven(k) ? -q[j+k] : q[j+k] for k in qx]; zeros(4n-8-j)]
 end
-
-function qrow(q,j)
-    [zeros(4*(j-1)); qblock(q, 1+4*(j-1)); zeros(length(q)-8-4*(j-1))]
-end
-
-D = reduce(vcat, [qrow(q,j) for j in 1:n-1]')
+D = reduce(vcat, Dblock(i)' for i in 1:n-1)
 
 
-
-function δD_δq(D_ik,q_k)
-    if isequal(D_ik, q_k)
-        return 1
-    elseif isequal(-D_ik, q_k)
-        return -1
-    else
-        return 0
-    end
-end
-
+δD_δq(D_ik,q_k) = isequal(D_ik, q_k) ? 1 : isequal(-D_ik, q_k) ? -1 : 0
 G = [sum([D[i,k] + δD_δq(D[i,k],q[k])*q[l] for k in 1:4n]) for i in 1:n-1, l in 1:4n]
+γ = [-2*sum(δD_δq(D[i,k],q[l])*dq(l)*q[k] for l in 1:4n, k in 1:4n) for i in 1:n-1]
+
+
+
+
 
 @variables m[1:4n]
 M = diagm(collect(m))
@@ -126,3 +147,22 @@ M = diagm(collect(m))
 Minv = inv(M'M)*M
 
 G*inv(M)
+
+# ----------------------------------- rest length ----------------------------------- #
+d = LinRange(0.015, 0.001, n) # height/width of each segment boundary
+l = 0.240/(n-1) # spacing of segment boundaries
+q_rest = [reduce(vcat, [l*(i-1); -d[i]/2; l*(i-1); d[i]/2] for i in 1:n); zeros(4n)]
+# [x_v; y_v; x_d; y_d]
+# segment volume (constant!)
+V = [l/3*(d[i]^2 + d[i+1]^2 + d[i]*d[i+1]) for i in 1:n-1]
+
+# masses:
+(ρ_arm*V[1])/4
+(ρ_arm*(V[i-1]+V[i]))/4
+(ρ_arm*V[n-1])/4
+# reduce(vcat, [kron([1;1], i) for i in 1:3])
+
+S(q) = -q[4]*q[1] +q[3]*q[2] -q[8]*q[3] +q[7]*q[4] -q[2]*q[5] +q[1]*q[6] +q[5]*q[8] -q[6]*q[7]
+T(q) = q[1]*(q[6]-q[4]) - q[5]*(q[2]-q[4]) + q[3]*(q[2]-q[6])
+
+sc = [l*(d[i]+d[i+1])/2 for i in 1:n-1]
