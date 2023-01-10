@@ -384,11 +384,11 @@ qs = reduce(hcat, Ft(sol(t), uu(t))[8:end] for t in ts);
 show(lineplot(ts, qs'; width=160))
 qs = reduce(hcat, P(sol(t), uu(t))[8:end] for t in ts);
 show(lineplot(ts, qs'; width=160))
-qs = reduce(hcat, fm(sol(t), uu(t))[8:end] for t in ts);
+qs = reduce(hcat, fm(sol(t), uu(t)) for t in ts);
 show(lineplot(ts, qs'; width=160))
 ##
 qs = reduce(hcat, Lv(sol(t)) for t in ts);
 show(lineplot(ts, qs'; width=160))
-qs = reduce(hcat, Ld(sol(t)) for t in ts);
+qs = reduce(hcat, FFd(sol(t), uu(t)) for t in ts);
 show(lineplot(ts, qs'; width=160))
 # names = reduce(vcat, ["xv$i"; "yv$i"; "xd$i"; "yd$i"] for i in 1:n)
