@@ -250,19 +250,16 @@ c_a = 0.0256 # dimensionless axial/tangential drag coefficient (experimental)
 # row block for construction of symbolic D matrix
 function Dblock(i)
     j = 4*(i-1)
-    # qx = [4,3,8,7,2,1,6,5] # result of shoelace formula
-    # 1/2 .* [zeros(j); [iseven(k) ? -q[j+k] : q[j+k] for k in qx]; zeros(4n-8-j)]
-    qx = [6,5,2,1,8,7,4,3]
-    1/2 .* [zeros(j); [isodd(k) ? -q[j+k] : q[j+k] for k in qx]; zeros(4n-8-j)]
+    qx = [4,3,8,7,2,1,6,5] # result of shoelace formula
+    1/2 .* [zeros(j); [iseven(k) ? -q[j+k] : q[j+k] for k in qx]; zeros(4n-8-j)]
+    # qx = [6,5,2,1,8,7,4,3]
+    # 1/2 .* [zeros(j); [isodd(k) ? -q[j+k] : q[j+k] for k in qx]; zeros(4n-8-j)]
 end
 D = reduce(vcat, Dblock(i)' for i in 1:n-1)
 
 # area of ith segment
 s(i) = sum(D[i,k]*q[k] for k in 1:4n)
 
-
-# left perpendicular vector
-⟂(v) = [-v[2],v[1]]
 
 
 # tangential axis of the ith segment
@@ -271,7 +268,7 @@ l_a(i) = norm(μ_a(i))
 e_a(i) = μ_a(i)/l_a(i)
 
 # perpendicular axis of the ith segment
-μ_p(i) = ⟂(μ_a(i))
+μ_p(i) = [-μ_a(i)[2], μ_a(i)[1]]
 e_p(i) = μ_p(i)/norm(μ_p(i))
 
 # ith segment centroid velocity and components
