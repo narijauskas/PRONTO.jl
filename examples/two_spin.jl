@@ -4,7 +4,7 @@ using LinearAlgebra
 
 NX = 4
 NU = 1
-NΘ = 0
+NΘ = 2
 struct TwoSpin <: PRONTO.Model{NX,NU,NΘ}
     kr::Float64
     kq::Float64

@@ -227,7 +227,7 @@ function pronto(θ::Model{NX,NU,NΘ}, x0::StaticVector, φ, τ; limitγ=false, t
             g = cost(η, τ)
             h-g >= -aα*γ*Dh ? break : (γ *= aβ)
         end
-        verbose && info(i, "Dh = $Dh, h = $h, γ=$γ") #TODO: 1st/2nd order
+        verbose && info(i, "Dh = $Dh, h = $h, γ = $γ") #TODO: 1st/2nd order
 
         φ = η
     end

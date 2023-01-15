@@ -105,7 +105,7 @@ end
 # ----------------------------------- ODE display ----------------------------------- #
 # I find it much more intuitive to show a trace of an ODE solution
 
-PLOT_HEIGHT::Int = 30
+PLOT_HEIGHT::Int = 20
 PLOT_WIDTH::Int = 120
 t_plot(t0,tf) = LinRange(t0,tf,4*PLOT_WIDTH)
 t_plot(x) = t_plot(extrema(x)...)
