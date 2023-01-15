@@ -94,10 +94,10 @@ end
 
 x0 = SVector{4}([0.0;0.0;1.0;0.0])
 xf = [1.0;0.0;0.0;1.0]
-t0,tf = τ = (0,5)
+t0,tf = τ = (0,3)
 
 
-θ = ion2(kl=0.001, kr=1, kq=1)
+θ = ion2(kl=0.00001, kr=1, kq=1)
 # μ = @closure t->SVector{2}([0.5*sin(t);0.5*sin(t)])
 μ = @closure t->SVector{2}(zeros(2))
 φ = open_loop(θ,x0,μ,τ)
