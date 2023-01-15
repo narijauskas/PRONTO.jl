@@ -1,43 +1,58 @@
+# export regulator
 
-# --------------------------------- regulator  η -> Kr --------------------------------- #
-
-#TODO: regulator(model,t,α,μ)
-# function regulator(::Val{NX},::Val{NU},α,μ,model) where {NX,NU}
-# (::M)(α,μ) = (M.f!(...);...)
-# (::M)(t) = M(M.α(t), M.μ(t))
-
-
-
-
-function regulator(α,μ,model)
-    NX = model.NX; NU = model.NU; 
-    T = model.T;
-    Qr = model.Qr; Rr = model.Rr; iRr = model.iRr;
-
-    fx! = model.fx!; _Ar = Buffer{Tuple{NX,NX}}()
-    Ar = @closure (t)->(fx!(_Ar,α(t),μ(t)); return _Ar)
-    fu! = model.fu!; _Br = Buffer{Tuple{NX,NU}}()
-    Br = @closure (t)->(fu!(_Br,α(t),μ(t)); return _Br)
-    
-    _Kr = Buffer{Tuple{NU,NX}}()
-    
-    Pr! = solve(ODEProblem(riccati!, collect(1.0*I(NX)), (T,0.0), (Ar,Br,Rr,Qr)))
-    _Pr = Buffer{Tuple{NX,NX}}()
-    Pr = @closure (t)->(Pr!(_Pr, t); return _Pr)
-        
-    iRrBr = Buffer{Tuple{NU,NX}}()
-    function Kr(t)
-        mul!(iRrBr, iRr(t), Br(t)')
-        mul!(_Kr, iRrBr, Pr(t))
-        return _Kr
-    end
-    # Kr(t) = Kr(α(t), μ(t),t)
-    return Kr
+struct Regulator{M,Φ,P}
+    θ::M
+    φ::Φ
+    Pr::P
 end
 
-function riccati!(dP, P, (Ar,Br,Rr,Qr), t)
-    # mul!(Kr, Rr(t)\Br(t)', P)
-    Kr = Rr(t)\Br(t)'*P
-    dP .= -Ar(t)'*P - P*Ar(t) + Kr'*Rr(t)*Kr - Qr(t)
-    #NOTE: dP is symmetric, as should be P
+(Kr::Regulator)(t) = Kr(Kr.φ.x(t), Kr.φ.u(t), t)
+(Kr::Regulator)(α, μ, t) = Kr(α, μ, t, Kr.θ)
+
+function (Kr::Regulator)(α, μ, t, θ)
+    Pr = Kr.Pr(t)
+    Rr = R(α,μ,t,θ)
+    Br = fu(α,μ,t,θ)
+
+    Rr\Br'Pr
 end
+
+
+nx(Kr::Regulator) = nx(Kr.θ)
+nu(Kr::Regulator) = nu(Kr.θ)
+extrema(Kr::Regulator) = extrema(Kr.Pr)
+eachindex(Kr::Regulator) = OneTo(nu(Kr)*nx(Kr))
+show(io::IO, Kr::Regulator) = println(io, preview(Kr))
+
+
+
+
+# regulator(θ,φ,τ) = regulator(θ, φ.x, φ.u, τ)
+# design the regulator, solving dPr_dt
+ function regulator(θ::Model{NX,NU}, φ, τ) where {NX,NU}
+    t0,tf = τ
+    #FUTURE: Pf provided by user or auto-generated as P(α,μ,θ)
+    # α 
+    # Pf = SMatrix{NX,NX,Float64}(I(NX) - φ.x(tf)*(φ.x(tf))')
+    # Pf = SMatrix{NX,NX,Float64}(I(NX))
+    α = φ.x(tf)
+    μ = φ.u(tf)
+    Pr = ODE(dPr_dt, Pf(α,μ,tf,θ), (tf,t0), (θ,φ))
+    Regulator(θ,φ,Pr)
+end
+
+
+
+function dPr_dt(Pr,(θ,φ),t)#(M, out, θ, t, φ, Pr)
+    α = φ.x(t)
+    μ = φ.u(t)
+
+    Ar = fx(α,μ,t,θ)
+    Br = fu(α,μ,t,θ)
+    Qr = Q(α,μ,t,θ)
+    Rr = R(α,μ,t,θ)
+    
+    return - Ar'Pr - Pr*Ar + Pr'Br*(Rr\Br'Pr) - Qr
+end
+
+

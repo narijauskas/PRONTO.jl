@@ -1,53 +1,32 @@
 
-# ----------------------------------- armijo  ξ,ζ,Kr -> γ -> ξ̂ ----------------------------------- #
 
-# armijo_backstep:
-function armijo_backstep(x,u,z,v,Kr,Dh,i,model; aα=0.4, aβ=0.7)
-    NX = model.NX; NU = model.NU; T = model.T;
-    f = model.f; l = model.l; p = model.p; x0 = model.x0;
-    γ = 1
-    
-    # compute cost
-    J = cost(x,u,l,T)
-    h = J(T)[1] + p(x(T)) # around regulated trajectory
+armijo_projection(θ,x0,ξ,ζ,γ,Kr,τ; kw...) = armijo_projection(θ,x0,ξ.x,ξ.u,ζ.x,ζ.u,γ,Kr,τ; kw...)
 
-    while γ > aβ^12
-        info(i, "armijo: γ = $γ")
-        # generate estimate
+function armijo_projection(θ::Model{NX,NU},x0,x,u,z,v,γ,Kr,τ; dt=0.001, kw...) where {NX,NU}
+    ubuf = Vector{SVector{NU,Float64}}()
+    t0,tf = τ; ts = t0:dt:tf
 
-        # α̂ = x + γz
-        α̂ = functor(buffer(NX)) do X,t
-            mul!(X, γ, z(t))
-            X .+= x(t)
-        end
+    cb = FunctionCallingCallback(funcat = ts, func_start = false) do x1,t,integrator
+        (θ,x,u,z,v,γ,Kr) = integrator.p
 
-        # μ̂ = u + γv
-        μ̂ = functor(buffer(NU)) do U,t
-            mul!(U, γ, v(t))
-            U .+= u(t)
-        end
-        x̂ = projection_x(x0,α̂,μ̂,Kr,model)
-        û = projection_u(x̂,α̂,μ̂,Kr,model)
+        α = x(t) + γ*z(t)
+        μ = u(t) + γ*v(t)
+        Kr = Kr(t)
+        u = μ - Kr*(x1-α)
 
-
-        J = cost(x̂,û,l,T)
-        g = J(T)[1] + p(x̂(T))
-
-        # check armijo rule
-        h-g >= -aα*γ*Dh ? (return (x̂,û)) : (γ *= aβ)
-        # println("γ=$γ, h-g=$(h-g)")
+        push!(ubuf, SVector{NU,Float64}(u))
     end
-    @warn "armijo maxiters"
-    return (x,u)
+
+    x = ODE(dxdt_armijo, x0, (t0,tf), (θ,x,u,z,v,γ,Kr); callback = cb, saveat = ts, kw...)
+    u = Interpolant(scale(interpolate(ubuf, BSpline(Linear())), ts))
+
+    return Trajectory(θ,x,u)
 end
 
-
-function stage_cost!(dh, h, (l,x,u), t)
-    dh .= l(x(t), u(t))
+function dxdt_armijo(x1, (θ,x,u,z,v,γ,Kr), t)
+    α = x(t) + γ*z(t)
+    μ = u(t) + γ*v(t)
+    Kr = Kr(t)
+    u = μ - Kr*(x1-α)
+    f(x1,u,t,θ)
 end
-
-function cost(x,u,l,T)
-    h = solve(ODEProblem(stage_cost!, [0], (0.0,T), (l,x,u)))
-    return h
-end
- 

@@ -1,44 +1,15 @@
 # PRONTO.jl
-
-A julia implementation of PRONTO.
-
-## Before Installation
-Install [julia](https://julialang.org/), [git](https://git-scm.com/), [VSCode](https://code.visualstudio.com/), and the terminal of your choice. These instructions assume you can correctly install and configure these tools.
-
-Make a [GitHub](https://github.com/) account if you don't already have one. I strongly recommend you set up an SSH key on your device and connect it to GitHub as well.
-
-## Installation
-1. change into your julia dev directory (or wherever you keep git repositories)
-```
-cd ~/.julia/dev
-```
-2. clone this repository
-```
-git clone git@github.com:mantasnaris/PRONTO.jl
-```
-or, if you don't have ssh set up:
-```
-https://github.com/mantasnaris/PRONTO.jl
-```
-3. start julia
-```
-julia -t auto
-```
-4. activate the local PRONTO environment (in julia pkg mode)
-```
-] activate .
-```
-5. download dependencies (in julia pkg mode)
-```
-] instantiate
-```
+A Julia implementation of the **PR**ojection-**O**perator-Based **N**ewton’s Method for **T**rajectory
+**O**ptimization (PRONTO). PRONTO is a direct method for trajectory optimization based on variational calculus which computes descent direction directly in infinite-dimensional functional space.
 
 
 ## Usage
-This code is still very much not done, stay tuned for usage instructions.
+Please see the examples folder for usage examples. This API is still very likely to change – especially regarding the symbolic generation of jacobians/hessians and passing them to the solver. Note that upcoming changes in Julia 1.9 should substantially improve the compile time of large generated functions ([#45276](https://github.com/JuliaLang/julia/issues/45276), [#45404](https://github.com/JuliaLang/julia/issues/45404)).
 
-## Organization
-`src` - package source files
-`test` - package test files
-`scripts` - examples, notebooks, etc.
-`dev` - experimental code
+To see the generated definition of any model function, run, eg. `methods(PRONTO.f)` and open the temporary file where the definition is stored.
+
+## Upcoming Changes
+- Fine grained control of verbosity/runtime-feedback.
+- Support for SVector parameters (eg. regulator Q/R matrix diagonals).
+- Support for constraints (Dearing et al. 2022).
+- Easy access to differential equation solver options (algorithm, tolerance, etc.).
