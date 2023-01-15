@@ -1,13 +1,10 @@
 
 
-## ----------------------------------- dependencies ----------------------------------- ##
-
-
+# ----------------------------------- preliminaries ----------------------------------- #
 using PRONTO
 using StaticArrays
 using LinearAlgebra
 using FastClosures
-
 
 
 NX = 6

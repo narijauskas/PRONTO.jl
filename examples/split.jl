@@ -30,7 +30,7 @@ end
 
 # 1. define a struct however you like (@kwdef should work...)
 # 2. the struct must be a subtype of Model{NX,NU,NΘ}, where integer type parameters {NX,NU,NΘ} encode dimensions
-# 3. fields = parameters, and can be accessed by, eg. θ.kr == θ[2] and θ.kq == θ[3]
+# 3. fields = parameters, and can be accessed by, eg. θ.kr ≡ θ[2] and θ.kq ≡ θ[3]
 
 
 # ------------------------------- split system to eigenstate 2 ------------------------------- ##
@@ -97,14 +97,12 @@ PRONTO.generate_model(Split4, dynamics, stagecost, termcost4, regQ, regR)
 
 
 
-## ------------------------------- plots ------------------------------- ##
+# ------------------------------- plotting output ------------------------------- #
 
-import Pkg: activate
-activate()
+import Pkg
+Pkg.activate()
 using GLMakie, Statistics
-activate(".")
-include("../dev/plot_setup.jl")
-# plot_split(ξ,τ)
+Pkg.activate(".")
 
 function plot_split(ξ,τ)
     fig = Figure()
@@ -143,7 +141,7 @@ t0,tf = τ = (0,10)
 θ = Split2(kl=0.01, kr=1, kq=1)
 μ = @closure t->SVector{1}(0.4*sin(t))
 φ = open_loop(θ,x0,μ,τ)
-@time ξ = pronto(θ,x0,φ,τ; tol = 1e-6, maxiters = 50, limitγ = true)
+ξ = pronto(θ,x0,φ,τ; tol = 1e-6, maxiters = 50, limitγ = true)
 
 plot_split(ξ,τ)
 
@@ -158,7 +156,7 @@ t0,tf = τ = (0,10)
 θ = Split4(kl=0.01, kr=1, kq=1)
 μ = @closure t->SVector{1}(0.5*sin(t))
 φ = open_loop(θ,x0,μ,τ)
-@time ξ = pronto(θ,x0,φ,τ; tol = 1e-6, maxiters = 50, limitγ = true)
+ξ = pronto(θ,x0,φ,τ; tol = 1e-6, maxiters = 50, limitγ = true)
 
 plot_split(ξ,τ)
 
@@ -173,7 +171,7 @@ t0,tf = τ = (0,2.55)
 θ = Split4(kl=0.02, kr=1, kq=1)
 μ = @closure t->SVector{1}(0.5*sin(t))
 φ = open_loop(θ,x0,μ,τ)
-@time ξ = pronto(θ,x0,φ,τ; tol = 1e-6, maxiters = 100, limitγ = true)
+ξ = pronto(θ,x0,φ,τ; tol = 1e-6, maxiters = 100, limitγ = true)
 
 plot_split(ξ,τ)
 
