@@ -16,7 +16,6 @@ function generate_model(T, user_f, user_l, user_p, user_Q, user_R)
     iinfo("initializing symbolics...")
     NX = nx(T); NU = nu(T)
     @variables x[1:NX] u[1:NU] t λ[1:NX]
-    # θ_sym = T(θ...) # the model instantiated with symbolic θs
     x = collect(x)
     u = collect(u)
     t = t
@@ -101,7 +100,6 @@ end
 # isnothing(force_dims) || (fx_sym = reshape(fx_sym, force_dims...))
 
 
-# SType(::Size{S}) where {S} = MVector{S..., Float64}
 MType(sz::Size{S}) where {S} = MType(Val(length(S)), sz)
 MType(::Val{1}, sz::Size{S}) where {S} = MVector{S..., Float64}
 MType(::Val{2}, sz::Size{S}) where {S} = MMatrix{S..., Float64}
@@ -113,7 +111,7 @@ SType(::Val{2}, sz::Size{S}) where {S} = SMatrix{S..., Float64}
 SType(::Val, sz::Size{S}) where {S} = SArray{Tuple{S...}, Float64, length(S), prod(S)}
 
 
-#MAYBE: do we want to save the whole model to a file?
+#MAYBE: do we actually want to save the whole model to a file?
 function build(sz, hdr, sym; format = identity, file=nothing)
     body = tmap(enumerate(sym)) do (i,x)
         :(out[$i] = $(format(toexpr(x))))
@@ -151,15 +149,12 @@ function _build(::InPlace, name, args, body)
 end
 
 
-
 # make a version of v with the sparsity pattern of fn
 function sparse_mask(v, fn)
     v .* map(fn) do ex
         iszero(ex) ? 0 : 1
     end |> collect
 end
-
-
 
 
 # remove excess begin blocks & comments
@@ -170,12 +165,9 @@ function clean(ex)
 end
 
 
-
 # insert the `new` expression at each matching `tgt` in the `src`
 function crispr(src,tgt,new)
     postwalk(src) do ex
         return @capture(ex, $tgt) ? new : ex
     end
 end
-
-

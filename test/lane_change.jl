@@ -49,15 +49,10 @@ end
 stagecost(x,u,t,θ) = 1/2*collect(x')I*x + 1/2*collect(u')I*u
 
 # should be solution to DARE at desired equilibrium
-# ref = zeros(NX)
-# Pl,_ = ared(fx(ref,zeros(NU)), fu(ref,zeros(NU)), Rlqr, Qlqr)
 termcost(x,u,t,θ) = 1/2*collect(x')*x
 
 regR(x,u,t,θ) = diagm([θ.r1,θ.r2])
 regQ(x,u,t,θ) = diagm([θ.q1,θ.q2,θ.q3,θ.q4,θ.q5,θ.q6])
-
-
-# regP(x,u,t,θ) = 
 
 PRONTO.generate_model(LaneChange, dynamics, stagecost, termcost, regQ, regR)
 

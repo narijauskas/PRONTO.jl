@@ -1,28 +1,8 @@
 # plot handling
 
+# ----------------------------------- interpolation functor ----------------------------------- #
 
-PLOT_HEIGHT::Int = 30
-PLOT_WIDTH::Int = 120
-t_plot(t0,tf) = LinRange(t0,tf,4*PLOT_WIDTH)
-t_plot(x) = t_plot(extrema(x)...)
-
-function set_plot_scale(height, width)
-    global PLOT_HEIGHT = convert(Int, height)
-    global PLOT_WIDTH = convert(Int, width)
-end
-
-
-
-preview(x; kw...) = preview(x, t_plot(x), eachindex(x); kw...)
-
-function preview(x, ts, is; kw...)
-    lineplot(ts, [x(t)[i] for t∈ts, i∈is];
-        height = PLOT_HEIGHT,
-        width = PLOT_WIDTH,
-        labels = false,
-        kw...)
-end
-
+# used to 
 struct Interpolant{T}
     itp::T
 end
@@ -36,6 +16,8 @@ eltype(::Interpolant{T}) where {T} = eltype(T)
 extrema(u::Interpolant) = extrema(first(u.itp.ranges))
 eachindex(::Interpolant{T}) where {T} = OneTo(length(eltype(T)))
 
+
+# ----------------------------------- ODE solution wrapper ----------------------------------- #
 
 struct ODE{T}
     wrap::FunctionWrapper{T, Tuple{Float64}}
@@ -115,14 +97,40 @@ show(io::IO, ode::ODE) = println(io, preview(ode))
 
 export domain, preview
 
-# this might be type piracy... but it prevents some obscenely long error messages
+# this is type piracy... but it prevents some obscenely long error messages
 function show(io::IO, fn::FunctionWrapper{T,A}) where {T,A}
     print(io, "FunctionWrapper: $A -> $T $(fn.ptr)")
+end
+
+# ----------------------------------- ODE display ----------------------------------- #
+# I find it much more intuitive to show a trace of an ODE solution
+
+PLOT_HEIGHT::Int = 30
+PLOT_WIDTH::Int = 120
+t_plot(t0,tf) = LinRange(t0,tf,4*PLOT_WIDTH)
+t_plot(x) = t_plot(extrema(x)...)
+
+function set_plot_scale(height, width)
+    global PLOT_HEIGHT = convert(Int, height)
+    global PLOT_WIDTH = convert(Int, width)
+end
+
+
+preview(x; kw...) = preview(x, t_plot(x), eachindex(x); kw...)
+
+function preview(x, ts, is; kw...)
+    lineplot(ts, [x(t)[i] for t∈ts, i∈is];
+                height = PLOT_HEIGHT,
+                width = PLOT_WIDTH,
+                labels = false,
+                kw...)
 end
 
 
 
 
+
+#FUTURE: Makie support
 # using MakieCore
 # function MakieCore.convert_arguments(P::MakieCore.PointBased, x::ODE, i)
 #     ts = LinRange(extrema(x)...,1001)
@@ -197,7 +205,7 @@ end
 # end
 #FUTURE: show size, length, time span, solver method?
 
-# this might be type piracy... but it prevents some obscenely long error messages
+# this is type piracy... but it prevents some obscenely long error messages
 function Base.show(io::IO, fn::FunctionWrapper{T,A}) where {T,A}
     print(io, "FunctionWrapper: $A -> $T $(fn.ptr)")
 end

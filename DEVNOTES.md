@@ -1,5 +1,11 @@
 # Dev Notes and Version History
 
+## Interestng Points
+  - solves a sequence of 7? ODEs in a loop
+  - can leverage the flexibility of DifferentialEquations.jl
+  - needs to break the chain of ODE solutions depending on previous ODE solutions: FunctionWrapper
+
+
 ## v0.4.0-dev
   - refactor v0.3 with optional symbolics
   - generic methods for all steps -> dispatch on M

@@ -1,18 +1,11 @@
-
-
-## ----------------------------------- dependencies ----------------------------------- ##
-
-
 using PRONTO
 using StaticArrays
 using LinearAlgebra
 
-
-
 NX = 4
 NU = 1
 NΘ = 0
-struct TwoSpin <: PRONTO.Model{4,1,2}
+struct TwoSpin <: PRONTO.Model{NX,NU,NΘ}
     kr::Float64
     kq::Float64
 end
@@ -38,11 +31,9 @@ function termcost(x,u,t,θ)
     1/2*collect(x')*Pl*x
 end
 
-
-# function PRONTO.preview(M::TwoSpin, ξ)
-# end
-
 PRONTO.generate_model(TwoSpin, dynamics, stagecost, termcost, Qreg, Rreg)
+
+# overwrite default behavior of Pf
 PRONTO.Pf(α,μ,tf,θ::TwoSpin) = SMatrix{4,4,Float64}(I(4))
 
 # ----------------------------------- tests ----------------------------------- ##
@@ -54,18 +45,5 @@ x0 = @SVector [0.0, 1.0, 0.0, 0.0]
 xf = @SVector [1.0, 0.0, 0.0, 0.0]
 u0 = [0.1]
 μ = @closure t->SizedVector{1}(u0)
-φ = open_loop(θ,xf,μ,τ)
-ξ = pronto(θ,x0,φ,τ)
-
-##
-# φ = PRONTO.guess_zi(M,θ,xf,u0,t0,tf)
-# @time ξ = pronto(M,θ,t0,tf,x0,u0,φ)
-
-
-# using GLMakie
-# fig = Figure(); ax = Axis(fig[1,1])
-# ts = LinRange(t0,tf,10001)
-# is = eachindex(ξ.x)
-# xs = [ξ.x(t)[i] for t∈ts, i∈is]
-# foreach(i->lines!(ax, ts, xs[:,i]), is)
-# display(fig)
+φ = open_loop(θ,xf,μ,τ) # guess trajectory
+ξ = pronto(θ,x0,φ,τ) # optimal trajectory

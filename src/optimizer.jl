@@ -32,10 +32,6 @@ struct FirstOrder <: SearchOrder end
 struct SecondOrder <: SearchOrder end
 
 
-
-
-
-# M,N,Λ,Ξ,P
 struct Optimizer{Tθ,Tλ,Tξ,TP}
     N::SearchOrder
     θ::Tθ
@@ -58,8 +54,6 @@ function (Ko::Optimizer)(x,u,t,θ)
     B = fu(x,u,t,θ)
 
     return R\(S' + B'P)
-
-    # return (Ko,vo)
 end
 
 order(Ko::Optimizer) = Ko.N
@@ -69,18 +63,12 @@ extrema(Ko::Optimizer) = extrema(Ko.P)
 eachindex(Ko::Optimizer) = OneTo(nu(Ko)*nx(Ko))
 show(io::IO, Ko::Optimizer) = println(io, preview(Ko))
 
-# R = isapprox(vo) ? L(...) : l(...)
-
 
 function asymmetry(A)
     (m,n) = size(A)
     @assert m == n "must be square matrix"
     sum([0.5*abs(A[i,j]-A[j,i]) for i in 1:n, j in 1:n])
 end
-
-
-# ro_f = collect(px(M,θ,tf,φ(tf)))
-
 
 retcode(x::ODE) = x.soln.retcode
 isstable(x::ODE) = retcode(x) == :Success
@@ -94,8 +82,8 @@ function optimizer(θ,λ,ξ,φ,τ)
     μf = φ.u(tf)
     
     Pf = pxx(αf,μf,tf,θ)
-    # local P,N
-    #FIX:
+
+    #FIX: this implementation is not the most robust
     P,N = try
         N = SecondOrder()
         P = ODE(dP_dt, Pf, (tf,t0), (θ,λ,ξ,N), verbose=false)
@@ -106,16 +94,11 @@ function optimizer(θ,λ,ξ,φ,τ)
         P = ODE(dP_dt, Pf, (tf,t0), (θ,λ,ξ,N))
         (P,N)
     end
-    # if isstable(P2)
-    #     P = P2
-    # else
-    #     N = FirstOrder()
-    #     P = ODE(dP_dt, Pf, (tf,t0), (θ,λ,ξ,N))
-    # end
+
     return Optimizer(N,θ,λ,ξ,P)
 end
 
-
+# for debugging - only first order descent
 function optimizer1(θ,λ,ξ,φ,τ)
     t0,tf = τ
     αf = φ.x(tf)

@@ -1,4 +1,4 @@
-# ----------------------------------- * runtime feedback ----------------------------------- #
+# ----------------------------------- runtime feedback ----------------------------------- #
 using Crayons
 
 as_tag(str) = as_tag(crayon"default", str)
@@ -11,33 +11,23 @@ clearln() = print("\e[2K","\e[1G")
 info(str) = println(as_tag(crayon"magenta","PRONTO"), str)
 info(i, str) = println(as_tag(crayon"magenta","PRONTO[$i]"), str)
 iinfo(str) = println("    > ", str) # secondary-level
-iiinfo(str) = println("        > ", str) # tertiary level
+iiinfo(str) = println("        > ", str) # tertiary-level
 
-# info(v::A,str) = info(str)
-# info(v::B,str) = nothing
+# ----------------------------------- code timing ----------------------------------- #
 
-# ----------------------------------- * code timing ----------------------------------- #
-
-tick(name) = esc(Symbol(String(name)*"_tick"))
-tock(name) = esc(Symbol(String(name)*"_tock"))
+_tick(name) = esc(Symbol(String(name)*"_tick"))
+_tock(name) = esc(Symbol(String(name)*"_tock"))
 
 macro tick(name=:(_))
-
-    :($(tick(name)) = time_ns())
+    :($(_tick(name)) = time_ns())
 end
 
 macro tock(name=:(_))
-
-    :($(tock(name)) = time_ns())
+    :($(_tock(name)) = time_ns())
 end
 
 macro clock(name=:(_))
-
-    _tick = tick(name)
-    _tock = tock(name)
-    ms = :(($_tock - $_tick)/1e6)
+    ms = :(($_tock(name) - $_tick(name))/1e6)
     :("$($:(round($ms; digits=3))) ms")
 end
 
-
-# barplot(["dPr/dt","dx/dt"],rand(2), width=72, color=:magenta,title="Runtime Stats")
