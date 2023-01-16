@@ -162,6 +162,15 @@ t0,tf = τ = (0,10)
 
 plot_split(ξ,τ)
 
+##
+using MAT
+ts = t0:0.001:tf
+is = eachindex(ξ.u)
+us = [ξ.u(t)[i] for t∈ts, i∈is]
+file = matopen("Uopt_4hk_Julia.mat", "w")
+write(file, "Uopt", us)
+close(file)
+
 
 ## ------------------------------- demo: eigenstate 1->4 in 2s ------------------------------- ##
 
