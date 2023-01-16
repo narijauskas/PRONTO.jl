@@ -51,8 +51,8 @@ PRONTO.generate_model(TwoSpin, dynamics, stagecost, termcost, Qreg, Rreg)
 
 x0 = @SVector [0.0, 1.0, 0.0, 0.0]
 xf = @SVector [1.0, 0.0, 0.0, 0.0]
-u0 = [0.1]
-μ = @closure t->SizedVector{1}(u0)
+# u0 = [0.1]
+μ = @closure t->SizedVector{1}(0.1*sin(t))
 φ = open_loop(θ,xf,μ,τ)
 ξ = pronto(θ,x0,φ,τ)
 
