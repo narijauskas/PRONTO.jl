@@ -20,7 +20,8 @@ This optimization problem is first converted into a linear-quadratic optimal con
 
 Because $ζ_k$ is computed by local second order approximation, there is no guarantee that $g(ξ_k + ζ_k) < g(ξ_k)$. Consequently we find a step size $γ_k ≤ 1$ via backtracking line search which enforces the Armijo rule.
 
-After calculating a descent direction $ζ_k$ and a step size $γ_k$ the projection operator is used to ensure the next solution iterate lies on the trajectory manifold
+After calculating a descent direction $ζ_k$ and a step size $γ_k$ the projection operator is used to ensure the next solution iterate lies on the trajectory manifold.
+
 $$ ξ_{k+1} = \mathcal{P}(ξ_k + γ_k ζ_k)$$
 
 For the mathematical details of the PRONTO algorithm, please refer to: [(Hauser 2002)](https://www.sciencedirect.com/science/article/pii/S1474667015387334), [(Hauser 2003)](https://ieeexplore.ieee.org/abstract/document/1243395), and [(Shao et al. 2022)](https://journals.aps.org/pra/abstract/10.1103/PhysRevA.105.032605)
