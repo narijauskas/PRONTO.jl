@@ -96,7 +96,6 @@ PRONTO.generate_model(Split2, dynamics, stagecost, termcost2, regQ, regR)
 PRONTO.generate_model(Split4, dynamics, stagecost, termcost4, regQ, regR)
 
 
-
 # ------------------------------- plotting output ------------------------------- #
 
 import Pkg
@@ -141,9 +140,9 @@ t0,tf = τ = (0,10)
 θ = Split2(kl=0.01, kr=1, kq=1)
 μ = @closure t->SVector{1}(0.4*sin(t))
 φ = open_loop(θ,x0,μ,τ)
-ξ = pronto(θ,x0,φ,τ; tol = 1e-6, maxiters = 50, limitγ = true)
+@time ξ = pronto(θ,x0,φ,τ; tol = 1e-6, maxiters = 50, limitγ = true)
 
-plot_split(ξ,τ)
+# plot_split(ξ,τ)
 
 
 ## ------------------------------- demo: eigenstate 1->4 in 10s ------------------------------- ##
@@ -156,9 +155,9 @@ t0,tf = τ = (0,10)
 θ = Split4(kl=0.01, kr=1, kq=1)
 μ = @closure t->SVector{1}(0.5*sin(t))
 φ = open_loop(θ,x0,μ,τ)
-ξ = pronto(θ,x0,φ,τ; tol = 1e-6, maxiters = 50, limitγ = true)
+@time ξ = pronto(θ,x0,φ,τ; tol = 1e-4, maxiters = 50, limitγ = true)
 
-plot_split(ξ,τ)
+# plot_split(ξ,τ)
 
 
 ## ------------------------------- demo: eigenstate 1->4 in 2s ------------------------------- ##
