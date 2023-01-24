@@ -43,7 +43,13 @@ PRONTO.Pf(α,μ,tf,θ::TwoSpin) = SMatrix{4,4,Float64}(I(4))
 
 x0 = @SVector [0.0, 1.0, 0.0, 0.0]
 xf = @SVector [1.0, 0.0, 0.0, 0.0]
-u0 = [0.1]
-μ = @closure t->SizedVector{1}(u0)
-φ = open_loop(θ,xf,μ,τ) # guess trajectory
+u0 = [0.0]
+
+smooth(t, x0, xf, tf) = @. (xf - x0)*(tanh((2π/tf)*t - π) + 1)/2 + x0
+μ = @closure t->u0*sin(t)
+α = @closure t->smooth(t, x0, xf, tf)
+φ = PRONTO.Trajectory(θ,α,μ);
+
+# μ = @closure t->SizedVector{1}(u0)
+# φ = open_loop(θ,xf,μ,τ) # guess trajectory
 ξ = pronto(θ,x0,φ,τ) # optimal trajectory
