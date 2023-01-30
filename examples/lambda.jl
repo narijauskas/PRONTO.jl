@@ -87,13 +87,13 @@ x0 = @SVector [1.0, 0.0, 0.0, 0.0, 0.0,0.0]
 xf = @SVector [0.0, 0.0, 1.0, 0.0, 0.0,0.0]
 # u0 = [0.1]
 
-# smooth(t, x0, xf, tf) = @. (xf - x0)*(tanh((2π/tf)*t - π) + 1)/2 + x0
-# μ = @closure t->u0*sin(t)
-# α = @closure t->smooth(t, x0, xf, tf)
-# φ = PRONTO.Trajectory(θ,α,μ);
+smooth(t, x0, xf, tf) = @. (xf - x0)*(tanh((2π/tf)*t - π) + 1)/2 + x0
+μ = @closure t->0.05*ones(4)
+α = @closure t->smooth(t, x0, xf, tf)
+φ = PRONTO.Trajectory(θ,α,μ);
 
-μ = @closure t->SVector{4}(0.1*ones(4))
-φ = open_loop(θ,x0,μ,τ)
+# μ = @closure t->SVector{4}(0.1*ones(4))
+# φ = open_loop(θ,x0,μ,τ)
 
 # μ = @closure t->SizedVector{1}(u0)
 # φ = open_loop(θ,xf,μ,τ) # guess trajectory
@@ -102,3 +102,9 @@ xf = @SVector [0.0, 0.0, 1.0, 0.0, 0.0,0.0]
 
 ##
 using MAT
+ts = t0:0.001:tf
+is = eachindex(ξ.u)
+us = [ξ.u(t)[i] for t∈ts, i∈is]
+file = matopen("Uopt_Lambda.mat", "w")
+write(file, "Uopt", us)
+close(file)
