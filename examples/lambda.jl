@@ -81,6 +81,7 @@ PRONTO.Pf(α,μ,tf,θ::Lambda) = SMatrix{6,6,Float64}(I(6) - inprod(α))
 ##
 
 # ----------------------------------- tests ----------------------------------- ##θ = Lambda(1,1)
+θ = Lambda(1,1)
 τ = t0,tf = 0,5
 
 x0 = @SVector [1.0, 0.0, 0.0, 0.0, 0.0,0.0]
@@ -88,7 +89,7 @@ xf = @SVector [0.0, 0.0, 1.0, 0.0, 0.0,0.0]
 # u0 = [0.1]
 
 smooth(t, x0, xf, tf) = @. (xf - x0)*(tanh((2π/tf)*t - π) + 1)/2 + x0
-μ = @closure t->0.05*ones(4)
+μ = @closure t->0.01*ones(4)
 α = @closure t->smooth(t, x0, xf, tf)
 φ = PRONTO.Trajectory(θ,α,μ);
 
