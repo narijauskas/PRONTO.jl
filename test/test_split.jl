@@ -21,7 +21,7 @@ end
 # get the ith eigenstate
 function x_eig(i)
     n = 5
-    α = 10 
+    α = 7
     v = -α/4
     H0 = SymTridiagonal(promote([4.0i^2 for i in -n:n], v*ones(2n))...)
     w = eigvecs(collect(H0)) # symbolic doesn't work here
@@ -68,7 +68,7 @@ end
 function dynamics(x,u,t,θ)
     ω = 1.0
     n = 5
-    α = 10
+    α = 7
     v = -α/4
     H0 = SymTridiagonal(promote([4.0i^2 for i in -n:n], v*ones(2n))...)
     H1 = v*im*Tridiagonal(ones(2n), zeros(2n+1), -ones(2n))
@@ -135,24 +135,24 @@ end
 ## ------------------------------- demo: eigenstate 1->2 in 10s ------------------------------- ##
 
 
-x0 = SVector{22}(x_eig(1))
-xf = SVector{22}(x_eig(2))
-t0,tf = τ = (0,10)
+# x0 = SVector{22}(x_eig(1))
+# xf = SVector{22}(x_eig(2))
+# t0,tf = τ = (0,10)
 
 
-θ = Split2(kl=0.01, kr=1, kq=1)
-μ = @closure t->SVector{1}(0.4*sin(t))
-φ = open_loop(θ,x0,μ,τ)
-@time ξ = pronto(θ,x0,φ,τ; tol = 1e-6, maxiters = 50, limitγ = true)
+# θ = Split2(kl=0.01, kr=1, kq=1)
+# μ = @closure t->SVector{1}(0.4*sin(t))
+# φ = open_loop(θ,x0,μ,τ)
+# @time ξ = pronto(θ,x0,φ,τ; tol = 1e-6, maxiters = 50, limitγ = true)
 
-plot_split(ξ,τ)
+# plot_split(ξ,τ)
 
 
 ## ------------------------------- demo: eigenstate 1->4 in 10s ------------------------------- ##
 
 x0 = SVector{22}(x_eig(1))
 xf = SVector{22}(x_eig(4))
-t0,tf = τ = (0,10)
+t0,tf = τ = (0,1.5)
 
 
 θ = Split4(kl=0.01, kr=1, kq=1)
@@ -167,7 +167,7 @@ using MAT
 ts = t0:0.001:tf
 is = eachindex(ξ.u)
 us = [ξ.u(t)[i] for t∈ts, i∈is]
-file = matopen("Uopt_4hk_Julia.mat", "w")
+file = matopen("Uopt_4hk_7V.mat", "w")
 write(file, "Uopt", us)
 close(file)
 
