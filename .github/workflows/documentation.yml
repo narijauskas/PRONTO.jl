@@ -1,0 +1,28 @@
+name: Documentation
+
+on: # Controls when the action will run. 
+  push: # triggers the workflow on push events to the main branch
+    branches: [main]
+    tags: '*'
+  workflow_dispatch: # run the workflow manually from the Actions tab
+  pull_request: # generate a preview on creation of a pull request
+
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+# This workflow contains a single job called "build"
+jobs:
+  build:
+    runs-on: ubuntu-latest # The type of runner that the job will run on
+    steps: # Steps represent a sequence of tasks that will be executed as part of the job
+      - uses: actions/checkout@v2
+      - uses: julia-actions/setup-julia@v1
+        with:
+          version: '1.8'
+      - name: Install Dependencies
+          run: julia --project=docs/ -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'
+        # run: julia install.jl
+      - name: Build and Deploy
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # For authentication with GitHub Actions token
+          DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }} # For authentication with SSH deploy key
+        run: julia --project=docs/ docs/make.jl

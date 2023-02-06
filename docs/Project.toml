@@ -1,0 +1,7 @@
+[deps]
+Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+PRONTO = "97df7862-8962-462b-83f4-d1fea1a8c26c"
+LiveServer = "16fef848-5104-11e9-1b77-fb7a48bbb589"
+
+[compat]
+Documenter = "0.27"
