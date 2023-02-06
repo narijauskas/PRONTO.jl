@@ -15,10 +15,9 @@ makedocs(
 
 deploydocs(
     repo = "github.com/narijauskas/PRONTO.jl.git",
-    # versions = ["stable" => "v^",],
-    versions = nothing, # temporary
     devbranch = "main",
     devurl = "dev",
     push_preview = true,
+    versions = [devurl => devurl, ],
 )
 
