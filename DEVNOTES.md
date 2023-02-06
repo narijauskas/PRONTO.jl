@@ -1,9 +1,30 @@
 # Dev Notes and Version History
 
-## Interestng Points
-  - solves a sequence of 7? ODEs in a loop
-  - can leverage the flexibility of DifferentialEquations.jl
-  - needs to break the chain of ODE solutions depending on previous ODE solutions: FunctionWrapper
+## TODO:
+
+### General
+  - website infrastructure
+  - expand documentation
+    - detailed examples
+    - problem setup requirements & syntax
+    - what goes on under the hood
+  - cleanup devnotes
+  - consolidate/cleanup tests/examples
+    - get rid of octopus
+    - clean up lambda
+
+### Code functionality
+  - store intermediate trajectories/matrices
+  - generate Dh plot
+  - debug options
+  - vectorized parameters
+
+## v0.4.0
+  - refactor v0.3 with fewer symbolic intermediates (might change with Julia 1.9)
+  - interpolated inputs for trajectories
+
+
+
 
 
 ## v0.4.0-dev
@@ -14,11 +35,10 @@
   - Triangular dPr structure (ie, make dPr a vector)
   - @model macro to provide isolated eval of user code
 
-### autodiff
-  - allocates minimal, thread-safe buffer
 
 
-## v0.3.0-dev
+## v0.3.0
+    - unreleased
     - rewrite with new dispatch-on-model function pasing structure
     - newton step
     - inline plots
@@ -59,3 +79,6 @@
     - write example problems
     - write test sets
     - write documentation
+
+## v0.5.x
+  - stabilize API
