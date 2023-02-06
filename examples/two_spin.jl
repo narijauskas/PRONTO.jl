@@ -36,6 +36,37 @@ PRONTO.generate_model(TwoSpin, dynamics, stagecost, termcost, Qreg, Rreg)
 # overwrite default behavior of Pf
 PRONTO.Pf(α,μ,tf,θ::TwoSpin) = SMatrix{4,4,Float64}(I(4))
 
+
+## plots
+import Pkg
+Pkg.activate()
+using GLMakie, Statistics
+Pkg.activate(".")
+
+function plot_spin(ξ,τ)
+    fig = Figure()
+    ts = LinRange(τ...,10001)
+
+    ax = Axis(fig[1:2,1]; title="state")
+    is = eachindex(ξ.x)
+    xs = [ξ.x(t)[i] for t∈ts, i∈is]
+    foreach(i->lines!(ax, ts, xs[:,i]), is)
+    
+    # ax = Axis(fig[1:2,2]; title="population")
+    # ps = ([I(11) I(11)] * (xs.^2)')'
+    # foreach(i->lines!(ax, ts, ps[:,i]), 1:11)
+
+
+    ax = Axis(fig[1:2,2]; title="inputs")
+    is = eachindex(ξ.u)
+    us = [ξ.u(t)[i] for t∈ts, i∈is]
+    foreach(i->lines!(ax, ts, us[:,i]), is)
+
+    return fig
+end
+##
+
+
 # ----------------------------------- tests ----------------------------------- ##
 
 θ = TwoSpin(1,1)
@@ -53,3 +84,5 @@ smooth(t, x0, xf, tf) = @. (xf - x0)*(tanh((2π/tf)*t - π) + 1)/2 + x0
 # μ = @closure t->SizedVector{1}(u0)
 # φ = open_loop(θ,xf,μ,τ) # guess trajectory
 ξ = pronto(θ,x0,φ,τ) # optimal trajectory
+
+plot_spin(ξ,τ)
