@@ -62,6 +62,12 @@ function termcost4(x,u,t,θ)
     1/2 * collect(x')*P*x
 end
 
+# function termcost4(x,u,t,θ)
+#     xf = (x_eig(4) + x_eig(5)) / sqrt(2)
+#     P = I(22) - inprod(xf)
+#     1/2 * collect(x')*P*x
+# end
+
 
 # ------------------------------- split system definitions ------------------------------- ##
 
@@ -120,8 +126,8 @@ function plot_split(ξ,τ)
     # foreach(i->lines!(ax, ts, ps[:,i]), 1:11)
 
     ax = Axis(fig[1:2,2]; title="fidelity")
-    fs = [ξ.x(t)'inprod(x_eig(i))*ξ.x(t) for t∈ts,i∈1:4]
-    foreach(i->lines!(ax, ts, fs[:,i]), 1:4)
+    fs = [ξ.x(t)'inprod(x_eig(i))*ξ.x(t) for t∈ts,i∈1:5]
+    foreach(i->lines!(ax, ts, fs[:,i]), 1:5)
 
     ax = Axis(fig[3,1:2]; title="inputs")
     is = eachindex(ξ.u)
@@ -151,7 +157,7 @@ end
 ## ------------------------------- demo: eigenstate 1->4 in 10s ------------------------------- ##
 
 x0 = SVector{22}(x_eig(1))
-xf = SVector{22}(x_eig(4))
+xf = SVector{22}((x_eig(4) + x_eig(5))/sqrt(2))
 t0,tf = τ = (0,1.5)
 
 
