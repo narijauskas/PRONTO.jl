@@ -83,6 +83,8 @@ function dynamics(x,u,t,θ)
 end
 
 stagecost(x,u,t,θ) = 1/2 *θ[1]*collect(u')I*u
+
+
 regR(x,u,t,θ) = θ.kr*I(1)
 function regQ(x,u,t,θ)
     x_re = x[1:11]
@@ -93,14 +95,13 @@ end
 
 
 
-PRONTO.Pf(α,μ,tf,θ::Split2) = SMatrix{22,22,Float64}(I(22) - α*α')
+# PRONTO.Pf(α,μ,tf,θ::Split2) = SMatrix{22,22,Float64}(I(22) - α*α')
 PRONTO.Pf(α,μ,tf,θ::Split4) = SMatrix{22,22,Float64}(I(22) - α*α')
 
 # ------------------------------- generate model and derivatives ------------------------------- ##
 
 # PRONTO.generate_model(Split2, dynamics, stagecost, termcost2, regQ, regR)
 PRONTO.generate_model(Split4, dynamics, stagecost, termcost4, regQ, regR)
-
 
 
 ## ------------------------------- plots ------------------------------- ##
@@ -157,7 +158,7 @@ end
 ## ------------------------------- demo: eigenstate 1->4 in 10s ------------------------------- ##
 
 x0 = SVector{22}(x_eig(1))
-xf = SVector{22}((x_eig(4) + x_eig(5))/sqrt(2))
+# xf = SVector{22}((x_eig(4) + x_eig(5))/sqrt(2))
 t0,tf = τ = (0,1.5)
 
 
