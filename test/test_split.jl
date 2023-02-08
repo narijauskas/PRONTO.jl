@@ -21,7 +21,7 @@ end
 # get the ith eigenstate
 function x_eig(i)
     n = 5
-    α = 7
+    α = 10
     v = -α/4
     H0 = SymTridiagonal(promote([4.0i^2 for i in -n:n], v*ones(2n))...)
     w = eigvecs(collect(H0)) # symbolic doesn't work here
@@ -74,7 +74,7 @@ end
 function dynamics(x,u,t,θ)
     ω = 1.0
     n = 5
-    α = 7
+    α = 10
     v = -α/4
     H0 = SymTridiagonal(promote([4.0i^2 for i in -n:n], v*ones(2n))...)
     H1 = v*im*Tridiagonal(ones(2n), zeros(2n+1), -ones(2n))
@@ -159,7 +159,7 @@ end
 
 x0 = SVector{22}(x_eig(1))
 # xf = SVector{22}((x_eig(4) + x_eig(5))/sqrt(2))
-t0,tf = τ = (0,1.5)
+t0,tf = τ = (0,2)
 
 
 θ = Split4(kl=0.01, kr=1, kq=1)
@@ -174,7 +174,7 @@ using MAT
 ts = t0:0.001:tf
 is = eachindex(ξ.u)
 us = [ξ.u(t)[i] for t∈ts, i∈is]
-file = matopen("Uopt_4hk_7V.mat", "w")
+file = matopen("Uopt_4hk_10V_2T.mat", "w")
 write(file, "Uopt", us)
 close(file)
 

@@ -21,7 +21,7 @@ end
 # get the ith eigenstate
 function x_eig(i)
     n = 5
-    α = 10 
+    α = 10
     v = -α/4
     H0 = SymTridiagonal(promote([4.0i^2 for i in -n:n], v*ones(2n))...)
     w = eigvecs(collect(H0)) # symbolic doesn't work here
@@ -81,7 +81,6 @@ PRONTO.Pf(α,μ,tf,θ::Reflect4) = SMatrix{44,44,Float64}(I(44))
 
 # ------------------------------- generate model and derivatives ------------------------------- ##
 
-# PRONTO.generate_model(Split2, dynamics, stagecost, termcost2, regQ, regR)
 PRONTO.generate_model(Reflect4, dynamics, stagecost, termcost4, regQ, regR)
 
 
@@ -99,14 +98,16 @@ function plot_reflect(ξ,τ)
     fig = Figure()
     ts = LinRange(τ...,10001)
 
-    ax = Axis(fig[1:2,1]; title="state")
+    # ax = Axis(fig[1:2,1]; title="state")
+    # is = eachindex(ξ.x)
+    # xs = [ξ.x(t)[i] for t∈ts, i∈is]
+    # foreach(i->lines!(ax, ts, xs[:,i]), is)
+    
+    ax = Axis(fig[1:2,1]; title="population")
     is = eachindex(ξ.x)
     xs = [ξ.x(t)[i] for t∈ts, i∈is]
-    foreach(i->lines!(ax, ts, xs[:,i]), is)
-    
-    # ax = Axis(fig[1:2,2]; title="population")
-    # ps = ([I(22) I(2)] * (xs.^2)')'
-    # foreach(i->lines!(ax, ts, ps[:,i]), 1:11)
+    ps = ([I(22) I(22)] * (xs.^2)')'
+    foreach(i->lines!(ax, ts, ps[:,i]), 1:11)
 
     # ax = Axis(fig[1:2,2]; title="fidelity")
     # fs = [ξ.x(t)'inprod(x_eig(i))*ξ.x(t) for t∈ts,i∈1:4]
@@ -128,12 +129,21 @@ end
 ψf = zeros(11,1)
 ψf[7:11] = x_eig(4)[7:11]
 x0 = SVector{44}(vec([ψ0;ψf;0*ψ0;0*ψf]))
-t0,tf = τ = (0,4)
+t0,tf = τ = (0,2.8)
 
 
 θ = Reflect4(kl=0.01, kr=1, kq=1)
 μ = @closure t->SVector{1}(1.0*sin(12*t))
 φ = open_loop(θ,x0,μ,τ)
-@time ξ = pronto(θ,x0,φ,τ; tol = 1e-4, maxiters = 50, limitγ = true)
+@time ξ = pronto(θ,x0,φ,τ; tol = 1e-6, maxiters = 100, limitγ = true)
 
 plot_reflect(ξ,τ)
+
+##
+using MAT
+ts = t0:0.001:tf
+is = eachindex(ξ.u)
+us = [ξ.u(t)[i] for t∈ts, i∈is]
+file = matopen("Uopt_4hk_mirror.mat", "w")
+write(file, "Uopt", us)
+close(file)
