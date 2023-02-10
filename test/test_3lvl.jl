@@ -61,9 +61,9 @@ function dynamics(x,u,t,θ)
     return mprod(-im*(H0+H1))*x
 end
 
-stagecost(x,u,t,θ) = 1/2 *θ[1]*collect(u')I*u
+# stagecost(x,u,t,θ) = 1/2 *θ[1]*collect(u')I*u
 
-# stagecost(x,u,t,θ) = 1/2*(θ.kl*collect(u')I*u + 0.1*collect(x')*mprod(diagm([0, 0, 1]))*x)
+stagecost(x,u,t,θ) = 1/2*(θ.kl*collect(u')I*u + 1*collect(x')*mprod(diagm([0, 0, 1]))*x)
 
 
 regR(x,u,t,θ) = θ.kr*I(1)
@@ -117,11 +117,11 @@ end
 ## ------------------------------- demo: eigenstate 1->2 in 5 ------------------------------- ##
 
 x0 = SVector{6}(x_eig(1))
-t0,tf = τ = (0,5)
+t0,tf = τ = (0,15)
 
 
 θ = lvl3(kl=0.01, kr=1, kq=1)
-μ = @closure t->SVector{1}(0.5*sin(t))
+μ = @closure t->SVector{1}(0.5*sin(10*t))
 φ = open_loop(θ,x0,μ,τ)
 @time ξ = pronto(θ,x0,φ,τ; tol = 1e-4, maxiters = 50, limitγ = true)
 
