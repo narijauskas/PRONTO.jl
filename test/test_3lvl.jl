@@ -127,13 +127,3 @@ t0,tf = τ = (0,15)
 
 
 plot_3lvl(ξ,τ)
-
-
-##
-using MAT
-ts = t0:0.001:tf
-is = eachindex(ξ.u)
-us = [ξ.u(t)[i] for t∈ts, i∈is]
-file = matopen("Uopt_8hk_36V_2T.mat", "w")
-write(file, "Uopt", us)
-close(file)
