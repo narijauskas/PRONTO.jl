@@ -59,12 +59,13 @@ function Qreg(x,u,t,θ)
     x_re = x[1:3]
     x_im = x[4:6]
     ψ = x_re + im*x_im
-    θ.kq*mprod(I(3) - ψ*ψ')
+    θ.kq*mprod(I(3))
 end
 
 function stagecost(x,u,t,θ)
     Rl = [0.01;;]
-    1/2 * Rl * collect(u')*u
+    Ql = inprod([0;1;0;0;0;0])
+    1/2 * Rl * collect(u')*u + 0.1 * 1/2 * collect(x')*Ql*x
 end
 
 function termcost(x,u,t,θ)
@@ -76,7 +77,7 @@ end
 PRONTO.generate_model(Lambda, dynamics, stagecost, termcost, Qreg, Rreg)
 
 # overwrite default behavior of Pf
-PRONTO.Pf(α,μ,tf,θ::Lambda) = SMatrix{6,6,Float64}(I(6) - inprod(α))
+PRONTO.Pf(α,μ,tf,θ::Lambda) = SMatrix{6,6,Float64}(I(6))
 
 ##
 
@@ -89,7 +90,7 @@ xf = @SVector [0.0, 0.0, 1.0, 0.0, 0.0,0.0]
 # u0 = [0.1]
 
 smooth(t, x0, xf, tf) = @. (xf - x0)*(tanh((2π/tf)*t - π) + 1)/2 + x0
-μ = @closure t->0.01*ones(4)
+μ = @closure t->0.5*ones(4)
 α = @closure t->smooth(t, x0, xf, tf)
 φ = PRONTO.Trajectory(θ,α,μ);
 
