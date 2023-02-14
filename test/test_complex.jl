@@ -52,7 +52,7 @@ stagecost(x,u,t,θ) = 1/2*(θ.kl*collect(u')I*u + 1*collect(x')*diagm([0, 0, 1])
 regR(x,u,t,θ) = θ.kr*I(1)
 
 function regQ(x,u,t,θ)
-    θ.kq*(I(3) - ψ*ψ')
+    θ.kq*(I(3) - x*x')
 end
 
 PRONTO.Pf(α,μ,tf,θ::lvl3) = SMatrix{3,3,Float64}(I(3) - α*α')
