@@ -1,70 +1,109 @@
-
-
-## ----------------------------------- dependencies ----------------------------------- ##
-
-
 using PRONTO
-using StaticArrays
-using LinearAlgebra
+using StaticArrays, LinearAlgebra
 
 
-
-NX = 4
-NU = 1
-NΘ = 0
-struct TwoSpin <: PRONTO.Model{4,1,2}
-    kr::Float64
-    kq::Float64
+function x_eig(i)
+    E0 = 0
+    E1 = 1
+    E2 = 5
+    H0 = diagm([E0, E1, E2])
+    w = eigvecs(collect(H0)) 
+    x_eig = w[:,i]
 end
 
 
-# ----------------------------------- model definition ----------------------------------- ##
-function dynamics(x,u,t,θ)
-    H0 = [0 0 1 0;0 0 0 -1;-1 0 0 0;0 1 0 0]
-    H1 = [0 -1 0 0;1 0 0 0;0 0 0 -1;0 0 1 0]
-    (H0 + u[1]*H1)*x
+# ------------------------------- 3lvl system to eigenstate 2 ------------------------------- ##
+
+@kwdef struct lvl3 <: Model{3,1,3}
+    kl::Float64 # stage cost gain
+    kr::Float64 # regulator r gain
+    kq::Float64 # regulator q gain
 end
 
-Rreg(x,u,t,θ) = θ[1]*I(NU)
-Qreg(x,u,t,θ) = θ[2]*I(NX)
-
-function stagecost(x,u,t,θ)
-    Rl = [0.01;;]
-    1/2 * collect(u')*Rl*u
-end
 
 function termcost(x,u,t,θ)
-    Pl = [0 0 0 0;0 1 0 0;0 0 0 0;0 0 0 1]
-    1/2*collect(x')*Pl*x
+    P = I(3) - x_eig(2)*x_eig(2)'
+    1/2 * collect(x')*P*x
 end
 
 
-# function PRONTO.preview(M::TwoSpin, ξ)
-# end
+# ------------------------------- 3lvl system definitions ------------------------------- ##
 
-PRONTO.generate_model(TwoSpin, dynamics, stagecost, termcost, Qreg, Rreg)
+function dynamics(x,u,t,θ)
+    E0 = 0
+    E1 = 1
+    E2 = 5
+    H0 = diagm([E0, E1, E2])
+    a1 = 0.1
+    a2 = 0.5
+    a3 = 0.3
+    Ω1 = a1*u[1]
+    Ω2 = a2*u[1]
+    Ω3 = a3*u[1]
+    H1 = [0 Ω1 Ω3;Ω1 0 Ω2;Ω3 Ω2 0]
+    return -im*(H0+H1)*x
+end
 
-# ----------------------------------- tests ----------------------------------- ##
+# stagecost(x,u,t,θ) = 1/2 *θ[1]*collect(u')I*u
 
-θ = TwoSpin(1,1)
-τ = t0,tf = 0,10
-
-x0 = @SVector [0.0, 1.0, 0.0, 0.0]
-xf = @SVector [1.0, 0.0, 0.0, 0.0]
-# u0 = [0.1]
-μ = @closure t->SizedVector{1}(0.1*sin(t))
-φ = open_loop(θ,xf,μ,τ)
-ξ = pronto(θ,x0,φ,τ)
-
-##
-# φ = PRONTO.guess_zi(M,θ,xf,u0,t0,tf)
-# @time ξ = pronto(M,θ,t0,tf,x0,u0,φ)
+stagecost(x,u,t,θ) = 1/2*(θ.kl*collect(u')I*u + 1*collect(x')*diagm([0, 0, 1])*x)
 
 
-using GLMakie
-fig = Figure(); ax = Axis(fig[1,1])
-ts = LinRange(t0,tf,10001)
-is = eachindex(ξ.x)
-xs = [ξ.x(t)[i] for t∈ts, i∈is]
-foreach(i->lines!(ax, ts, xs[:,i]), is)
-display(fig)
+regR(x,u,t,θ) = θ.kr*I(1)
+
+function regQ(x,u,t,θ)
+    θ.kq*(I(3) - ψ*ψ')
+end
+
+PRONTO.Pf(α,μ,tf,θ::lvl3) = SMatrix{3,3,Float64}(I(3) - α*α')
+
+# ------------------------------- generate model and derivatives ------------------------------- ##
+
+PRONTO.generate_model(lvl3, dynamics, stagecost, termcost, regQ, regR)
+
+
+## ------------------------------- plots ------------------------------- ##
+
+import Pkg: activate
+activate()
+using GLMakie, Statistics
+activate(".")
+include("../dev/plot_setup.jl")
+# plot_split(ξ,τ)
+
+function plot_3lvl(ξ,τ)
+    fig = Figure()
+    ts = LinRange(τ...,1001)
+
+    ax = Axis(fig[1:2,1]; title="state")
+    is = eachindex(ξ.x)
+    xs = [ξ.x(t)[i] for t∈ts, i∈is]
+    foreach(i->lines!(ax, ts, xs[:,i]), is)
+    
+    ax = Axis(fig[1:2,2]; title="population")
+    ps = ([I(3) I(3)] * (xs.^2)')'
+    foreach(i->lines!(ax, ts, ps[:,i]), 1:3)
+
+
+    ax = Axis(fig[3,1:2]; title="inputs")
+    is = eachindex(ξ.u)
+    us = [ξ.u(t)[i] for t∈ts, i∈is]
+    foreach(i->lines!(ax, ts, us[:,i]), is)
+
+    return fig
+end
+
+
+## ------------------------------- demo: eigenstate 1->2 in 5 ------------------------------- ##
+
+x0 = SVector{6}(x_eig(1))
+t0,tf = τ = (0,15)
+
+
+θ = lvl3(kl=0.01, kr=1, kq=1)
+μ = @closure t->SVector{1}(0.5*sin(10*t))
+φ = open_loop(θ,x0,μ,τ)
+@time ξ = pronto(θ,x0,φ,τ; tol = 1e-4, maxiters = 50, limitγ = true)
+
+
+plot_3lvl(ξ,τ)
