@@ -17,7 +17,7 @@ end
 
 # ------------------------------- mirror system on eigenstate 4 ------------------------------- ##
 
-@kwdef struct unit4 <: Model{28,1,3}
+@kwdef struct unit4 <: Model{36,1,3}
     kl::Float64 # stage cost gain
     kr::Float64 # regulator r gain
     kq::Float64 # regulator q gain
@@ -25,12 +25,12 @@ end
 
 
 function termcost(x,u,t,θ)
-    ψ0 = zeros(7,1)
-    ψ0[2] = 1
-    ψf = zeros(7,1)
-    ψf[6] = 1
+    ψ0 = zeros(9,1)
+    ψ0[3] = 1
+    ψf = zeros(9,1)
+    ψf[7] = 1
     xf = vec([-ψf;-ψ0;0*ψf;0*ψ0])
-    P = I(28)
+    P = I(36)
     1/2 * collect((x-xf)')*P*(x-xf)
 end
 
@@ -39,7 +39,7 @@ end
 
 function dynamics(x,u,t,θ)
     ω = 1.0
-    n = 3
+    n = 4
     α = 10
     v = -α/4
     H0 = SymTridiagonal(promote([4.0i^2 for i in -n:n], v*ones(2n))...)
@@ -55,11 +55,11 @@ stagecost(x,u,t,θ) = 1/2 *θ.kl*collect(u')I*u
 
 regR(x,u,t,θ) = θ.kr*I(1)
 function regQ(x,u,t,θ)
-    θ.kq*I(28)
+    θ.kq*I(36)
 end
 
 
-PRONTO.Pf(α,μ,tf,θ::unit4) = SMatrix{28,28,Float64}(I(28))
+PRONTO.Pf(α,μ,tf,θ::unit4) = SMatrix{36,36,Float64}(I(36))
 
 # ------------------------------- generate model and derivatives ------------------------------- ##
 
@@ -68,11 +68,11 @@ PRONTO.generate_model(unit4, dynamics, stagecost, termcost, regQ, regR)
 
 ## ------------------------------- demo: eigenstate 4->4 in 4 ------------------------------- ##
 
-ψ0 = zeros(7,1)
-ψ0[2] = 1
-ψf = zeros(7,1)
-ψf[6] = 1
-x0 = SVector{28}(vec([ψ0;ψf;0*ψ0;0*ψf]))
+ψ0 = zeros(9,1)
+ψ0[3] = 1
+ψf = zeros(9,1)
+ψf[7] = 1
+x0 = SVector{36}(vec([ψ0;ψf;0*ψ0;0*ψf]))
 t0,tf = τ = (0,2.88)
 
 
@@ -87,6 +87,6 @@ using MAT
 ts = t0:0.001:tf
 is = eachindex(ξ.u)
 us = [ξ.u(t)[i] for t∈ts, i∈is]
-file = matopen("Uopt_4hk_mirror.mat", "w")
+file = matopen("Uopt_4hk_mirror_4N.mat", "w")
 write(file, "Uopt", us)
 close(file)
