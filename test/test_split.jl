@@ -58,7 +58,8 @@ end
 
 
 function termcost4(x,u,t,θ)
-    P = I(22) - inprod(x_eig(1))
+    xf = (x_eig(4)-x_eig(5))/sqrt(2)
+    P = I(22) - inprod(xf)
     1/2 * collect(x')*P*x
 end
 
@@ -157,9 +158,9 @@ end
 
 ## ------------------------------- demo: eigenstate 1->4 in 10s ------------------------------- ##
 
-x0 = SVector{22}(x_eig(4))
+x0 = SVector{22}(x_eig(1))
 # xf = SVector{22}((x_eig(4) + x_eig(5))/sqrt(2))
-t0,tf = τ = (0,2)
+t0,tf = τ = (0,1.5)
 
 
 θ = Split4(kl=0.01, kr=1, kq=1)
@@ -174,7 +175,7 @@ using MAT
 ts = t0:0.001:tf
 is = eachindex(ξ.u)
 us = [ξ.u(t)[i] for t∈ts, i∈is]
-file = matopen("Uopt_4hk_Recomb.mat", "w")
+file = matopen("Uopt_4hk_1.5T-.mat", "w")
 write(file, "Uopt", us)
 close(file)
 
