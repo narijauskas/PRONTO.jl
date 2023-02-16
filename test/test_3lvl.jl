@@ -40,7 +40,7 @@ end
 
 function termcost(x,u,t,θ)
     P = I(6) - inprod(x_eig(2))
-    1/2 * collect(x')*P*x
+    1/2 * 10 * collect(x')*P*x
 end
 
 
@@ -63,7 +63,11 @@ end
 
 # stagecost(x,u,t,θ) = 1/2 *θ[1]*collect(u')I*u
 
-stagecost(x,u,t,θ) = 1/2*(θ.kl*collect(u')I*u + 1*collect(x')*mprod(diagm([0, 0, 1]))*x)
+function kll(t)
+    return 0.01+10*(exp(-2*t)+exp(2*t-30))
+end
+
+stagecost(x,u,t,θ) = 1/2*(kll(t)*collect(u')I*u + 1*collect(x')*mprod(diagm([0, 0, 1]))*x)
 
 
 regR(x,u,t,θ) = θ.kr*I(1)
