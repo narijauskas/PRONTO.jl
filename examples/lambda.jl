@@ -103,10 +103,10 @@ smooth(t, x0, xf, tf) = @. (xf - x0)*(tanh((2π/tf)*t - π) + 1)/2 + x0
 
 
 ##
-using MAT
-ts = t0:0.001:tf
-is = eachindex(ξ.u)
-us = [ξ.u(t)[i] for t∈ts, i∈is]
-file = matopen("Uopt_Lambda.mat", "w")
-write(file, "Uopt", us)
-close(file)
+# using MAT
+# ts = t0:0.001:tf
+# is = eachindex(ξ.u)
+# us = [ξ.u(t)[i] for t∈ts, i∈is]
+# file = matopen("Uopt_Lambda.mat", "w")
+# write(file, "Uopt", us)
+# close(file)
