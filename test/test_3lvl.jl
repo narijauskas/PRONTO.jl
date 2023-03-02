@@ -32,10 +32,11 @@ end
 
 # ------------------------------- 3lvl system to eigenstate 2 ------------------------------- ##
 
-@kwdef struct lvl3 <: Model{6,1,3}
+@kwdef struct lvl3 <: Model{6,1,4}
     kl::Float64 # stage cost gain
     kr::Float64 # regulator r gain
     kq::Float64 # regulator q gain
+    T::Float64 # time horizon T
 end
 
 
@@ -118,10 +119,13 @@ end
 ## ------------------------------- demo: eigenstate 1->2 in 5 ------------------------------- ##
 
 x0 = SVector{6}(x_eig(1))
-t0,tf = τ = (0,15)
 
 
-θ = lvl3(kl=0.01, kr=1, kq=1)
+
+θ = lvl3(kl=0.01, kr=1, kq=1, T=15)
+
+t0,tf = τ = (0,θ.T)
+
 # μ = @closure t->SVector{1}(0.5*sin(10*t))
 μ = @closure t->SVector{1}((π/tf)*exp(-(t-tf/2)^2/(tf^2))*cos(2*π*1*t))
 φ = open_loop(θ,x0,μ,τ)
