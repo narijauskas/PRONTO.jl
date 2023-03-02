@@ -65,11 +65,15 @@ end
 
 # stagecost(x,u,t,θ) = 1/2 * (θ[1]*collect(u')I*u + 1*collect(x')*mprod(diagm([0, 0, 1]))*x)
 
+# function kll(t)
+#     return θ.kl+10*(exp(-2*t)+exp(2*t-2*θ.T))
+# end
+
 function kll(t)
-    return 0.01+10*(exp(-2*t)+exp(2*t-30))
+    return max(θ.kl,100*10^(-2*t),100*10^(2*t-2*θ.T))
 end
 
-stagecost(x,u,t,θ) = 1/2*(kll(t)*collect(u')I*u + 1*collect(x')*mprod(diagm([0, 0, 1]))*x)
+stagecost(x,u,t,θ) = 15/2*(kll(t)*collect(u')I*u + 1*collect(x')*mprod(diagm([0, 0, 1]))*x)/θ.T
 
 
 regR(x,u,t,θ) = θ.kr*I(1)
@@ -116,20 +120,72 @@ function plot_3lvl(ξ,τ)
 end
 
 
-## ------------------------------- demo: eigenstate 1->2 in 5 ------------------------------- ##
+## ------------------------------- demo: eigenstate 0->1 in 10 ------------------------------- ##
 
 x0 = SVector{6}(x_eig(1))
 
+θ = lvl3(kl=0.01, kr=1, kq=1, T=10)
 
+t0,tf = τ = (0,θ.T)
+
+μ = @closure t->SVector{1}((π/tf)*exp(-(t-tf/2)^2/(tf^2))*cos(2*π*1*t))
+φ = open_loop(θ,x0,μ,τ)
+@time ξ = pronto(θ,x0,φ,τ; tol = 1e-4, maxiters = 50, limitγ = true)
+
+plot_3lvl(ξ,τ)
+
+## ------------------------------- demo: eigenstate 0->1 in 15 ------------------------------- ##
+
+x0 = SVector{6}(x_eig(1))
 
 θ = lvl3(kl=0.01, kr=1, kq=1, T=15)
 
 t0,tf = τ = (0,θ.T)
 
-# μ = @closure t->SVector{1}(0.5*sin(10*t))
 μ = @closure t->SVector{1}((π/tf)*exp(-(t-tf/2)^2/(tf^2))*cos(2*π*1*t))
 φ = open_loop(θ,x0,μ,τ)
 @time ξ = pronto(θ,x0,φ,τ; tol = 1e-4, maxiters = 50, limitγ = true)
 
+plot_3lvl(ξ,τ)
+
+## ------------------------------- demo: eigenstate 0->1 in 20 ------------------------------- ##
+
+x0 = SVector{6}(x_eig(1))
+
+θ = lvl3(kl=0.01, kr=1, kq=1, T=20)
+
+t0,tf = τ = (0,θ.T)
+
+μ = @closure t->SVector{1}((π/tf)*exp(-(t-tf/2)^2/(tf^2))*cos(2*π*1*t))
+φ = open_loop(θ,x0,μ,τ)
+@time ξ = pronto(θ,x0,φ,τ; tol = 1e-4, maxiters = 50, limitγ = true)
+
+plot_3lvl(ξ,τ)
+
+## ------------------------------- demo: eigenstate 0->1 in 50 ------------------------------- ##
+
+x0 = SVector{6}(x_eig(1))
+
+θ = lvl3(kl=0.01, kr=1, kq=1, T=50)
+
+t0,tf = τ = (0,θ.T)
+
+μ = @closure t->SVector{1}((π/tf)*exp(-(t-tf/2)^2/(tf^2))*cos(2*π*1*t))
+φ = open_loop(θ,x0,μ,τ)
+@time ξ = pronto(θ,x0,φ,τ; tol = 1e-4, maxiters = 50, limitγ = true)
+
+plot_3lvl(ξ,τ)
+
+## ------------------------------- demo: eigenstate 0->1 in 100 ------------------------------- ##
+
+x0 = SVector{6}(x_eig(1))
+
+θ = lvl3(kl=0.01, kr=1, kq=1, T=100)
+
+t0,tf = τ = (0,θ.T)
+
+μ = @closure t->SVector{1}((π/tf)*exp(-(t-tf/2)^2/(tf^2))*cos(2*π*1*t))
+φ = open_loop(θ,x0,μ,τ)
+@time ξ = pronto(θ,x0,φ,τ; tol = 1e-4, maxiters = 50, limitγ = true)
 
 plot_3lvl(ξ,τ)
