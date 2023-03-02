@@ -69,11 +69,11 @@ end
 #     return θ.kl+10*(exp(-2*t)+exp(2*t-2*θ.T))
 # end
 
-function kll(t)
-    return max(θ.kl,100*10^(-2*t),100*10^(2*t-2*θ.T))
-end
+# function kll(t,θ)
+#     return max(θ.kl,100*10^(-2*t),100*10^(2*t-2*θ.T))
+# end
 
-stagecost(x,u,t,θ) = 15/2*(kll(t)*collect(u')I*u + 1*collect(x')*mprod(diagm([0, 0, 1]))*x)/θ.T
+stagecost(x,u,t,θ) = 15/2*(max(θ.kl,100*10^(-2*t),100*10^(2*t-2*θ.T))*collect(u')I*u + 1*collect(x')*mprod(diagm([0, 0, 1]))*x)/θ.T
 
 
 regR(x,u,t,θ) = θ.kr*I(1)
