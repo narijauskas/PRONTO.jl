@@ -63,9 +63,10 @@ function Qreg(x,u,t,θ)
 end
 
 function stagecost(x,u,t,θ)
-    Rl = [0.01;;]
+    # Rl = [0.01;;]
+    Rl = 0.5*diagm([tanh(2*t-5)+1.1;0.01;-tanh(2*t-5)+1.1;0.01])
     Ql = inprod([0;1;0;0;0;0])
-    1/2 * Rl * collect(u')*u + 0.1 * 1/2 * collect(x')*Ql*x
+    1/2 *  collect(u')*Rl*u + 0.1 * 1/2 * collect(x')*Ql*x
 end
 
 function termcost(x,u,t,θ)
@@ -103,10 +104,10 @@ smooth(t, x0, xf, tf) = @. (xf - x0)*(tanh((2π/tf)*t - π) + 1)/2 + x0
 
 
 ##
-# using MAT
-# ts = t0:0.001:tf
-# is = eachindex(ξ.u)
-# us = [ξ.u(t)[i] for t∈ts, i∈is]
-# file = matopen("Uopt_Lambda.mat", "w")
-# write(file, "Uopt", us)
-# close(file)
+using MAT
+ts = t0:0.001:tf
+is = eachindex(ξ.u)
+us = [ξ.u(t)[i] for t∈ts, i∈is]
+file = matopen("Uopt_Lambda.mat", "w")
+write(file, "Uopt", us)
+close(file)
