@@ -58,7 +58,11 @@ end
 
 
 function termcost4(x,u,t,θ)
-    xf = (x_eig(4)-x_eig(5))/sqrt(2)
+    # xf = (x_eig(4)-x_eig(5))/sqrt(2)
+    xf = zeros(22)
+    xf[4] = 1
+    xf[8] = 1
+    xf = xf/sqrt(2)
     P = I(22) - inprod(xf)
     1/2 * collect(x')*P*x
 end
@@ -166,7 +170,7 @@ t0,tf = τ = (0,1.5)
 θ = Split4(kl=0.01, kr=1, kq=1)
 μ = @closure t->SVector{1}(0.5*sin(t))
 φ = open_loop(θ,x0,μ,τ)
-@time ξ = pronto(θ,x0,φ,τ; tol = 1e-4, maxiters = 50, limitγ = true)
+@time ξ = pronto(θ,x0,φ,τ; tol = 1e-3, maxiters = 100, limitγ = true)
 
 plot_split(ξ,τ)
 
@@ -175,7 +179,7 @@ using MAT
 ts = t0:0.001:tf
 is = eachindex(ξ.u)
 us = [ξ.u(t)[i] for t∈ts, i∈is]
-file = matopen("Uopt_4hk_1.5T-.mat", "w")
+file = matopen("Uopt_4hk_1.5T.mat", "w")
 write(file, "Uopt", us)
 close(file)
 
