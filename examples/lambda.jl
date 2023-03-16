@@ -64,7 +64,7 @@ end
 
 function stagecost(x,u,t,θ)
     # Rl = [0.01;;]
-    Rl = 0.5*diagm([tanh(2*t-5)+1.1;0.01;-tanh(2*t-5)+1.1;0.01])
+    Rl = 0.1*diagm([0.01;tanh(2*t-5)+1.1;0.01;-tanh(2*t-5)+1.1])
     Ql = inprod([0;1;0;0;0;0])
     1/2 *  collect(u')*Rl*u + 0.1 * 1/2 * collect(x')*Ql*x
 end
@@ -91,7 +91,7 @@ xf = @SVector [0.0, 0.0, 1.0, 0.0, 0.0,0.0]
 # u0 = [0.1]
 
 smooth(t, x0, xf, tf) = @. (xf - x0)*(tanh((2π/tf)*t - π) + 1)/2 + x0
-μ = @closure t->0.5*ones(4)
+μ = @closure t->0.01*[sin(t);0;sin(t);0]
 α = @closure t->smooth(t, x0, xf, tf)
 φ = PRONTO.Trajectory(θ,α,μ);
 
@@ -100,7 +100,7 @@ smooth(t, x0, xf, tf) = @. (xf - x0)*(tanh((2π/tf)*t - π) + 1)/2 + x0
 
 # μ = @closure t->SizedVector{1}(u0)
 # φ = open_loop(θ,xf,μ,τ) # guess trajectory
-ξ = pronto(θ,x0,φ,τ) # optimal trajectory
+ξ = pronto(θ,x0,φ,τ; tol = 1e-6, maxiters = 100, limitγ = true) # optimal trajectory
 
 
 ##
