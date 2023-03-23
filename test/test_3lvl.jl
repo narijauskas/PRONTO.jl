@@ -66,7 +66,6 @@ end
 
 stagecost(x,u,t,θ) = 15/2*(max(θ.kl,100*10^(-5*t),100*10^(5*(t-θ.T)))*collect(u')I*u + 1*collect(x')*mprod(diagm([0, 0, 1]))*x)/θ.T
 
-
 regR(x,u,t,θ) = θ.kr*I(1)
 
 function regQ(x,u,t,θ)
