@@ -47,7 +47,7 @@ end
 function dynamics(x,u,t,θ)
     H0 = [1 0;0 -1]
     H1 = [0 -1im;1im 0]
-    return mprod(-im*(H0+u*H1))*x
+    return mprod(-im*(H0+u[1]*H1))*x
 end
 
 
@@ -103,7 +103,7 @@ x0 = SVector{4}(x_eig(1))
 
 θ = spin2(kl=0.01, kr=1, kq=1)
 
-t0,tf = τ = (0,θ.T)
+t0,tf = τ = (0,10)
 
 μ = @closure t->SVector{1}(0.5*sin(t))
 φ = open_loop(θ,x0,μ,τ)
