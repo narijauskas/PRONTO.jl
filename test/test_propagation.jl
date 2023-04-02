@@ -20,8 +20,8 @@ end
 
 
 function x_eig(i)
-    n = 6
-    α = 20
+    n = 5
+    α = 10
     v = -α/4
     H0 = SymTridiagonal(promote([4.0i^2 for i in -n:n], v*ones(2n))...)
     w = eigvecs(collect(H0)) # symbolic doesn't work here
@@ -31,7 +31,7 @@ end
 
 # ------------------------------- split system to eigenstate 8 ------------------------------- ##
 
-@kwdef struct Split8 <: Model{26,1,3}
+@kwdef struct propagation <: Model{22,1,3}
     kl::Float64 # stage cost gain
     kr::Float64 # regulator r gain
     kq::Float64 # regulator q gain
@@ -39,7 +39,7 @@ end
 
 
 function termcost8(x,u,t,θ)
-    P = I(26) - inprod(x_eig(6))
+    P = 0
     1/2 * collect(x')*P*x
 end
 
@@ -48,8 +48,8 @@ end
 
 function dynamics(x,u,t,θ)
     ω = 1.0
-    n = 6
-    α = 20
+    n = 5
+    α = 10
     v = -α/4
     H0 = SymTridiagonal(promote([4.0i^2 for i in -n:n], v*ones(2n))...)
     H1 = v*im*Tridiagonal(ones(2n), zeros(2n+1), -ones(2n))
@@ -57,35 +57,35 @@ function dynamics(x,u,t,θ)
     return mprod(-im*ω*(H0 + sin(u[1])*H1 + (1-cos(u[1]))*H2) )*x
 end
 
-stagecost(x,u,t,θ) = 1/2 *θ[1]*collect(u')I*u
+stagecost(x,u,t,θ) = 1/2 * (θ[1]*collect(u')I*u + 0.3*collect(x')*mprod(diagm([1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1]))*x)
 
 
 regR(x,u,t,θ) = θ.kr*I(1)
 
 function regQ(x,u,t,θ)
-    x_re = x[1:13]
-    x_im = x[14:26]
+    x_re = x[1:11]
+    x_im = x[12:22]
     ψ = x_re + im*x_im
-    θ.kq*mprod(I(13) - ψ*ψ')
+    θ.kq*mprod(I(11) - ψ*ψ')
 end
 
-PRONTO.Pf(α,μ,tf,θ::Split8) = SMatrix{26,26,Float64}(I(26) - α*α')
+PRONTO.Pf(α,μ,tf,θ::propagation) = SMatrix{22,22,Float64}(I(22) - α*α')
 
 # ------------------------------- generate model and derivatives ------------------------------- ##
 
-PRONTO.generate_model(Split8, dynamics, stagecost, termcost8, regQ, regR)
+PRONTO.generate_model(propagation, dynamics, stagecost, termcost8, regQ, regR)
 
 
 ## ------------------------------- demo: eigenstate 1->8 in 10 ------------------------------- ##
 
-x0 = SVector{26}(x_eig(1))
-t0,tf = τ = (0,2)
+x0 = SVector{22}([0 0 0 1.0 0 0 0 1.0 0 0 0 0 0 0 0 0 0 0 0 0 0 0])
+t0,tf = τ = (0,1.94)
 
 
-θ = Split8(kl=0.01, kr=1, kq=1)
-μ = @closure t->SVector{1}(0.5*sin(t))
+θ = propagation(kl=0.01, kr=1, kq=1)
+μ = @closure t->SVector{1}(0.2*sin(16.1948*t))
 φ = open_loop(θ,x0,μ,τ)
-@time ξ = pronto(θ,x0,φ,τ; tol = 1e-6, maxiters = 50, limitγ = true)
+@time ξ = pronto(θ,x0,φ,τ; tol = 1e-4, maxiters = 50, limitγ = true)
 
 
 ##
@@ -93,6 +93,6 @@ using MAT
 ts = t0:0.001:tf
 is = eachindex(ξ.u)
 us = [ξ.u(t)[i] for t∈ts, i∈is]
-file = matopen("Uopt_6hk_20V_2T.mat", "w")
-write(file, "Uopt", us)
+file = matopen("Uopt_Prop_1.94T.mat", "w")
+write(file, "Uprop", us)
 close(file)

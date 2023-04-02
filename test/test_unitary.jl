@@ -26,9 +26,9 @@ end
 
 function termcost(x,u,t,θ)
     ψ0 = zeros(9,1)
-    ψ0[3] = 1
+    ψ0[2] = 1
     ψf = zeros(9,1)
-    ψf[7] = 1
+    ψf[8] = 1
     xf = vec([-ψf;-ψ0;0*ψf;0*ψ0])
     P = I(36)
     1/2 * collect((x-xf)')*P*(x-xf)
@@ -69,18 +69,17 @@ PRONTO.generate_model(unit4, dynamics, stagecost, termcost, regQ, regR)
 ## ------------------------------- demo: eigenstate 4->4 in 4 ------------------------------- ##
 
 ψ0 = zeros(9,1)
-ψ0[3] = 1
+ψ0[2] = 1
 ψf = zeros(9,1)
-ψf[7] = 1
+ψf[8] = 1
 x0 = SVector{36}(vec([ψ0;ψf;0*ψ0;0*ψf]))
-t0,tf = τ = (0,2.88)
+t0,tf = τ = (0,4)
 
 
 θ = unit4(kl=0.01, kr=1, kq=1)
-μ = @closure t->SVector{1}(1.0*sin(12*t))
+μ = @closure t->SVector{1}(1.0*sin(20*t))
 φ = open_loop(θ,x0,μ,τ)
 @time ξ = pronto(θ,x0,φ,τ; tol = 1e-3, maxiters = 100, limitγ = true)
-
 
 ##
 using MAT

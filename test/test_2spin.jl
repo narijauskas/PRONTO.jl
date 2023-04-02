@@ -27,7 +27,7 @@ function x_eig(i)
 end
 
 
-# ------------------------------- 3lvl system to eigenstate 2 ------------------------------- ##
+# ------------------------------- 2spin system to eigenstate 2 ------------------------------- ##
 
 @kwdef struct spin2 <: Model{4,1,3}
     kl::Float64 # stage cost gain
@@ -42,7 +42,7 @@ function termcost(x,u,t,θ)
 end
 
 
-# ------------------------------- 3lvl system definitions ------------------------------- ##
+# ------------------------------- 2spin system definitions ------------------------------- ##
 
 function dynamics(x,u,t,θ)
     H0 = [1 0;0 -1]
@@ -97,7 +97,7 @@ function plot_spin2(ξ,τ)
 end
 
 
-## ------------------------------- demo: eigenstate 0->1 in 2 ------------------------------- ##
+## ------------------------------- demo: eigenstate 1->2 in 10 ------------------------------- ##
 
 x0 = SVector{4}(x_eig(1))
 
