@@ -40,7 +40,7 @@ end
 
 function termcost2(x,u,t,θ)
     P = I(22) - inprod(x_eig(2))
-    1/2 * (100*collect(x')*P*x)
+    1/2 * collect(x')*P*x
 end
 
 
@@ -79,10 +79,10 @@ x0 = SVector{22}(x_eig(1))
 t0,tf = τ = (0,5)
 
 
-θ = Depth(kl=0.001, kr=1, kq=1)
-μ = @closure t->SVector{1}(5*sin(t))
+θ = Depth(kl=1e-5, kr=1, kq=1)
+μ = @closure t->SVector{1}(9+sin(4*t))
 φ = open_loop(θ,x0,μ,τ)
-@time ξ = pronto(θ,x0,φ,τ; tol = 1e-4, maxiters = 100, limitγ = true)
+@time ξ = pronto(θ,x0,φ,τ; tol = 1e-8, maxiters = 100, limitγ = true)
 
 
 ##
