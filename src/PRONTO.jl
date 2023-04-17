@@ -176,9 +176,10 @@ include("armijo.jl") # armijo step and projection
 fwd(τ) = extrema(τ)
 bkwd(τ) = reverse(fwd(τ))
 
+quantumγ = (ξ,ζ)->1/maximum(maximum(ζ.x(t) for t in t0:0.0001:tf))
 
 # solves for x(t),u(t)'
-function pronto(θ::Model{NX,NU,NΘ}, x0::StaticVector, φ, τ; limitγ=false, tol = 1e-5, maxiters = 20,verbose=true) where {NX,NU,NΘ}
+function pronto(θ::Model{NX,NU,NΘ}, x0::StaticVector, φ, τ; limitγ=(ξ,ζ)->1, tol = 1e-5, maxiters = 20,verbose=true) where {NX,NU,NΘ}
     t0,tf = τ
 
     for i in 1:maxiters
@@ -216,9 +217,8 @@ function pronto(θ::Model{NX,NU,NΘ}, x0::StaticVector, φ, τ; limitγ=false, t
         # print(ξ)
 
         # -------------- select γ via armijo step -------------- #
-        # γ = γmax; 
         aα=0.4; aβ=0.7
-        γ = limitγ ? min(1, 1/maximum(maximum(ζ.x(t) for t in t0:0.0001:tf))) : 1.0
+        γ = min(1,limitγ(ξ,ζ))
 
         local η
         while γ > aβ^25
