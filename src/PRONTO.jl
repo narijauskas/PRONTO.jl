@@ -176,7 +176,7 @@ include("armijo.jl") # armijo step and projection
 fwd(τ) = extrema(τ)
 bkwd(τ) = reverse(fwd(τ))
 
-quantumγ = (ξ,ζ,τ)->begin
+unit_sphere = (ξ,ζ,τ)->begin
     t0,tf = τ
     1/maximum(maximum(ζ.x(t) for t in LinRange(t0,tf,1000)))
 end
