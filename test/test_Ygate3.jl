@@ -40,7 +40,7 @@ end
 end
 
 
-function termcost(x,u,t,θ)
+function termcostY(x,u,t,θ)
     ψ1 = [0;1;0]
     ψ2 = [-1;0;0]
     xf = vec([0*ψ1;0*ψ2;ψ1;ψ2])
@@ -81,7 +81,7 @@ PRONTO.Pf(α,μ,tf,θ::ygate3) = SMatrix{12,12,Float64}(I(12))
 
 # ------------------------------- generate model and derivatives ------------------------------- ##
 
-PRONTO.generate_model(ygate3, dynamics, stagecost, termcost, regQ, regR)
+PRONTO.generate_model(ygate3, dynamics, stagecostY, termcost, regQ, regR)
 
 
 ## ------------------------------- demo: Ygate in 10 ------------------------------- ##
@@ -90,7 +90,7 @@ PRONTO.generate_model(ygate3, dynamics, stagecost, termcost, regQ, regR)
 ψ2 = [0;1;0]
 x0 = SVector{12}(vec([ψ1;ψ2;0*ψ1;0*ψ2]))
 
-θ = zgate3(kl=0.01, kr=1, kq=1, T=10.0)
+θ = ygate3(kl=0.01, kr=1, kq=1, T=10.0)
 
 t0,tf = τ = (0,θ.T)
 

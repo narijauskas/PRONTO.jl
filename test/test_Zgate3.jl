@@ -40,7 +40,7 @@ end
 end
 
 
-function termcost(x,u,t,θ)
+function termcostZ(x,u,t,θ)
     ψ1 = [1;0;0]
     ψ2 = [0;-1;0]
     xf = vec([ψ1;ψ2;0*ψ1;0*ψ2])
@@ -81,7 +81,7 @@ PRONTO.Pf(α,μ,tf,θ::zgate3) = SMatrix{12,12,Float64}(I(12))
 
 # ------------------------------- generate model and derivatives ------------------------------- ##
 
-PRONTO.generate_model(zgate3, dynamics, stagecost, termcost, regQ, regR)
+PRONTO.generate_model(zgate3, dynamics, stagecost, termcostZ, regQ, regR)
 
 
 ## ------------------------------- demo: Zgate in 10 ------------------------------- ##

@@ -40,7 +40,7 @@ end
 end
 
 
-function termcost(x,u,t,θ)
+function termcostX(x,u,t,θ)
     ψ1 = [1;0;0]
     ψ2 = [0;1;0]
     xf = vec([ψ2;ψ1;0*ψ2;0*ψ1])
@@ -81,7 +81,7 @@ PRONTO.Pf(α,μ,tf,θ::xgate3) = SMatrix{12,12,Float64}(I(12))
 
 # ------------------------------- generate model and derivatives ------------------------------- ##
 
-PRONTO.generate_model(xgate3, dynamics, stagecost, termcost, regQ, regR)
+PRONTO.generate_model(xgate3, dynamics, stagecost, termcostX, regQ, regR)
 
 
 ## ------------------------------- demo: Xgate in 10 ------------------------------- ##
