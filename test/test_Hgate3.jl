@@ -69,7 +69,8 @@ function dynamics(x,u,t,θ)
 end
 
 
-stagecost(x,u,t,θ) = 1/2* (θ.kl* collect(u')I*u + 0.3*collect(x')*mprod(diagm([0,0,1,0,0,1]))*x)
+# stagecost(x,u,t,θ) = 1/2* (θ.kl* collect(u')I*u + 0.3*collect(x')*mprod(diagm([0,0,1,0,0,1]))*x)
+stagecost(x,u,t,θ) = 1/2* (max(θ.kl,100*10^(-4*t),100*10^(4*(t-θ.T)))*collect(u')I*u + 0.3*collect(x')*mprod(diagm([0,0,1,0,0,1]))*x)
 
 regR(x,u,t,θ) = θ.kr*I(1)
 
@@ -100,7 +101,7 @@ t0,tf = τ = (0,θ.T)
 
 ##
 using MAT
-ts = t0:0.001:tf
+ts = t0:0.01:tf
 is = eachindex(ξ.u)
 us = [ξ.u(t)[i] for t∈ts, i∈is]
 file = matopen("Uopt_Hgate_10T.mat", "w")

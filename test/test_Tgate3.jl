@@ -30,9 +30,9 @@ function x_eig(i)
 end
 
 
-# ------------------------------- zgate3 system to eigenstate 2 ------------------------------- ##
+# ------------------------------- tgate3 system to eigenstate 2 ------------------------------- ##
 
-@kwdef struct zgate3 <: Model{12,1,4}
+@kwdef struct tgate3 <: Model{12,1,4}
     kl::Float64 # stage cost gain
     kr::Float64 # regulator r gain
     kq::Float64 # regulator q gain
@@ -40,16 +40,16 @@ end
 end
 
 
-function termcostZ(x,u,t,θ)
+function termcostT(x,u,t,θ)
     ψ1 = [1;0;0]
-    ψ2 = [0;-1;0]
-    xf = vec([ψ1;ψ2;0*ψ1;0*ψ2])
+    ψ2 = [0;sqrt(2)/2;0]
+    xf = vec([ψ1;ψ2;0*ψ1;ψ2])
     P = I(12)
     1/2 * collect((x-xf)')*P*(x-xf)
 end
 
 
-# ------------------------------- zgate3 system definitions ------------------------------- ##
+# ------------------------------- tgate3 system definitions ------------------------------- ##
 
 function dynamics(x,u,t,θ)
     E0 = 0
@@ -78,20 +78,20 @@ function regQ(x,u,t,θ)
     θ.kq*I(12)
 end
 
-PRONTO.Pf(α,μ,tf,θ::zgate3) = SMatrix{12,12,Float64}(I(12))
+PRONTO.Pf(α,μ,tf,θ::tgate3) = SMatrix{12,12,Float64}(I(12))
 
 # ------------------------------- generate model and derivatives ------------------------------- ##
 
-PRONTO.generate_model(zgate3, dynamics, stagecost, termcostZ, regQ, regR)
+PRONTO.generate_model(tgate3, dynamics, stagecost, termcostT, regQ, regR)
 
 
-## ------------------------------- demo: Zgate in 10 ------------------------------- ##
+## ------------------------------- demo: Tgate in 10 ------------------------------- ##
 
 ψ1 = [1;0;0]
 ψ2 = [0;1;0]
 x0 = SVector{12}(vec([ψ1;ψ2;0*ψ1;0*ψ2]))
 
-θ = zgate3(kl=0.01, kr=1, kq=1, T=10.0)
+θ = tgate3(kl=0.01, kr=1, kq=1, T=10.0)
 
 t0,tf = τ = (0,θ.T)
 
@@ -104,6 +104,6 @@ using MAT
 ts = t0:0.01:tf
 is = eachindex(ξ.u)
 us = [ξ.u(t)[i] for t∈ts, i∈is]
-file = matopen("Uopt_Zgate_10T.mat", "w")
+file = matopen("Uopt_Tgate_10T.mat", "w")
 write(file, "Uopt", us)
 close(file)

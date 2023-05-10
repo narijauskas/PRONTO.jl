@@ -69,7 +69,8 @@ function dynamics(x,u,t,θ)
 end
 
 
-stagecost(x,u,t,θ) = 1/2* (θ.kl* collect(u')I*u + 0.3*collect(x')*mprod(diagm([0,0,1,0,0,1]))*x)
+# stagecost(x,u,t,θ) = 1/2* (θ.kl* collect(u')I*u + 0.3*collect(x')*mprod(diagm([0,0,1,0,0,1]))*x)
+stagecost(x,u,t,θ) = 1/2* (max(θ.kl,100*10^(-4*t),100*10^(4*(t-θ.T)))*collect(u')I*u + 0.3*collect(x')*mprod(diagm([0,0,1,0,0,1]))*x)
 
 regR(x,u,t,θ) = θ.kr*I(1)
 
@@ -81,7 +82,7 @@ PRONTO.Pf(α,μ,tf,θ::ygate3) = SMatrix{12,12,Float64}(I(12))
 
 # ------------------------------- generate model and derivatives ------------------------------- ##
 
-PRONTO.generate_model(ygate3, dynamics, stagecostY, termcost, regQ, regR)
+PRONTO.generate_model(ygate3, dynamics, stagecost, termcostY, regQ, regR)
 
 
 ## ------------------------------- demo: Ygate in 10 ------------------------------- ##
@@ -100,7 +101,7 @@ t0,tf = τ = (0,θ.T)
 
 ##
 using MAT
-ts = t0:0.001:tf
+ts = t0:0.01:tf
 is = eachindex(ξ.u)
 us = [ξ.u(t)[i] for t∈ts, i∈is]
 file = matopen("Uopt_Ygate_10T.mat", "w")
