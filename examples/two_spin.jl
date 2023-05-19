@@ -1,49 +1,66 @@
 using PRONTO
-using StaticArrays
-using LinearAlgebra
+using StaticArrays, LinearAlgebra
 
-NX = 4
-NU = 1
-NΘ = 2
-struct TwoSpin <: PRONTO.Model{NX,NU,NΘ}
-    kr::Float64
-    kq::Float64
+function mprod(x) 
+    Re = I(2) 
+    Im = [0 -1; 1 0] 
+    M = kron(Re,real(x)) + kron(Im,imag(x)); 
+    return M 
 end
 
-
-# ----------------------------------- model definition ----------------------------------- ##
-function dynamics(x,u,t,θ)
-    H0 = [0 0 1 0;0 0 0 -1;-1 0 0 0;0 1 0 0]
-    H1 = [0 -1 0 0;1 0 0 0;0 0 0 -1;0 0 1 0]
-    (H0 + u[1]*H1)*x
+function inprod(x) 
+    i = Int(length(x)/2) 
+    a = x[1:i] 
+    b = x[i+1:end] 
+    P = [a*a'+b*b' -(a*b'+b*a'); a*b'+b*a' a*a'+b*b'] 
+    return P
 end
 
-Rreg(x,u,t,θ) = θ[1]*I(NU)
-Qreg(x,u,t,θ) = θ[2]*I(NX)
+function x_eig(i)
+    H0 = [0 1;1 0]
+    w = eigvecs(collect(H0)) 
+    x_eig = kron([1;0],w[:,i])
+end
 
-function stagecost(x,u,t,θ)
-    Rl = [0.01;;]
-    1/2 * collect(u')*Rl*u
+@kwdef struct Spin2 <: PRONTO.Model{4,1,3}
+    kl::Float64 # stage cost gain
+    kr::Float64 # regulator r gain
+    kq::Float64 # regulator q gain
 end
 
 function termcost(x,u,t,θ)
-    Pl = [0 0 0 0;0 1 0 0;0 0 0 0;0 0 0 1]
-    1/2*collect(x')*Pl*x
+    P = I(4) - inprod(x_eig(2))
+    1/2 * collect(x')*P*x
 end
 
-PRONTO.generate_model(TwoSpin, dynamics, stagecost, termcost, Qreg, Rreg)
+function dynamics(x,u,t,θ)
+    H0 = [0 1;1 0]
+    H1 = [0 -im;im 0]
+    return mprod(-im*(H0 + u[1]*H1) )*x
+end
 
-# overwrite default behavior of Pf
-PRONTO.Pf(α,μ,tf,θ::TwoSpin) = SMatrix{4,4,Float64}(I(4))
+stagecost(x,u,t,θ) = 1/2 *θ[1]*collect(u')I*u
 
-# ----------------------------------- tests ----------------------------------- ##
+regR(x,u,t,θ) = θ.kr*I(1)
 
-θ = TwoSpin(1,1)
-τ = t0,tf = 0,10
+function regQ(x,u,t,θ) 
+    x_re = x[1:2] 
+    x_im = x[3:4] 
+    ψ = x_re + im*x_im 
+    θ.kq*mprod(I(2) - ψ*ψ')
+end
 
-x0 = @SVector [0.0, 1.0, 0.0, 0.0]
-xf = @SVector [1.0, 0.0, 0.0, 0.0]
-u0 = [0.1]
-μ = @closure t->SizedVector{1}(u0)
-φ = open_loop(θ,xf,μ,τ) # guess trajectory
-ξ = pronto(θ,x0,φ,τ) # optimal trajectory
+PRONTO.Pf(α,μ,tf,θ::Spin2) = SMatrix{4,4,Float64}(I(4) - α*α')
+
+PRONTO.generate_model(Spin2, dynamics, stagecost, termcost, regQ, regR)
+
+x0 = SVector{4}(x_eig(1))
+t0,tf = τ = (0,10)
+
+θ = Spin2(kl=0.01, kr=1, kq=1)
+
+μ = @closure t->SVector{1}(0.5*sin(t))
+φ = open_loop(θ,x0,μ,τ)
+
+@time ξ = pronto(θ,x0,φ,τ; tol = 1e-5, maxiters = 50, limitγ = true)
+
