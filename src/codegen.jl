@@ -3,6 +3,7 @@
 using Base: invokelatest
 using MacroTools: striplines, prettify, postwalk, @capture
 
+global format::Function = identity
 
 # builds buffered versions by default, for an in-place version, use:
 struct InPlace end
@@ -62,6 +63,7 @@ function generate_model(T, user_f, user_l, user_p, user_Q, user_R)
     fxu = Ju(Jx(f))
     fuu = Ju(Ju(f))
 
+    #YO: can reload defs from inplace versions
     Lxx = lxx .+ sum(λ[k]*fxx[k,:,:] for k in 1:NX)
     Lxu = lxu .+ sum(λ[k]*fxu[k,:,:] for k in 1:NX)
     Luu = luu .+ sum(λ[k]*fuu[k,:,:] for k in 1:NX)
@@ -78,6 +80,50 @@ function generate_model(T, user_f, user_l, user_p, user_Q, user_R)
     iinfo("done!")
     nothing
 end
+
+function build_vars(T)
+    NX = nx(T); NU = nu(T)
+    @variables x[1:NX] u[1:NU] t λ[1:NX]
+    x = collect(x)
+    u = collect(u)
+    t = t
+    θ = SymbolicModel(T)
+    λ = collect(λ)
+
+    return (x,u,t,θ,λ)
+end
+
+#FUTURE: options to make pretty (or add other postprocessing), save to file, etc.
+function build_f(T, user_f)
+    info("generating the $(as_bold(T)) model")
+    iinfo("initializing symbolics...")
+    NX = nx(T)
+    NU = nu(T)
+    (x,u,t,θ,λ) = build_vars(T)
+
+    Jx,Ju = Jacobian.([x,u])
+
+    iinfo("tracing functions for $T...")
+    f = invokelatest(user_f, x, u, t, θ)
+    
+    build(InPlace(), :(f!(out,x,u,t,θ::$T)), f)
+
+    fx = Jx(f)
+    fu = Ju(f)
+
+    build(Size(NX), :(f(x,u,t,θ::$T)), f)
+    build(Size(NX,NX), :(fx(x,u,t,θ::$T)), fx)
+    build(Size(NX,NU), :(fu(x,u,t,θ::$T)), fu)
+
+    fxx = Jx(Jx(f))
+    fxu = Ju(Jx(f))
+    fuu = Ju(Ju(f))
+    nothing
+end
+
+
+
+
 
 
 
@@ -112,14 +158,14 @@ SType(::Val, sz::Size{S}) where {S} = SArray{Tuple{S...}, Float64, length(S), pr
 
 
 #MAYBE: do we actually want to save the whole model to a file?
-function build(sz, hdr, sym; format = identity, file=nothing)
+function build(sz, hdr, sym; file=nothing)
     body = tmap(enumerate(sym)) do (i,x)
         :(out[$i] = $(format(toexpr(x))))
     end
     @capture(hdr, name_(args__))
     ex = _build(sz, name, args, body)
     file = tempname()*".jl"
-    write(file,string(clean(ex)))
+    write(file, string(clean(ex)))
     Base.include(Main, file)
     iiinfo("generated $hdr")
     # eval(ex)

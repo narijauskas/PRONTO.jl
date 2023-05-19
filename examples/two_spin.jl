@@ -11,7 +11,7 @@ struct TwoSpin <: PRONTO.Model{NX,NU,NΘ}
 end
 
 
-# ----------------------------------- model definition ----------------------------------- ##
+## ----------------------------------- model definition ----------------------------------- ##
 function dynamics(x,u,t,θ)
     H0 = [0 0 1 0;0 0 0 -1;-1 0 0 0;0 1 0 0]
     H1 = [0 -1 0 0;1 0 0 0;0 0 0 -1;0 0 1 0]
@@ -31,19 +31,46 @@ function termcost(x,u,t,θ)
     1/2*collect(x')*Pl*x
 end
 
+
+@dynamics TwoSpin begin
+    H0 = [0 0 1 0;0 0 0 -1;-1 0 0 0;0 1 0 0]
+    H1 = [0 -1 0 0;1 0 0 0;0 0 0 -1;0 0 1 0]
+    (H0 + u[1]*H1)*x
+end
+
+@model_f TwoSpin begin
+    H0 = [0 0 1 0;0 0 0 -1;-1 0 0 0;0 1 0 0]
+    H1 = [0 -1 0 0;1 0 0 0;0 0 0 -1;0 0 1 0]
+    (H0 + u[1]*H1)*x
+end
+
+@model_l TwoSpin begin
+    Rl = [0.01;;]
+    1/2 * collect(u')*Rl*u
+end
+
+@regulatorQ TwoSpin θ[1]*I(NU)
+@regulatorR TwoSpin θ[2]*I(NX)
+
+
 PRONTO.generate_model(TwoSpin, dynamics, stagecost, termcost, Qreg, Rreg)
+# PRONTO.build_f
+# PRONTO.build_l
+# PRONTO.build_L
+# PRONTO.build_p
+# PRONTO.build_QR
 
 # overwrite default behavior of Pf
 PRONTO.Pf(α,μ,tf,θ::TwoSpin) = SMatrix{4,4,Float64}(I(4))
 
-# ----------------------------------- tests ----------------------------------- ##
+## ----------------------------------- tests ----------------------------------- ##
 
-θ = TwoSpin(1,1)
+θ = TwoSpin(1,1) # make an instance of the mode.
 τ = t0,tf = 0,10
 
 x0 = @SVector [0.0, 1.0, 0.0, 0.0]
 xf = @SVector [1.0, 0.0, 0.0, 0.0]
 u0 = [0.1]
 μ = @closure t->SizedVector{1}(u0)
-φ = open_loop(θ,xf,μ,τ) # guess trajectory
-ξ = pronto(θ,x0,φ,τ) # optimal trajectory
+φ = open_loop(θ, xf, μ, τ) # guess trajectory
+ξ = pronto(θ, x0, φ, τ) # optimal trajectory
