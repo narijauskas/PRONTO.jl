@@ -38,22 +38,32 @@ end
     (H0 + u[1]*H1)*x
 end
 
-@model_f TwoSpin begin
-    H0 = [0 0 1 0;0 0 0 -1;-1 0 0 0;0 1 0 0]
-    H1 = [0 -1 0 0;1 0 0 0;0 0 0 -1;0 0 1 0]
-    (H0 + u[1]*H1)*x
-end
 
-@model_l TwoSpin begin
+@stage_cost TwoSpin begin
     Rl = [0.01;;]
     1/2 * collect(u')*Rl*u
+end
+
+@terminal_cost TwoSpin begin
+    Pl = [0 0 0 0;0 1 0 0;0 0 0 0;0 0 0 1]
+    1/2*collect(x')*Pl*x
 end
 
 @regulatorQ TwoSpin θ[1]*I(NU)
 @regulatorR TwoSpin θ[2]*I(NX)
 
+@lagrangian TwoSpin
 
 PRONTO.generate_model(TwoSpin, dynamics, stagecost, termcost, Qreg, Rreg)
+PRONTO.build_f(TwoSpin, dynamics)
+PRONTO.build_l(TwoSpin, stagecost)
+PRONTO.build_p(TwoSpin, termcost)
+
+
+
+
+
+
 # PRONTO.build_f
 # PRONTO.build_l
 # PRONTO.build_L

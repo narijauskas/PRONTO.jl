@@ -81,51 +81,99 @@ function generate_model(T, user_f, user_l, user_p, user_Q, user_R)
     nothing
 end
 
-function build_vars(T)
-    NX = nx(T); NU = nu(T)
+function init_syms(T)
+    NX = nx(T)
+    NU = nu(T)
     @variables x[1:NX] u[1:NU] t λ[1:NX]
     x = collect(x)
     u = collect(u)
     t = t
     θ = SymbolicModel(T)
     λ = collect(λ)
-
-    return (x,u,t,θ,λ)
+    Jx,Ju = Jacobian.([x,u])
+    return (NX,NU,x,u,t,θ,λ,Jx,Ju)
 end
 
 #FUTURE: options to make pretty (or add other postprocessing), save to file, etc.
 function build_f(T, user_f)
-    info("generating the $(as_bold(T)) model")
-    iinfo("initializing symbolics...")
-    NX = nx(T)
-    NU = nu(T)
-    (x,u,t,θ,λ) = build_vars(T)
+    info("building dynamics methods for $(as_bold(T))")
+    NX,NU,x,u,t,θ,λ,Jx,Ju = init_syms(T)
 
-    Jx,Ju = Jacobian.([x,u])
-
-    iinfo("tracing functions for $T...")
     f = invokelatest(user_f, x, u, t, θ)
-    
+
     build(InPlace(), :(f!(out,x,u,t,θ::$T)), f)
-
-    fx = Jx(f)
-    fu = Ju(f)
-
     build(Size(NX), :(f(x,u,t,θ::$T)), f)
-    build(Size(NX,NX), :(fx(x,u,t,θ::$T)), fx)
-    build(Size(NX,NU), :(fu(x,u,t,θ::$T)), fu)
 
-    fxx = Jx(Jx(f))
-    fxu = Ju(Jx(f))
-    fuu = Ju(Ju(f))
-    nothing
+    build(Size(NX,NX), :(fx(x,u,t,θ::$T)), Jx(f))
+    build(Size(NX,NU), :(fu(x,u,t,θ::$T)), Ju(f))
+    return nothing
 end
 
+function build_l(T, user_l)
+    info("building stage cost methods for $(as_bold(T))")
+    NX,NU,x,u,t,θ,λ,Jx,Ju = init_syms(T)
 
+    l = invokelatest(user_l, x, u, t, θ)
+    lx = reshape(Jx(l), NX)
+    lu = reshape(Ju(l), NU)
 
+    build(Size(1), :(l(x,u,t,θ::$T)), l)
+    build(Size(NX), :(lx(x,u,t,θ::$T)), lx)
+    build(Size(NU), :(lu(x,u,t,θ::$T)), lu)
 
+    build(Size(NX,NX), :(lxx(x,u,t,θ::$T)), Jx(lx))
+    build(Size(NX,NU), :(lxu(x,u,t,θ::$T)), Ju(lx))
+    build(Size(NU,NU), :(luu(x,u,t,θ::$T)), Ju(lu))
+    return nothing
+end
 
+function build_p(T, user_p)
+    info("building terminal cost methods for $(as_bold(T))")
+    NX,NU,x,u,t,θ,λ,Jx,Ju = init_syms(T)
 
+    p = invokelatest(user_p, x, u, t, θ)
+    px = reshape(Jx(p), NX)
+
+    build(Size(1), :(p(x,u,t,θ::$T)), p)
+    build(Size(NX), :(px(x,u,t,θ::$T)), px)
+    build(Size(NX,NX), :(pxx(x,u,t,θ::$T)), Jx(px))
+    return nothing
+end
+
+function build_Q(T, user_Q)
+    info("building regulator Q method for $(as_bold(T))")
+    NX,NU,x,u,t,θ,λ,Jx,Ju = init_syms(T)
+
+    Q = invokelatest(user_Q, x, u, t, θ)
+    build(Size(NX,NX), :(Q(x,u,t,θ::$T)), Q)
+    return nothing
+end
+
+function build_R(T, user_R)
+    info("building regulator R method for $(as_bold(T))")
+    NX,NU,x,u,t,θ,λ,Jx,Ju = init_syms(T)
+
+    R = invokelatest(user_R, x, u, t, θ)
+    build(Size(NU,NU), :(R(x,u,t,θ::$T)), R)
+    return nothing
+end
+
+function build_L(T, user_R)
+    info("building lagrangian methods for $(as_bold(T))")
+    NX,NU,x,u,t,θ,λ,Jx,Ju = init_syms(T)
+
+    # invokelatest(lxx())
+
+    
+    #YO: can reload defs from inplace versions
+    Lxx = lxx .+ sum(λ[k]*fxx[k,:,:] for k in 1:NX)
+    Lxu = lxu .+ sum(λ[k]*fxu[k,:,:] for k in 1:NX)
+    Luu = luu .+ sum(λ[k]*fuu[k,:,:] for k in 1:NX)
+
+    build(Size(NX,NX), :(Lxx(λ,x,u,t,θ::$T)), Lxx)
+    build(Size(NX,NU), :(Lxu(λ,x,u,t,θ::$T)), Lxu)
+    build(Size(NU,NU), :(Luu(λ,x,u,t,θ::$T)), Luu)
+end
 
 # append ! to a symbol, eg. :name -> :name!
 _!(ex) = Symbol(String(ex)*"!")
@@ -167,7 +215,7 @@ function build(sz, hdr, sym; file=nothing)
     file = tempname()*".jl"
     write(file, string(clean(ex)))
     Base.include(Main, file)
-    iiinfo("generated $hdr")
+    iinfo("$hdr\t"*as_color(crayon"dark_gray", "[$file]"))
     # eval(ex)
 end
 
