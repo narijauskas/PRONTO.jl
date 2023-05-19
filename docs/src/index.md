@@ -52,10 +52,10 @@ function x_eig(i)
 end
 ```
 
-We can name our model `Spin2`, where `{4,1,3}` represents the number of states $x,|\psi\rangle$, the number of inputs $u, \phi$ and the number of parameters `kl, kr, kq`.
+We can name our model `Spin2`, where `{4,1,3}` represents the 4 states $x,|\psi\rangle$, the single input $u, \phi$ and the 3 parameters `kl, kr, kq`.
 
 ```julia
-@kwdef struct Spin2 <: Model{4,1,3}
+@kwdef struct Spin2 <: PRONTO.Model{4,1,3}
     kl::Float64 # stage cost gain
     kr::Float64 # regulator r gain
     kq::Float64 # regulator q gain
@@ -71,7 +71,7 @@ function termcost(x,u,t,θ)
 end
 ```
 
-We convert the the Schr$\"{o}$dinger equation
+We convert the the Schrödinger equation
 $i|\dot{\psi}(t)\rangle = (\mathcal{H_0} + \phi(t)\mathcal{H_1})|\psi(t)\rangle$ into the system dynamics $\dot{x}(t) = H(u)x$
 
 ```julia
@@ -92,7 +92,7 @@ as
 stagecost(x,u,t,θ) = 1/2 *θ[1]*collect(u')I*u
 ```
 
-Regulator
+### Regulator
 ```julia
 regR(x,u,t,θ) = θ.kr*I(1)
 
@@ -111,6 +111,58 @@ We have finished defining our model! Now it is the time to generate the model so
 ```julia
 PRONTO.generate_model(Spin2, dynamics, stagecost, termcost, regQ, regR)
 ```
+PRONTO now generates optimal function kernels for it's own internal use.
+```
+[PRONTO: generating the TwoSpin model
+    > initializing symbolics...
+    > tracing functions for TwoSpin...
+        > generated f!(out, x, u, t, θ::TwoSpin)
+        > generated Q(x, u, t, θ::TwoSpin)
+        > generated R(x, u, t, θ::TwoSpin)
+        > generated f(x, u, t, θ::TwoSpin)
+        > generated fx(x, u, t, θ::TwoSpin)
+        > generated fu(x, u, t, θ::TwoSpin)
+        > generated l(x, u, t, θ::TwoSpin)
+        > generated lx(x, u, t, θ::TwoSpin)
+        > generated lu(x, u, t, θ::TwoSpin)
+        > generated lxx(x, u, t, θ::TwoSpin)
+        > generated lxu(x, u, t, θ::TwoSpin)
+        > generated luu(x, u, t, θ::TwoSpin)
+        > generated Lxx(λ, x, u, t, θ::TwoSpin)
+        > generated Lxu(λ, x, u, t, θ::TwoSpin)
+        > generated Luu(λ, x, u, t, θ::TwoSpin)
+        > generated p(x, u, t, θ::TwoSpin)
+        > generated px(x, u, t, θ::TwoSpin)
+        > generated pxx(x, u, t, θ::TwoSpin)
+    > done!
+```
+They look like this (for example):
+```julia
+function PRONTO.fx(x, u, t, θ::TwoSpin)
+    out = (MMatrix{4, 4, Float64})(undef)
+    @inbounds begin
+            out[1] = 0
+            out[2] = (getindex)(u, 1)
+            out[3] = -1
+            out[4] = 0
+            out[5] = (*)(-1, (getindex)(u, 1))
+            out[6] = 0
+            out[7] = 0
+            out[8] = 1
+            out[9] = 1
+            out[10] = 0
+            out[11] = 0
+            out[12] = (getindex)(u, 1)
+            out[13] = 0
+            out[14] = -1
+            out[15] = (*)(-1, (getindex)(u, 1))
+            out[16] = 0
+        end
+    return (SMatrix{4, 4, Float64})(out)
+end
+```
+
+
 
 We now show how to solve the problem. The initial state is the $|0\rangle$ state `x_eig(1)`, and we start the system at time $0$ `t0` and end at $2$ `tf`.
 
@@ -119,7 +171,7 @@ x0 = SVector{4}(x_eig(1))
 t0,tf = τ = (0,2)
 ```
 
-Parameters
+### Parameters
 ```julia
 θ = Split8(kl=0.01, kr=1, kq=1)
 ```
