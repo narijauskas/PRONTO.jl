@@ -12,23 +12,28 @@ export generate_model, InPlace
 export build
 
 macro dynamics(T, ex)
-    :(build_f($(esc(T)), (x,u,t,θ)->$(esc(ex))))
+    fn = :((x,u,t,θ)->$ex)
+    :(build_f($(esc(T)), $(esc(fn))))
 end
 
 macro stage_cost(T, ex)
-    :(build_l($(esc(T)), (x,u,t,θ)->$(esc(ex))))
+    fn = :((x,u,t,θ)->$ex)
+    :(build_l($(esc(T)), $(esc(fn))))
 end
 
 macro terminal_cost(T, ex)
-    :(build_p($(esc(T)), (x,u,t,θ)->$(esc(ex))))
+    fn = :((x,u,t,θ)->$ex)
+    :(build_p($(esc(T)), $(esc(fn))))
 end
 
 macro regulatorQ(T, ex)
-    :(build_Q($(esc(T)), (x,u,t,θ)->$(esc(ex))))
+    fn = :((x,u,t,θ)->$ex)
+    :(build_Q($(esc(T)), $(esc(fn))))
 end
 
 macro regulatorR(T, ex)
-    :(build_R($(esc(T)), (x,u,t,θ)->$(esc(ex))))
+    fn = :((x,u,t,θ)->$ex)
+    :(build_R($(esc(T)), $(esc(fn))))
 end
 
 macro lagrangian(T)
@@ -113,9 +118,9 @@ function init_syms(T)
     @variables x[1:NX] u[1:NU] t λ[1:NX]
     x = collect(x)
     u = collect(u)
+    λ = collect(λ)
     t = t
     θ = SymbolicModel(T)
-    λ = collect(λ)
     Jx,Ju = Jacobian.([x,u])
     M = :($(nameof(T)){T})
     return (NX,NU,x,u,t,θ,λ,Jx,Ju,M)
@@ -154,7 +159,7 @@ function build_l(T, user_l)
     l = invokelatest(user_l, x, u, t, θ)
     lx = reshape(Jx(l), NX)
     lu = reshape(Ju(l), NU)
-
+    # return l
     build(Size(1), :(l(x,u,t,θ::$M)), l)
     build(Size(NX), :(lx(x,u,t,θ::$M)), lx)
     build(Size(NU), :(lu(x,u,t,θ::$M)), lu)
@@ -260,10 +265,14 @@ SType(::Val{1}, sz::Size{S}) where {S} = :(SVector{$(S...), T})
 SType(::Val{2}, sz::Size{S}) where {S} = :(SMatrix{$(S...), T})
 SType(::Val, sz::Size{S}) where {S} = :(SArray{Tuple{$(S...)}, T, $(length(S)), $(prod(S))})
 
+function tmaparr(f, args...) 
+    x = tmap(f, args...)
+    return x isa AbstractArray ? x : [x]
+end
 
 #MAYBE: do we actually want to save the whole model to a file?
 function build(sz, hdr, sym; file=nothing)
-    body = tmap(enumerate(sym)) do (i,x)
+    body = tmaparr(enumerate(sym)) do (i,x)
         :(out[$i] = $(format(toexpr(x))))
     end
     @capture(hdr, name_(args__))

@@ -20,14 +20,22 @@ end
     (H0 + u[1]*H1)*x
 end
 
+θ = PRONTO.SymbolicModel(TwoSpin)
+x = Symbolics.variables(:x, 1:NX)
+u = Symbolics.variables(:u, 1:NU)
+t = Symbolics.variables(:t)
+
+PRONTO.f!(out, x, u, t, θ)
+out
+
 @stage_cost TwoSpin begin
     Rl = [0.01;;]
-    1/2 * collect(u')*Rl*u
+    1/2 * u'*Rl*u
 end
 
 @terminal_cost TwoSpin begin
     Pl = [0 0 0 0;0 1 0 0;0 0 0 0;0 0 0 1]
-    1/2*collect(x')*Pl*x
+    1/2*x'*Pl*x
 end
 
 @regulatorQ TwoSpin θ.kq*I(NX)
