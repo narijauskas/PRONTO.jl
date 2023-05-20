@@ -12,6 +12,7 @@ NΘ = 2
     kq::T = 1.0
 end
 
+
 @dynamics TwoSpin begin
     H0 = [0 0 1 0;0 0 0 -1;-1 0 0 0;0 1 0 0]
     H1 = [0 -1 0 0;1 0 0 0;0 0 0 -1;0 0 1 0]
@@ -36,15 +37,3 @@ end
 PRONTO.Pf(α,μ,tf,θ::TwoSpin{T}) where T = SMatrix{4,4,T}(I(4))
 
 info(PRONTO.as_bold("TwoSpin")*" model ready")
-
-## ----------------------------------- run optimization ----------------------------------- ##
-
-θ = TwoSpin()
-τ = t0,tf = 0,10
-
-x0 = @SVector [0.0, 1.0, 0.0, 0.0]
-xf = @SVector [1.0, 0.0, 0.0, 0.0]
-μ = t->[0.1]
-φ = open_loop(θ, xf, μ, τ) # guess trajectory
-ξ = pronto(θ, x0, φ, τ) # optimal trajectory
-@time ξ = pronto(θ, x0, φ, τ) # optimal trajectory

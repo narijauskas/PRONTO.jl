@@ -4,26 +4,27 @@ module PRONTO
 using FunctionWrappers: FunctionWrapper
 using StaticArrays
 using FastClosures
-export @closure
-
 using Base: @kwdef
-export @kwdef
 
 import LinearAlgebra
 using LinearAlgebra: mul!, I
-using UnicodePlots
+
 using MacroTools
 using SparseArrays
 using MatrixEquations
 
+
 #FUTURE: using OrdinaryDiffEq?
 using DifferentialEquations
-using Symbolics
-using Symbolics: derivative
-using SymbolicUtils.Code
-export Num # reexport needed for codegen macro scoping
+#TODO: support this
 
-using ThreadTools
+using Symbolics # code generation
+using Symbolics: derivative # code generation
+using SymbolicUtils.Code # code generation
+export Num # this reexport is needed for codegen macro scoping
+using ThreadTools # code generation
+
+using UnicodePlots # data representation
 
 using Dates: now
 

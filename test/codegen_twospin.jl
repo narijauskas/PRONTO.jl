@@ -1,5 +1,5 @@
-using Test, PRONTO
-
+using PRONTO
+using Test
 using StaticArrays
 using LinearAlgebra
 using Base: @kwdef
@@ -9,11 +9,11 @@ NU = 1
 NΘ = 2
 
 @kwdef struct TwoSpin{T} <: PRONTO.Model{NX,NU,NΘ}
-    kr::T = 1
-    kq::T = 1
+    kr::T = 1.0
+    kq::T = 1.0
 end
 
-## ----------------------------------- build ----------------------------------- ##
+## ----------------------------------- generate solver kernel ----------------------------------- ##
 
 @dynamics TwoSpin begin
     H0 = [0 0 1 0;0 0 0 -1;-1 0 0 0;0 1 0 0]
@@ -35,30 +35,59 @@ end
 @regulatorR TwoSpin θ.kr*I(NU)
 @lagrangian TwoSpin
 
+
+# overwrite default behavior of Pf
+PRONTO.Pf(α,μ,tf,θ::TwoSpin{T}) where T = SMatrix{4,4,T}(I(4))
+
+
 ## ----------------------------------- test ----------------------------------- ##
 
-
-
-
-
-
-θ = symbolic(TwoSpin)
-x = symbolic(:x, 1:NX)
-u = symbolic(:u, 1:NU)
-t = symbolic(:t)
-
-PRONTO.f(x,u,t,θ)
-PRONTO.fx(x,u,t,θ)
-PRONTO.fu(x,u,t,θ)
+# ex = PRONTO.f(x,u,t,θ)
+# PRONTO.fx(x,u,t,θ)
+# PRONTO.fu(x,u,t,θ)
 
 
 # symbolic(:x, 1:NX)
 
-θ0 = TwoSpin{Float64}() # make an instance of the mode.
-τ = t0,tf = 0,10
+θ = TwoSpin{Float64}()
+t = 0.0
+u = @SVector [0.1]
+x = @SVector [0.5, 0.6, 0.7, 0.8]
 
-x0 = @SVector [0.0, 1.0, 0.0, 0.0]
-xf = @SVector [1.0, 0.0, 0.0, 0.0]
-u0 = 0.1
+##
 
-PRONTO.fx(x0,u0,t0,θ0)
+@testset "dynamics" begin
+    @test PRONTO.f(x,u,t,θ) == [
+        x[3] - u[1]*x[2];
+        -x[4] + u[1]*x[1];
+        -x[1] - u[1]*x[4];
+        x[2] + u[1]x[3];
+    ]
+end
+
+@testset "dynamics derivatives" begin
+    @test PRONTO.fx(x,u,t,θ) == [
+        0 -u[1] 1 0;
+        u[1] 0 0 -1;
+        -1 0 0 -u[1];
+        0 1 u[1] 0;
+    ]
+
+    @test PRONTO.fu(x,u,t,θ) == [
+        -x[2];
+        x[1];
+        -x[4];
+        x[3];;
+    ]
+
+    @test PRONTO.fxx(x,u,t,θ) == zeros(4,4,4)
+
+    @test PRONTO.fxu(x,u,t,θ) == Float64[
+        0 -1 0 0;
+        1 0 0 0;
+        0 0 0 -1;
+        0 0 1 0;;;
+    ]
+
+    @test PRONTO.fuu(x,u,t,θ) == zeros(4,1,1)
+end

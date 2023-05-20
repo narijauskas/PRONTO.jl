@@ -1,11 +1,5 @@
-# PRONTO.jl
-
-Hello and welcome to the julia implementation of the **PR**ojection-**O**perator-Based **N**ewton’s Method for **T**rajectory **O**ptimization (PRONTO).
-
-For now, please see the README - actual docs are coming soon! 
-
-### Q
-```math
+##Q
+\begin{equation}
 \left[
 \begin{array}{cccc}
 \theta_2 & 0 & 0 & 0 \\
@@ -14,21 +8,21 @@ For now, please see the README - actual docs are coming soon!
 0 & 0 & 0 & \theta_2 \\
 \end{array}
 \right]
-```
+\end{equation}
 
 
-### R
-```math
+##R
+\begin{equation}
 \left[
 \begin{array}{c}
 \theta_1 \\
 \end{array}
 \right]
-```
+\end{equation}
 
 
-### f
-```math
+##f
+\begin{equation}
 \left[
 \begin{array}{c}
 x_3 - u_1 x_2 \\
@@ -37,11 +31,11 @@ x_3 - u_1 x_2 \\
 x_2 + u_1 x_3 \\
 \end{array}
 \right]
-```
+\end{equation}
 
 
-### fx
-```math
+##fx
+\begin{equation}
 \left[
 \begin{array}{cccc}
 0 &  - u_1 & 1 & 0 \\
@@ -50,11 +44,11 @@ u_1 & 0 & 0 & -1 \\
 0 & 1 & u_1 & 0 \\
 \end{array}
 \right]
-```
+\end{equation}
 
 
-### fu
-```math
+##fu
+\begin{equation}
 \left[
 \begin{array}{c}
  - x_2 \\
@@ -63,11 +57,11 @@ x_1 \\
 x_3 \\
 \end{array}
 \right]
-```
+\end{equation}
 
 
-### fxu
-```math
+##fxu
+\begin{equation}
 \left[
 \begin{array}{cccc}
 0 & -1 & 0 & 0 \\
@@ -76,11 +70,11 @@ x_3 \\
 0 & 0 & 1 & 0 \\
 \end{array}
 \right]
-```
+\end{equation}
 
 
-### fuu
-```math
+##fuu
+\begin{equation}
 \left[
 \begin{array}{c}
 0 \\
@@ -89,21 +83,21 @@ x_3 \\
 0 \\
 \end{array}
 \right]
-```
+\end{equation}
 
 
-### l
-```math
+##l
+\begin{equation}
 \left[
 \begin{array}{c}
 0.005 u_1^{2} \\
 \end{array}
 \right]
-```
+\end{equation}
 
 
-### lx
-```math
+##lx
+\begin{equation}
 \left[
 \begin{array}{c}
 0 \\
@@ -112,21 +106,21 @@ x_3 \\
 0 \\
 \end{array}
 \right]
-```
+\end{equation}
 
 
-### lu
-```math
+##lu
+\begin{equation}
 \left[
 \begin{array}{c}
 0.01 u_1 \\
 \end{array}
 \right]
-```
+\end{equation}
 
 
-### lxx
-```math
+##lxx
+\begin{equation}
 \left[
 \begin{array}{cccc}
 0 & 0 & 0 & 0 \\
@@ -135,11 +129,11 @@ x_3 \\
 0 & 0 & 0 & 0 \\
 \end{array}
 \right]
-```
+\end{equation}
 
 
-### lxu
-```math
+##lxu
+\begin{equation}
 \left[
 \begin{array}{c}
 0 \\
@@ -148,31 +142,31 @@ x_3 \\
 0 \\
 \end{array}
 \right]
-```
+\end{equation}
 
 
-### luu
-```math
+##luu
+\begin{equation}
 \left[
 \begin{array}{c}
 0.01 \\
 \end{array}
 \right]
-```
+\end{equation}
 
 
-### p
-```math
+##p
+\begin{equation}
 \left[
 \begin{array}{c}
 0.5 x_2^{2} + 0.5 x_4^{2} \\
 \end{array}
 \right]
-```
+\end{equation}
 
 
-### px
-```math
+##px
+\begin{equation}
 \left[
 \begin{array}{c}
 0 \\
@@ -181,11 +175,11 @@ x_2 \\
 x_4 \\
 \end{array}
 \right]
-```
+\end{equation}
 
 
-### pxx
-```math
+##pxx
+\begin{equation}
 \left[
 \begin{array}{cccc}
 0 & 0 & 0 & 0 \\
@@ -194,12 +188,11 @@ x_4 \\
 0 & 0 & 0 & 1 \\
 \end{array}
 \right]
-```
+\end{equation}
 
 
-
-### Lxx
-```math
+##Lxx
+\begin{equation}
 \left[
 \begin{array}{cccc}
 0 & 0 & 0 & 0 \\
@@ -208,11 +201,11 @@ x_4 \\
 0 & 0 & 0 & 0 \\
 \end{array}
 \right]
-```
+\end{equation}
 
 
-### Lxu
-```math
+##Lxu
+\begin{equation}
 \left[
 \begin{array}{c}
 \lambda_2 \\
@@ -221,16 +214,26 @@ x_4 \\
  - \lambda_3 \\
 \end{array}
 \right]
-```
+\end{equation}
 
 
-### Luu
-```math
+##Luu
+\begin{equation}
 \left[
 \begin{array}{c}
 0.01 \\
 \end{array}
 \right]
-```
+\end{equation}
 
 
+\begin{equation}
+\left[
+\begin{array}{c}
+0.6399999999999999 \\
+-0.75 \\
+-0.5800000000000001 \\
+0.6699999999999999 \\
+\end{array}
+\right]
+\end{equation}
