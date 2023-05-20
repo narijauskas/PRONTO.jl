@@ -220,6 +220,9 @@ function _build(sz::Size{S}, name, args, body, M) where {S}
         function PRONTO.$name($(args...), θ::$M{T}) where {T<:Number}
             out = $(MType(sz))(undef)
             PRONTO.$name!(out, $(args...), θ)
+            # @inbounds begin
+            #     $(body...)
+            # end
             return $(SType(sz))(out)
         end
     end
@@ -229,17 +232,16 @@ function _build(sz::Size{S}, name, args, body, M) where {S}
             out = Array{Num}(undef, $(S...))
             PRONTO.$name!(out, $(args...), θ)
             return SArray{Tuple{$(S...)}}(out)
-            # return $(SType(sz))(out)
         end
     end
 
-    f3 = quote
-        function PRONTO.$name($(args...), θ::$M{T}) where {T}
-            out = Array{T}(undef, $(S...))
-            PRONTO.$name!(out, $(args...), θ)
-            return SArray{Tuple{$(S...)}}(out)
-        end
-    end
+    # f3 = quote
+    #     function PRONTO.$name($(args...), θ::$M{T}) where {T}
+    #         out = Array{T}(undef, $(S...))
+    #         PRONTO.$name!(out, $(args...), θ)
+    #         return SArray{Tuple{$(S...)}}(out)
+    #     end
+    # end
 
     f4 = quote
         function PRONTO.$name!(out, $(args...), θ::$M)
@@ -250,7 +252,7 @@ function _build(sz::Size{S}, name, args, body, M) where {S}
         end
     end
 
-    return (f1,f2,f3,f4)
+    return (f1,f2,f4)
 end
 
 # function _build(::InPlace, name, args, body, M)

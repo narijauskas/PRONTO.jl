@@ -21,6 +21,7 @@ using DifferentialEquations
 using Symbolics
 using Symbolics: derivative
 using SymbolicUtils.Code
+export Num # reexport needed for codegen macro scoping
 
 using ThreadTools
 
@@ -157,6 +158,7 @@ bkwd(τ) = reverse(fwd(τ))
 # solves for x(t),u(t)'
 function pronto(θ::Model{NX,NU,NΘ}, x0::StaticVector, φ, τ; limitγ=false, tol = 1e-5, maxiters = 20,verbose=true) where {NX,NU,NΘ}
     t0,tf = τ
+    verbose && info(0, "starting PRONTO")
 
     for i in 1:maxiters
         # info(i, "iteration")
@@ -184,8 +186,8 @@ function pronto(θ::Model{NX,NU,NΘ}, x0::StaticVector, φ, τ; limitγ=false, t
 
         Dh,D2g = cost_derivs(θ,λ,φ,ξ,ζ,τ)
         
-        Dh > 0 && (info("increased cost - quitting"); (return φ))
-        -Dh < tol && (info(as_bold("PRONTO converged")); (return φ))
+        Dh > 0 && (info(i, "increased cost - quitting"); (return φ))
+        -Dh < tol && (info(i-1, as_bold("PRONTO converged")); (return φ))
 
         # compute cost
         h = cost(ξ, τ)
