@@ -1,4 +1,5 @@
-using PRONTO
+using Test, PRONTO
+
 using StaticArrays
 using LinearAlgebra
 using Base: @kwdef
@@ -8,11 +9,11 @@ NU = 1
 NΘ = 2
 
 @kwdef struct TwoSpin{T} <: PRONTO.Model{NX,NU,NΘ}
-    kr::T = 1.0
-    kq::T = 1.0
+    kr::T = 1
+    kq::T = 1
 end
 
-## ----------------------------------- generate solver kernel ----------------------------------- ##
+## ----------------------------------- build ----------------------------------- ##
 
 @dynamics TwoSpin begin
     H0 = [0 0 1 0;0 0 0 -1;-1 0 0 0;0 1 0 0]
@@ -34,16 +35,14 @@ end
 @regulatorR TwoSpin θ.kr*I(NU)
 @lagrangian TwoSpin
 
-
-# overwrite default behavior of Pf
-PRONTO.Pf(α,μ,tf,θ::TwoSpin{T}) where T = SMatrix{4,4,T}(I(4))
+## ----------------------------------- test ----------------------------------- ##
 
 
 
-## ----------------------------------- symbolic ----------------------------------- ##
+
+
 
 θ = symbolic(TwoSpin)
-λ = symbolic(:λ, 1:NX)
 x = symbolic(:x, 1:NX)
 u = symbolic(:u, 1:NU)
 t = symbolic(:t)
@@ -52,25 +51,14 @@ PRONTO.f(x,u,t,θ)
 PRONTO.fx(x,u,t,θ)
 PRONTO.fu(x,u,t,θ)
 
-PRONTO.l(x,u,t,θ)
-PRONTO.lx(x,u,t,θ)
-PRONTO.lu(x,u,t,θ)
 
-PRONTO.Q(x,u,t,θ)
+# symbolic(:x, 1:NX)
 
-PRONTO.Lxx(λ,x,u,t,θ)
-PRONTO.Lxu(λ,x,u,t,θ)
-PRONTO.Luu(λ,x,u,t,θ)
-
-
-## ----------------------------------- numeric ----------------------------------- ##
-
-θ = TwoSpin()
+θ0 = TwoSpin{Float64}() # make an instance of the mode.
 τ = t0,tf = 0,10
 
 x0 = @SVector [0.0, 1.0, 0.0, 0.0]
 xf = @SVector [1.0, 0.0, 0.0, 0.0]
 u0 = 0.1
-μ = @closure t->SizedVector{1}(u0)
-φ = open_loop(θ, xf, μ, τ) # guess trajectory
-ξ = pronto(θ, x0, φ, τ) # optimal trajectory
+
+PRONTO.fx(x0,u0,t0,θ0)

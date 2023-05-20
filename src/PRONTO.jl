@@ -133,60 +133,11 @@ function Pf(α,μ,tf,θ::Model{NX}) where {NX}
     return SMatrix{NX,NX,Float64}(Pf)
 end
 
-# definitions for the following must be generated from a user-specified model by codegen
-f!(out,x,u,t,θ) = throw(ModelDefError(θ))
-Q(α,μ,t,θ) = throw(ModelDefError(θ))
-R(α,μ,t,θ) = throw(ModelDefError(θ))
 
-f(x,u,t,θ) = throw(ModelDefError(θ))
-fx(x,u,t,θ) = throw(ModelDefError(θ))
-fu(x,u,t,θ) = throw(ModelDefError(θ))
-
-fx!(out,x,u,t,θ) = throw(ModelDefError(θ))
-fu!(out,x,u,t,θ) = throw(ModelDefError(θ))
-
-fxx(x,u,t,θ) = throw(ModelDefError(θ))
-fxu(x,u,t,θ) = throw(ModelDefError(θ))
-fuu(x,u,t,θ) = throw(ModelDefError(θ))
-
-fxx!(x,u,t,θ) = throw(ModelDefError(θ))
-fxu!(x,u,t,θ) = throw(ModelDefError(θ))
-fuu!(x,u,t,θ) = throw(ModelDefError(θ))
-
-l(x,u,t,θ) = throw(ModelDefError(θ))
-lx(x,u,t,θ) = throw(ModelDefError(θ))
-lu(x,u,t,θ) = throw(ModelDefError(θ))
-
-lx!(out,x,u,t,θ) = throw(ModelDefError(θ))
-lu!(out,x,u,t,θ) = throw(ModelDefError(θ))
-
-lxx(x,u,t,θ) = throw(ModelDefError(θ))
-lxu(x,u,t,θ) = throw(ModelDefError(θ))
-luu(x,u,t,θ) = throw(ModelDefError(θ))
-
-lxx!(x,u,t,θ) = throw(ModelDefError(θ))
-lxu!(x,u,t,θ) = throw(ModelDefError(θ))
-luu!(x,u,t,θ) = throw(ModelDefError(θ))
-
-p(x,u,t,θ) = throw(ModelDefError(θ))
-px(x,u,t,θ) = throw(ModelDefError(θ))
-pxx(x,u,t,θ) = throw(ModelDefError(θ))
-
-Lxx(λ,x,u,t,θ) = throw(ModelDefError(θ))
-Lxu(λ,x,u,t,θ) = throw(ModelDefError(θ))
-Luu(λ,x,u,t,θ) = throw(ModelDefError(θ))
-
-# currently unused:
-# fxx(x,u,t,θ) = throw(ModelDefError(θ))
-# fxu(x,u,t,θ) = throw(ModelDefError(θ))
-# fuu(x,u,t,θ) = throw(ModelDefError(θ))
-# L(λ,x,u,t,θ) = throw(ModelDefError(θ))
-# Lx(λ,x,u,t,θ) = throw(ModelDefError(θ))
-# Lu(λ,x,u,t,θ) = throw(ModelDefError(θ))
 
 # ----------------------------------- #. components ----------------------------------- #
 
-
+include("kernels.jl") # placeholder solver kernel function definitions
 include("codegen.jl") # takes derivatives, generates model functions
 include("odes.jl") # wrappers for ODE solution handling
 include("regulator.jl") # regulator for projection operator
