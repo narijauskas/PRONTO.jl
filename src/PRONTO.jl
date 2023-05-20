@@ -78,19 +78,26 @@ function show(io::IO,::MIME"text/plain", θ::T) where {T<:Model}
 end
 
 
-# facilitate symbolic differentiation of model
-struct SymbolicModel{T}
-    vars
-end
+# # facilitate symbolic differentiation of model
+# struct SymbolicModel{T}
+#     vars
+# end
 
-function SymbolicModel(T::DataType)
+# function SymbolicModel(T::DataType)
+#     @variables θ[1:nθ(T)]
+#     SymbolicModel{T}(collect(θ))
+# end
+
+# getindex(θ::SymbolicModel{T}, i::Integer) where {T} = getindex(getfield(θ, :vars), i)
+# getproperty(θ::SymbolicModel{T}, name::Symbol) where {T} = getindex(θ, fieldindex(T, name))
+
+symindex(T, name) = findfirst(isequal(name), fieldnames(T))
+symfields(T,θ) = Tuple(θ[symindex(T, name)] for name in fieldnames(T))
+
+function SymbolicModel(T)
     @variables θ[1:nθ(T)]
-    SymbolicModel{T}(collect(θ))
+    T{Num}(; zip(fieldnames(T), symfields(T, collect(θ)))...)
 end
-
-getindex(θ::SymbolicModel{T}, i::Integer) where {T} = getindex(getfield(θ, :vars), i)
-getproperty(θ::SymbolicModel{T}, name::Symbol) where {T} = getindex(θ, fieldindex(T, name))
-
 
 # ----------------------------------- #. helpers ----------------------------------- #
 include("helpers.jl")
@@ -127,7 +134,7 @@ function Pf(α,μ,tf,θ::Model{NX}) where {NX}
 end
 
 # definitions for the following must be generated from a user-specified model by codegen
-f!(dx,x,u,t,θ) = throw(ModelDefError(θ))
+f!(out,x,u,t,θ) = throw(ModelDefError(θ))
 Q(α,μ,t,θ) = throw(ModelDefError(θ))
 R(α,μ,t,θ) = throw(ModelDefError(θ))
 
@@ -135,12 +142,31 @@ f(x,u,t,θ) = throw(ModelDefError(θ))
 fx(x,u,t,θ) = throw(ModelDefError(θ))
 fu(x,u,t,θ) = throw(ModelDefError(θ))
 
+fx!(out,x,u,t,θ) = throw(ModelDefError(θ))
+fu!(out,x,u,t,θ) = throw(ModelDefError(θ))
+
+fxx(x,u,t,θ) = throw(ModelDefError(θ))
+fxu(x,u,t,θ) = throw(ModelDefError(θ))
+fuu(x,u,t,θ) = throw(ModelDefError(θ))
+
+fxx!(x,u,t,θ) = throw(ModelDefError(θ))
+fxu!(x,u,t,θ) = throw(ModelDefError(θ))
+fuu!(x,u,t,θ) = throw(ModelDefError(θ))
+
 l(x,u,t,θ) = throw(ModelDefError(θ))
 lx(x,u,t,θ) = throw(ModelDefError(θ))
 lu(x,u,t,θ) = throw(ModelDefError(θ))
+
+lx!(out,x,u,t,θ) = throw(ModelDefError(θ))
+lu!(out,x,u,t,θ) = throw(ModelDefError(θ))
+
 lxx(x,u,t,θ) = throw(ModelDefError(θ))
 lxu(x,u,t,θ) = throw(ModelDefError(θ))
 luu(x,u,t,θ) = throw(ModelDefError(θ))
+
+lxx!(x,u,t,θ) = throw(ModelDefError(θ))
+lxu!(x,u,t,θ) = throw(ModelDefError(θ))
+luu!(x,u,t,θ) = throw(ModelDefError(θ))
 
 p(x,u,t,θ) = throw(ModelDefError(θ))
 px(x,u,t,θ) = throw(ModelDefError(θ))

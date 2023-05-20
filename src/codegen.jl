@@ -11,6 +11,32 @@ struct InPlace end
 export generate_model, InPlace
 export build
 
+macro dynamics(T, ex)
+    :(build_f($(esc(T)), (x,u,t,θ)->$(esc(ex))))
+end
+
+macro stage_cost(T, ex)
+    :(build_l($(esc(T)), (x,u,t,θ)->$(esc(ex))))
+end
+
+macro terminal_cost(T, ex)
+    :(build_p($(esc(T)), (x,u,t,θ)->$(esc(ex))))
+end
+
+macro regulatorQ(T, ex)
+    :(build_Q($(esc(T)), (x,u,t,θ)->$(esc(ex))))
+end
+
+macro regulatorR(T, ex)
+    :(build_R($(esc(T)), (x,u,t,θ)->$(esc(ex))))
+end
+
+macro lagrangian(T)
+    :(build_L($(esc(T))))
+end
+
+export @dynamics, @stage_cost, @terminal_cost, @regulatorQ, @regulatorR ,@lagrangian
+
 #FUTURE: options to make pretty (or add other postprocessing), save to file, etc.
 function generate_model(T, user_f, user_l, user_p, user_Q, user_R)
     info("generating the $(as_bold(T)) model")
@@ -91,88 +117,118 @@ function init_syms(T)
     θ = SymbolicModel(T)
     λ = collect(λ)
     Jx,Ju = Jacobian.([x,u])
-    return (NX,NU,x,u,t,θ,λ,Jx,Ju)
+    M = :($(nameof(T)){T})
+    return (NX,NU,x,u,t,θ,λ,Jx,Ju,M)
 end
 
 #FUTURE: options to make pretty (or add other postprocessing), save to file, etc.
 function build_f(T, user_f)
     info("building dynamics methods for $(as_bold(T))")
-    NX,NU,x,u,t,θ,λ,Jx,Ju = init_syms(T)
+    NX,NU,x,u,t,θ,λ,Jx,Ju,M = init_syms(T)
 
     f = invokelatest(user_f, x, u, t, θ)
 
-    build(InPlace(), :(f!(out,x,u,t,θ::$T)), f)
-    build(Size(NX), :(f(x,u,t,θ::$T)), f)
+    build(InPlace(), :(f!(out,x,u,t,θ::$M)), f)
+    build(Size(NX), :(f(x,u,t,θ::$M)), f)
 
-    build(Size(NX,NX), :(fx(x,u,t,θ::$T)), Jx(f))
-    build(Size(NX,NU), :(fu(x,u,t,θ::$T)), Ju(f))
+    build(Size(NX,NX), :(fx(x,u,t,θ::$M)), Jx(f))
+    build(Size(NX,NU), :(fu(x,u,t,θ::$M)), Ju(f))
+
+    build(InPlace(), :(fx!(out,x,u,t,θ::$M)), Jx(f))
+    build(InPlace(), :(fu!(out,x,u,t,θ::$M)), Ju(f))
+
+    build(Size(NX,NX,NX), :(fxx(x,u,t,θ::$M)), Jx(Jx(f)))
+    build(Size(NX,NX,NU), :(fxu(x,u,t,θ::$M)), Ju(Jx(f)))
+    build(Size(NX,NU,NU), :(fuu(x,u,t,θ::$M)), Ju(Ju(f)))
+    
+    # build(InPlace(), :(fxx!(out,x,u,t,θ::$M)), Jx(Jx(f)))
+    # build(InPlace(), :(fxu!(out,x,u,t,θ::$M)), Ju(Jx(f)))
+    # build(InPlace(), :(fuu!(out,x,u,t,θ::$M)), Ju(Ju(f)))
     return nothing
 end
 
 function build_l(T, user_l)
     info("building stage cost methods for $(as_bold(T))")
-    NX,NU,x,u,t,θ,λ,Jx,Ju = init_syms(T)
+    NX,NU,x,u,t,θ,λ,Jx,Ju,M = init_syms(T)
 
     l = invokelatest(user_l, x, u, t, θ)
     lx = reshape(Jx(l), NX)
     lu = reshape(Ju(l), NU)
 
-    build(Size(1), :(l(x,u,t,θ::$T)), l)
-    build(Size(NX), :(lx(x,u,t,θ::$T)), lx)
-    build(Size(NU), :(lu(x,u,t,θ::$T)), lu)
+    build(Size(1), :(l(x,u,t,θ::$M)), l)
+    build(Size(NX), :(lx(x,u,t,θ::$M)), lx)
+    build(Size(NU), :(lu(x,u,t,θ::$M)), lu)
 
-    build(Size(NX,NX), :(lxx(x,u,t,θ::$T)), Jx(lx))
-    build(Size(NX,NU), :(lxu(x,u,t,θ::$T)), Ju(lx))
-    build(Size(NU,NU), :(luu(x,u,t,θ::$T)), Ju(lu))
+    build(InPlace(), :(lx!(out,x,u,t,θ::$M)), lx)
+    build(InPlace(), :(lu!(out,x,u,t,θ::$M)), lu)
+
+    build(Size(NX,NX), :(lxx(x,u,t,θ::$M)), Jx(lx))
+    build(Size(NX,NU), :(lxu(x,u,t,θ::$M)), Ju(lx))
+    build(Size(NU,NU), :(luu(x,u,t,θ::$M)), Ju(lu))
     return nothing
 end
 
 function build_p(T, user_p)
     info("building terminal cost methods for $(as_bold(T))")
-    NX,NU,x,u,t,θ,λ,Jx,Ju = init_syms(T)
+    NX,NU,x,u,t,θ,λ,Jx,Ju,M = init_syms(T)
 
     p = invokelatest(user_p, x, u, t, θ)
     px = reshape(Jx(p), NX)
 
-    build(Size(1), :(p(x,u,t,θ::$T)), p)
-    build(Size(NX), :(px(x,u,t,θ::$T)), px)
-    build(Size(NX,NX), :(pxx(x,u,t,θ::$T)), Jx(px))
+    build(Size(1), :(p(x,u,t,θ::$M)), p)
+    build(Size(NX), :(px(x,u,t,θ::$M)), px)
+    build(Size(NX,NX), :(pxx(x,u,t,θ::$M)), Jx(px))
     return nothing
 end
 
 function build_Q(T, user_Q)
     info("building regulator Q method for $(as_bold(T))")
-    NX,NU,x,u,t,θ,λ,Jx,Ju = init_syms(T)
+    NX,NU,x,u,t,θ,λ,Jx,Ju,M = init_syms(T)
 
     Q = invokelatest(user_Q, x, u, t, θ)
-    build(Size(NX,NX), :(Q(x,u,t,θ::$T)), Q)
+    build(Size(NX,NX), :(Q(x,u,t,θ::$M)), Q)
     return nothing
 end
 
 function build_R(T, user_R)
     info("building regulator R method for $(as_bold(T))")
-    NX,NU,x,u,t,θ,λ,Jx,Ju = init_syms(T)
+    NX,NU,x,u,t,θ,λ,Jx,Ju,M = init_syms(T)
 
     R = invokelatest(user_R, x, u, t, θ)
-    build(Size(NU,NU), :(R(x,u,t,θ::$T)), R)
+    build(Size(NU,NU), :(R(x,u,t,θ::$M)), R)
     return nothing
 end
 
-function build_L(T, user_R)
+function build_L(T)
     info("building lagrangian methods for $(as_bold(T))")
-    NX,NU,x,u,t,θ,λ,Jx,Ju = init_syms(T)
+    NX,NU,x,u,t,θ,λ,Jx,Ju,M = init_syms(T)
 
-    # invokelatest(lxx())
+    fx = Array{Num}(undef, NX, NX)
+    fu = Array{Num}(undef, NX, NU)
+    lx = Array{Num}(undef, NX)
+    lu = Array{Num}(undef, NU)
 
+    invokelatest(fx!, fx, x, u, t, θ)
+    invokelatest(fu!, fu, x, u, t, θ)
+    invokelatest(lx!, lx, x, u, t, θ)
+    invokelatest(lu!, lu, x, u, t, θ)
     
-    #YO: can reload defs from inplace versions
+    fxx = Jx(fx)
+    fxu = Ju(fx)
+    fuu = Ju(fu)
+
+    lxx = Jx(lx)
+    lxu = Ju(lx)
+    luu = Ju(lu)
+    
     Lxx = lxx .+ sum(λ[k]*fxx[k,:,:] for k in 1:NX)
     Lxu = lxu .+ sum(λ[k]*fxu[k,:,:] for k in 1:NX)
     Luu = luu .+ sum(λ[k]*fuu[k,:,:] for k in 1:NX)
 
-    build(Size(NX,NX), :(Lxx(λ,x,u,t,θ::$T)), Lxx)
-    build(Size(NX,NU), :(Lxu(λ,x,u,t,θ::$T)), Lxu)
-    build(Size(NU,NU), :(Luu(λ,x,u,t,θ::$T)), Luu)
+    build(Size(NX,NX), :(Lxx(λ,x,u,t,θ::$M)), Lxx)
+    build(Size(NX,NU), :(Lxu(λ,x,u,t,θ::$M)), Lxu)
+    build(Size(NU,NU), :(Luu(λ,x,u,t,θ::$M)), Luu)
+    return nothing
 end
 
 # append ! to a symbol, eg. :name -> :name!
@@ -195,14 +251,14 @@ end
 
 
 MType(sz::Size{S}) where {S} = MType(Val(length(S)), sz)
-MType(::Val{1}, sz::Size{S}) where {S} = MVector{S..., Float64}
-MType(::Val{2}, sz::Size{S}) where {S} = MMatrix{S..., Float64}
-MType(::Val, sz::Size{S}) where {S} = MArray{Tuple{S...}, Float64, length(S), prod(S)}
+MType(::Val{1}, sz::Size{S}) where {S} = :(MVector{$(S...), T})
+MType(::Val{2}, sz::Size{S}) where {S} = :(MMatrix{$(S...), T})
+MType(::Val, sz::Size{S}) where {S} = :(MArray{Tuple{$(S...)}, T, $(length(S)), $(prod(S))})
 
 SType(sz::Size{S}) where {S} = SType(Val(length(S)), sz)
-SType(::Val{1}, sz::Size{S}) where {S} = SVector{S..., Float64}
-SType(::Val{2}, sz::Size{S}) where {S} = SMatrix{S..., Float64}
-SType(::Val, sz::Size{S}) where {S} = SArray{Tuple{S...}, Float64, length(S), prod(S)}
+SType(::Val{1}, sz::Size{S}) where {S} = :(SVector{$(S...), T})
+SType(::Val{2}, sz::Size{S}) where {S} = :(SMatrix{$(S...), T})
+SType(::Val, sz::Size{S}) where {S} = :(SArray{Tuple{$(S...)}, T, $(length(S)), $(prod(S))})
 
 
 #MAYBE: do we actually want to save the whole model to a file?
@@ -221,7 +277,7 @@ end
 
 function _build(sz::Size, name, args, body)
     quote
-        function PRONTO.$name($(args...))
+        function PRONTO.$name($(args...)) where {T}
             out = $(MType(sz))(undef)
             @inbounds begin
                 $(body...)
@@ -233,7 +289,7 @@ end
 
 function _build(::InPlace, name, args, body)
     quote
-        function PRONTO.$name($(args...))
+        function PRONTO.$name($(args...)) where {T}
             @inbounds begin
                 $(body...)
             end
