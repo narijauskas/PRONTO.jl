@@ -51,17 +51,9 @@ where $\mathcal{H_0} = \sigma_z = \begin{bmatrix}
 \end{bmatrix}$, and $\mathcal{H_1} = \sigma_y = \begin{bmatrix}
 0 & -i \\
 i & 0
-\end{bmatrix}$ are the Pauli matrices. The control input $\phi(t)$ drives the system between 2 qubit states $|0\rangle$ and $|1\rangle$, which are the two eigenstates of the free Hamiltonian $\mathcal{H_0}$. 
+\end{bmatrix}$ are the Pauli matrices. The real control input $\phi(t)$ drives the system between 2 qubit states $|0\rangle$ and $|1\rangle$, which are the two eigenstates of the free Hamiltonian $\mathcal{H_0}$. Note that $|\psi \rangle$ is a $2 \times 1$ complex vector here; as a result, $x$ is a $4 \times 1$ real vector. 
 
-```julia
-function x_eig(i)
-    H0 = [0 1;1 0]
-    w = eigvecs(collect(H0)) 
-    x_eig = kron([1;0],w[:,i])
-end
-```
-
-We decide to name our model `Spin2`, where `{4,1,3}` represents the 4 state vector $x,|\psi\rangle$, the single input $u, \phi$ and the 3 parameters `kl, kr, kq`.
+We decide to name our model `Spin2`, where `{4,1,3}` represents the 4 state vector $x (|\psi\rangle)$, the single input $u (\phi)$ and the 3 parameters `kl, kr, kq`.
 
 ```julia
 @kwdef struct Spin2 <: PRONTO.Model{4,1,3}
@@ -71,11 +63,14 @@ We decide to name our model `Spin2`, where `{4,1,3}` represents the 4 state vect
 end
 ```
 
-For this example, the control objective is to steer the system from the $|0\rangle$ state `x_eig(1)` to the target state $|1\rangle$ `x_eig(2)`. We can then define our terminal cost function $P(x(T))$ as 
+For this example, the control objective is to steer the system from the $|0\rangle = [1, 0]^T$ state to the target state $|1\rangle = [0, 1]^T$. We can then define our terminal cost function $m(\psi(T))$ as 
+```math
+m(\psi(T)) = \frac{1}{2} \langle \psi(T)|P|\psi(T)\rangle = \frac{1}{2} \langle \psi(T)|(I-|1\rangle \langle 1|)|\psi(T)\rangle
+```
 
 ```julia
 function termcost(x,u,t,θ)
-    P = I(4) - inprod(x_eig(2))
+    P = I(4) - inprod([0 1 0 0])
     1/2 * collect(x')*P*x
 end
 ```
@@ -106,15 +101,21 @@ end
 
 For this example, we only consider the use of energy during the process, and we define our incremental cost
 ```math
-\int_0^T l(x,u,t) dt
+\int_0^T l(x,u,t) dt = \int_0^T \frac{kl}{2}u^Tu \quad dt
 ```
 as
 
 ```julia
-stagecost(x,u,t,θ) = 1/2 *θ[1]*collect(u')I*u
+stagecost(x,u,t,θ) = 1/2 *θ.kl*collect(u')I*u
 ```
 
 ### Regulator
+For this example, a Linear-Quadratic Regulator (LQR) is used and designed in this way:
+```math
+R_r(t) = I,\\
+Q_r(t) = I - |\psi(t)\rangle \langle \psi(t)|,\\
+P_r(T) = Q_r(T) = I - |\psi(T)\rangle \langle \psi(T)|.
+``` 
 ```julia
 regR(x,u,t,θ) = θ.kr*I(1)
 
@@ -231,55 +232,9 @@ Finally, we are ready to solve the optimization problem!
 
 
 ### Results
-
-```
-┌────────────────────────────────────────────────────────────────────────────────┐ 
-    │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡠⠚⠉⠉⠉⠳⢄⠀⠀⠀⠀⠀⢀⡠⠒⠊⠓⠲⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│ 
-    │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⠎⠀⠀⠀⠀⠀⠀⠀⠳⡀⠀⠀⡠⠊⠀⠀⠀⠀⠀⠀⠑⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│ 
-    │⡠⠤⠤⠤⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡰⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⢄⡔⠁⠀⠀⠀⠀⠀⠀⠀⠀⠈⢢⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│ 
-    │⠀⠀⠀⠀⠈⠳⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡔⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡜⢆⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠱⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│ 
-    │⠀⠀⠀⠀⠀⠀⢈⣶⠚⠉⠉⠑⠦⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡜⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡜⠀⠈⢆⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⡄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│ 
-    │⠀⠀⠀⠀⠀⡰⠋⠀⠱⡀⠀⠀⠀⠈⠢⡀⠀⠀⠀⣀⡤⠤⢄⡀⠀⠀⠀⠀⠀⠀⡜⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡜⠀⠀⠀⠈⢆⠀⠀⠀⠀⠀⠀⠀⢀⣀⣀⠀⠘⡄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│ 
-    │⠀⠀⠀⢀⠞⠀⠀⠀⠀⠱⡀⠀⠀⠀⠀⠙⢄⡴⠋⠀⠀⠀⠀⠈⠳⣄⠀⠀⠀⡸⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡜⠀⠀⠀⠀⠀⠈⢆⠀⠀⠀⢀⡴⠊⠉⠀⠈⠙⠲⣜⡄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│ 
-    │⠀⠀⢠⠊⠀⠀⠀⠀⠀⠀⠱⡀⠀⠀⠀⡴⠋⠣⡀⠀⠀⠀⠀⠀⠀⠈⠳⡀⡰⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡸⠀⢀⡠⠴⠒⠒⠲⠬⣆⠀⡴⠋⠀⠀⠀⠀⠀⠀⠀⠈⠻⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│ 
-    │⠀⢠⠃⠀⠀⠀⠀⠀⠀⠀⠀⠱⡀⣠⠎⠀⠀⠀⠙⢆⠀⠀⠀⠀⠀⠀⠀⢸⢧⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢰⢁⠔⠉⠀⠀⠀⠀⠀⠀⣸⡏⠲⢄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠘⡧⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│ 
-    │⡰⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡵⡁⠀⠀⠀⠀⠀⠀⠱⣄⠀⠀⠀⠀⢠⠃⠀⠱⣄⠀⠀⠀⠀⠀⠀⠀⠀⢠⡷⠃⠀⠀⠀⠀⠀⠀⢀⠔⠁⠸⡀⠀⠉⠢⣄⠀⠀⠀⠀⠀⠀⠀⠸⡘⢆⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⠎│ 
-    │⢫⠉⠉⠉⠉⠉⠉⠉⠉⠉⢩⠏⠉⠹⡉⠉⠉⠉⠉⠉⠉⠉⠻⢍⠉⢉⠏⠉⠉⠉⠉⠻⣍⠉⠉⠉⠉⠉⣩⠏⠉⠉⠉⠉⠉⠉⢉⡽⠋⠉⠉⠉⠹⡉⠉⠉⠉⠻⣍⠉⠉⠉⠉⠉⠉⠹⡉⠹⡍⠉⠉⠉⠉⠉⠉⠉⠉⢉⠏⠉│ 
-    │⠀⢣⡀⠀⠀⠀⠀⠀⠀⡴⠁⠀⠀⠀⢣⠀⠀⠀⠀⠀⠀⠀⠀⠀⢑⢮⡀⠀⠀⠀⠀⠀⠈⠑⠦⢄⣀⢔⠏⠀⠀⠀⢀⣀⡤⠖⠉⠀⠀⠀⠀⠀⠀⢣⠀⠀⠀⠀⠈⠢⡀⠀⠀⠀⠀⠀⠱⡀⠈⢦⠀⠀⠀⠀⠀⠀⢠⠏⠀⠀│ 
-    │⠀⠀⠱⡀⠀⠀⠀⢀⠞⠀⠀⠀⠀⠀⠀⢣⠀⠀⠀⠀⠀⠀⠀⠀⡎⠀⠈⠓⠤⣀⡀⠀⠀⢀⣠⠔⠁⡝⠉⠉⠉⠉⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢣⠀⠀⠀⠀⠀⠙⢆⠀⠀⠀⠀⠀⢱⠀⠀⠳⡀⠀⠀⠀⣠⠏⠀⠀⠀│ 
-    │⠀⠀⠀⠑⡄⠀⡠⠃⠀⠀⠀⠀⠀⠀⠀⠀⢣⠀⠀⠀⠀⠀⠀⡜⠀⠀⠀⠀⠀⠀⠉⠉⠉⠉⠀⠀⡜⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⢆⠀⠀⠀⠀⠀⠀⠳⡀⠀⠀⠀⠀⢣⠀⠀⠘⢆⠀⣴⠃⠀⠀⠀⠀│ 
-    │⠀⠀⠀⠀⢘⣖⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢣⠀⠀⠀⠀⡜⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡰⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⢆⠀⠀⠀⠀⠀⠀⠘⢦⡀⠀⠀⠀⠳⡀⠀⣨⡿⡃⠀⠀⠀⠀⠀│ 
-    │⠀⠀⠀⣠⠊⠈⢣⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠱⡀⠀⡜⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡰⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⢆⠀⠀⠀⠀⠀⠀⠀⠙⠢⣄⣀⣀⡱⣞⡝⠁⠙⢄⠀⠀⠀⠀│ 
-    │⠀⢀⠔⠁⠀⠀⠀⠑⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢱⡜⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡰⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⢆⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⠚⢄⠀⠀⠈⠳⣄⠀⠀│ 
-    │⠒⠁⠀⠀⠀⠀⠀⠀⠈⠣⡀⠀⠀⠀⠀⠀⠀⠀⢠⠎⠘⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡔⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢣⡀⠀⠀⠀⠀⠀⠀⠀⢀⠔⠁⠀⠀⠑⢤⣀⡀⣀⣹⠖│ 
-    │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠲⣄⡀⠀⠀⣠⠔⠁⠀⠀⠈⠣⡀⠀⠀⠀⠀⠀⠀⢀⠞⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠙⢦⡀⠀⠀⠀⣀⠔⠋⠀⠀⠀⠀⠀⠀⠀⠉⠀⠀⠀│ 
-    │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠉⠉⠀⠀⠀⠀⠀⠀⠀⠈⠢⣄⣀⣀⣠⠔⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠑⠒⠉⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│ 
-    └────────────────────────────────────────────────────────────────────────────────┘ 
-    ┌────────────────────────────────────────────────────────────────────────────────┐ 
-    │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⠊⠉⢣⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⠎⠉⠳⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⠎⠉⠣⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│ 
-    │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⠇⠀⠀⠀⢧⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⠎⠀⠀⠀⢱⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⠎⠀⠀⠀⢣⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│ 
-    │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡎⠀⠀⠀⠀⠈⡆⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡸⠀⠀⠀⠀⠀⢇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡸⠀⠀⠀⠀⠀⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│ 
-    │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢰⠁⠀⠀⠀⠀⠀⢹⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢰⠁⠀⠀⠀⠀⠀⠸⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⠃⠀⠀⠀⠀⠀⠸⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│ 
-    │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡎⠀⠀⠀⠀⠀⠀⠀⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡎⠀⠀⠀⠀⠀⠀⠀⢇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡜⠀⠀⠀⠀⠀⠀⠀⢇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│ 
-    │⠀⠀⠀⠀⠀⠀⠀⠀⠀⢰⠁⠀⠀⠀⠀⠀⠀⠀⢸⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⠃⠀⠀⠀⠀⠀⠀⠀⢸⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⠇⠀⠀⠀⠀⠀⠀⠀⢸⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│ 
-    │⠀⠀⠀⠀⠀⠀⠀⠀⠀⡎⠀⠀⠀⠀⠀⠀⠀⠀⠈⡆⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡜⠀⠀⠀⠀⠀⠀⠀⠀⠀⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡸⠀⠀⠀⠀⠀⠀⠀⠀⠀⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│ 
-    │⠀⠀⠀⠀⠀⠀⠀⠀⢠⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⢣⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⠇⠀⠀⠀⠀⠀⠀⠀⠀⠀⢱⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│ 
-    │⠀⠀⠀⠀⠀⠀⠀⠀⡼⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⡄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⡄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⡆⠀⠀⠀⠀⠀⠀⠀⠀⠀│ 
-    │⠀⠀⠀⠀⠀⠀⠀⢀⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡎⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢣⠀⠀⠀⠀⠀⠀⠀⠀⠀│ 
-    │⠉⠉⠉⠉⠉⠉⠉⢹⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⢹⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⢹⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⢹⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⢩⠋⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠹⡉⠉⠉⠉⠉⠉⠉⠉⠉│ 
-    │⠀⠀⠀⠀⠀⠀⠀⡏⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡜⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡸⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡇⠀⠀⠀⠀⠀⠀⠀⠀│ 
-    │⠀⠀⠀⠀⠀⠀⢰⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢱⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⠇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢱⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⠀⠀⠀⠀⠀⠀⠀⠀│ 
-    │⠀⠀⠀⠀⠀⠀⡼⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⡄⠀⠀⠀⠀⠀⠀⠀⠀⡸⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⡆⠀⠀⠀⠀⠀⠀⠀⠀⢸⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⡆⠀⠀⠀⠀⠀⠀⠀│ 
-    │⠀⠀⠀⠀⠀⢠⠇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢇⠀⠀⠀⠀⠀⠀⠀⠀⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢱⠀⠀⠀⠀⠀⠀⠀⠀⡎⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢣⠀⠀⠀⠀⠀⠀⠀│ 
-    │⠀⠀⠀⠀⠀⡸⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠸⡀⠀⠀⠀⠀⠀⠀⢸⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⡄⠀⠀⠀⠀⠀⠀⢰⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⡄⠀⠀⠀⠀⠀⠀│ 
-    │⠀⠀⠀⠀⢀⠇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢇⠀⠀⠀⠀⠀⠀⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢣⠀⠀⠀⠀⠀⠀⡎⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢣⠀⠀⠀⠀⠀⠀│ 
-    │⠀⠀⠀⠀⡼⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠸⡄⠀⠀⠀⠀⢸⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⡆⠀⠀⠀⠀⢰⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⡄⠀⠀⠀⠀⡸│ 
-    │⠀⠀⠀⢰⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢱⠀⠀⠀⢠⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠱⡀⠀⠀⢀⠇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢱⠀⠀⠀⢠⠃│ 
-    │⠣⣀⣠⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠣⣀⣠⠊⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠳⣀⣠⠎⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠣⣀⡠⠃⠀│ 
-    └────────────────────────────────────────────────────────────────────────────────┘ 
-```
-
 If you do this right, you should get:
-![image description](./pineapple.jpg)
+![image description](./Uopt.jpg)
+![image description](./Xopt.jpg)
 
-![web link](https://images-prod.healthline.com/hlcmsresource/images/AN_images/benefits-of-pineapple-1296x728-feature.jpg)
+The top figure is the optimal control input $u(t)$, while the bottom figure is the state vector $x(t)$ evolves in time. We wish to check if we achieve our control objective, which is to steer the system from $|0\rangle$ to $|1\rangle$, the evolution in time of population is shown below
+![image description](./Popt.jpg)   
