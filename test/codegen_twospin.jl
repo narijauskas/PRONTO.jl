@@ -1,3 +1,4 @@
+#=
 using PRONTO
 using Test
 using StaticArrays
@@ -39,7 +40,7 @@ end
 # overwrite default behavior of Pf
 PRONTO.Pf(α,μ,tf,θ::TwoSpin{T}) where T = SMatrix{4,4,T}(I(4))
 
-
+=#
 ## ----------------------------------- test ----------------------------------- ##
 
 # ex = PRONTO.f(x,u,t,θ)
@@ -61,11 +62,11 @@ x = @SVector [0.5, 0.6, 0.7, 0.8]
         x[3] - u[1]*x[2];
         -x[4] + u[1]*x[1];
         -x[1] - u[1]*x[4];
-        x[2] + u[1]x[3];
+        x[2] + u[1]*x[3];
     ]
 end
 
-@testset "dynamics derivatives" begin
+@testset "dynamics jacobians" begin
     @test PRONTO.fx(x,u,t,θ) == [
         0 -u[1] 1 0;
         u[1] 0 0 -1;
@@ -79,7 +80,9 @@ end
         -x[4];
         x[3];;
     ]
+end
 
+@testset "dynamics hessians" begin
     @test PRONTO.fxx(x,u,t,θ) == zeros(4,4,4)
 
     @test PRONTO.fxu(x,u,t,θ) == Float64[
@@ -90,4 +93,14 @@ end
     ]
 
     @test PRONTO.fuu(x,u,t,θ) == zeros(4,1,1)
+end
+
+
+@testset "stage cost" begin
+    @test PRONTO.f(x,u,t,θ) == [
+        x[3] - u[1]*x[2];
+        -x[4] + u[1]*x[1];
+        -x[1] - u[1]*x[4];
+        x[2] + u[1]*x[3];
+    ]
 end

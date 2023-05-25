@@ -1,6 +1,34 @@
 # Dev Notes and Version History
 
-## TODO:
+## Code Gen
+  - unit testing codegen #TODO: finish TwoSpin, verify
+  - support partial model regeneration #DONE:
+  - fix needing to collect(x') #DONE:
+  - codegen interface rework #DONE:
+
+## Package
+  - remove unneeded dependencies #DONE:
+  - set compats #YO: mostly done, set julia, update symbolics via breaking change
+  - switch DifferentialEquations->OrdinaryDiffEQ #TODO:
+  - clean old files #TODO:
+
+## Website
+  - fix versioning #TODO:
+  - fix badge #TODO:
+  - process PRs #YO: do these direct to main
+  - update docs
+
+## Solver Core
+  - solver options interface #FUTURE:
+  - save intermediate steps #FUTURE:
+  - Dh plots #FUTURE:
+  - finalize model type #FIX: not too broken, just important
+  - vectorized parameters #TODO: #MAYBE:
+
+## Don't Forget
+  - LinearOperators
+  - TimerOutputs
+
 
 ### General
   - website infrastructure
@@ -8,6 +36,7 @@
     - detailed examples
     - problem setup requirements & syntax
     - what goes on under the hood
+    - function wrappers, etc.
   - cleanup devnotes
   - consolidate/cleanup tests/examples
     - get rid of octopus

@@ -130,7 +130,7 @@ function build_R(T, user_R)
     return nothing
 end
 
-function build_L(T)
+function resolve_model(T::Type{<:Model})
     info("building lagrangian methods for $(as_bold(T))")
     NX,NU,x,u,t,θ,λ,Jx,Ju,M = init_syms(T)
 
@@ -204,8 +204,8 @@ function build(sz, hdr, sym, M; file=nothing)
         :(out[$i] = $(format(toexpr(x))))
     end
     @capture(hdr, name_(args__))
-    ex = _build(sz, name, args[1:end-1], body, M)
     file = tempname()*".jl"
+    ex = _build(sz, name, args[1:end-1], body, M)
     write(file, (@. ex |> clean |> string |> separate)...)
     Base.include(Main, file)
     iinfo("$hdr\t"*as_color(crayon"dark_gray", "[$file]"))

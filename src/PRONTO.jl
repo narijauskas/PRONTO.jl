@@ -1,37 +1,35 @@
-# PRONTO.jl dev_0.4
+# PRONTO.jl v0.5.0_dev
 module PRONTO
 
-using FunctionWrappers: FunctionWrapper
+using FunctionWrappers
+import FunctionWrappers: FunctionWrapper
 using StaticArrays
-using FastClosures
+using FastClosures #TODO: test speed
 using Base: @kwdef
 
-import LinearAlgebra
-using LinearAlgebra: mul!, I
+using Interpolations # data storage/resampling
 
-using MacroTools
-using SparseArrays
-using MatrixEquations
+import LinearAlgebra # collision with lu!
+import LinearAlgebra: mul!, I
+using MatrixEquations # provides arec
 
 
-#FUTURE: using OrdinaryDiffEq?
+#TODO: #FUTURE: using OrdinaryDiffEq
 using DifferentialEquations
-#TODO: support this
 
 using Symbolics # code generation
-using Symbolics: derivative # code generation
-using SymbolicUtils.Code # code generation
+import Symbolics: derivative # code generation
+using SymbolicUtils.Code #MAYBE: code generation
 export Num # this reexport is needed for codegen macro scoping
-using ThreadTools # code generation
 
+using ThreadTools # tmap for code generation
 using UnicodePlots # data representation
 
 using Dates: now
 
 using MacroTools
-using MacroTools: @capture
+import MacroTools: @capture
 
-using Interpolations
 
 using Base: OneTo
 using Base: fieldindex
@@ -39,10 +37,11 @@ import Base: extrema, length, eachindex, show, size, eltype, getproperty, getind
 
 
 export pronto
-export info
+export info #TODO: does this need to be exported?
 
-export @tick,@tock,@clock
+export @tick,@tock,@clock #TODO: get rid of alltogether?
 
+#TODO: reconsider export
 export ODE, Buffer
 export preview
 

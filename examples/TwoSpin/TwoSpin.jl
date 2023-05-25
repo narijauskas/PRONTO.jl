@@ -12,7 +12,6 @@ NΘ = 2
     kq::T = 1.0
 end
 
-
 @dynamics TwoSpin begin
     H0 = [0 0 1 0;0 0 0 -1;-1 0 0 0;0 1 0 0]
     H1 = [0 -1 0 0;1 0 0 0;0 0 0 -1;0 0 1 0]
@@ -29,7 +28,10 @@ end
     1/2*x'*Pl*x
 end
 
-@regulatorQ TwoSpin θ.kq*I(NX)
+@regulatorQ TwoSpin begin
+    θ.kq*I(NX)
+end
+
 @regulatorR TwoSpin θ.kr*I(NU)
 @lagrangian TwoSpin
 
