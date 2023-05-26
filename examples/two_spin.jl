@@ -5,18 +5,12 @@ using Base: @kwdef
 
 NX = 4
 NU = 1
-# NΘ = 2
 
-@kwdef struct TwoSpin <: Model{NX,NU}
+@kwdef struct TwoSpin <: PRONTO.Model{NX,NU}
     kr::Float64 = 1.0
     kq::Float64 = 1.0
 end
 
-
-# @kwdef struct TwoSpin{T} <: PRONTO.Model{NX,NU,NΘ}
-#     kr::T = 1.0
-#     kq::T = 1.0
-# end
 
 @dynamics TwoSpin begin
     H0 = [0 0 1 0;0 0 0 -1;-1 0 0 0;0 1 0 0]
@@ -36,12 +30,15 @@ end
 
 @regulatorQ TwoSpin θ.kq*I(NX)
 @regulatorR TwoSpin θ.kr*I(NU)
-@lagrangian TwoSpin
+
+# must be run after any changes to model definition
+resolve_model(TwoSpin)
 
 # overwrite default behavior of Pf
-PRONTO.Pf(α,μ,tf,θ::TwoSpin{T}) where T = SMatrix{4,4,T}(I(4))
+PRONTO.Pf(α,μ,tf,θ::TwoSpin) = SMatrix{4,4,Float64}(I(4))
+# PRONTO.Pf(model::TwoSpin,α,μ,tf) = SMatrix{4,4,Float64}(I(4))
 
-info(PRONTO.as_bold("TwoSpin")*" model ready")
+
 
 ## ----------------------------------- run optimization ----------------------------------- ##
 
@@ -52,5 +49,5 @@ x0 = @SVector [0.0, 1.0, 0.0, 0.0]
 xf = @SVector [1.0, 0.0, 0.0, 0.0]
 μ = t->[0.1]
 φ = open_loop(θ, xf, μ, τ) # guess trajectory
-ξ = pronto(θ, x0, φ, τ) # optimal trajectory
 @time ξ = pronto(θ, x0, φ, τ) # optimal trajectory
+@profview ξ = pronto(θ, x0, φ, τ) # optimal trajectory

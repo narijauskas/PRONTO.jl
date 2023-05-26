@@ -61,25 +61,32 @@ F(α,θ) = θ.μ*θ.g*θ.M*sin(θ.c*atan(θ.b*α))
     ]
 end
 
-stagecost(x,u,t,θ) = 1/2*collect(x')I*x + 1/2*collect(u')I*u
+@stage_cost LaneChange2 begin
+    1/2*x'*I*x + 1/2*u'*I*u
+end
 
 # should be solution to DARE at desired equilibrium
-termcost(x,u,t,θ) = 1/2*collect(x')*x
+@terminal_cost LaneChange2 begin
+    1/2*x'*I*x
+end
 
-regR(x,u,t,θ) = diagm([θ.r1,θ.r2])
-regQ(x,u,t,θ) = diagm([θ.q1,θ.q2,θ.q3,θ.q4,θ.q5,θ.q6])
+@regulatorR LaneChange2 diagm(θ.kr)
+@regulatorQ LaneChange2 diagm(θ.kq)
 
-PRONTO.generate_model(LaneChange, dynamics, stagecost, termcost, regQ, regR)
+# regR(x,u,t,θ) = diagm([θ.r1,θ.r2])
+# regQ(x,u,t,θ) = diagm([θ.q1,θ.q2,θ.q3,θ.q4,θ.q5,θ.q6])
 
+# PRONTO.generate_model(LaneChange, dynamics, stagecost, termcost, regQ, regR)
 
+resolve_model(LaneChange2)
 
 ## -------------------------------  ------------------------------- ##
-θ = LaneChange()
+θ = LaneChange2()
 x0 = SVector{6}(-5.0,zeros(5)...)
 xf = @SVector zeros(6)
 t0,tf = τ = (0,4)
-
-μ = @closure t->SVector{2}(zeros(2))
+μ = t->zeros(2)
+# μ = @closure t->SVector{2}(zeros(2))
 φ = open_loop(θ,x0,μ,τ)
 @time ξ = pronto(θ,x0,φ,τ; tol = 1e-6, maxiters = 50)
 

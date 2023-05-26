@@ -17,16 +17,16 @@ dh_dt(h, (θ,x,u), t) = l(x(t), u(t), t, θ)
 function cost_derivs(θ,λ,φ,ξ,ζ,τ)
     t0,tf = τ
 
-    🐱f = solve(ODEProblem(d🐱_dt, 0, (t0,tf), (θ,ξ,ζ)), Tsit5(); reltol=1e-7)(tf)
-    🐶f = solve(ODEProblem(d🐶_dt, 0, (t0,tf), (θ,λ,ξ,ζ)), Tsit5(); reltol=1e-7)(tf)
+    🐱_f = solve(ODEProblem(d🐱_dt, 0, (t0,tf), (θ,ξ,ζ)), Tsit5(); reltol=1e-7)(tf)
+    🐶_f = solve(ODEProblem(d🐶_dt, 0, (t0,tf), (θ,λ,ξ,ζ)), Tsit5(); reltol=1e-7)(tf)
 
     zf = ζ.x(tf)
     αf = φ.x(tf)
     μf = φ.u(tf)
     rf = px(αf,μf,tf,θ)
     Pf = pxx(αf,μf,tf,θ)
-    Dh = 🐱f + rf'zf
-    D2g = 🐶f + zf'Pf*zf
+    Dh = 🐱_f + rf'zf
+    D2g = 🐶_f + zf'Pf*zf
     return Dh,D2g
 end
 

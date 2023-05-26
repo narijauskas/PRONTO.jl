@@ -45,8 +45,15 @@ end
 
 #TODO: resolve_model
 
-export @dynamics, @stage_cost, @terminal_cost, @regulatorQ, @regulatorR ,@lagrangian
+export @dynamics, @stage_cost, @terminal_cost, @regulatorQ, @regulatorR, resolve_model
 
+
+function resolve_model(T::Type{<:Model})
+    #TODO: verify existence of all kernel methods
+    define_L(T)
+    info(PRONTO.as_bold(T)*" model ready")
+    return nothing
+end
 
 
 
@@ -197,27 +204,6 @@ end
 # trace(f, vars...) = invokelatest(f, vars...)
 # fxx = symbolic(T, PRONTO.fxx)
 # trace(f, model, x, u, t)
-function resolve_model(T::Type{<:Model})
-    info("building lagrangian methods for $(as_bold(T))")
-    NX,NU,x,u,t,θ,λ,Jx,Ju,M = init_syms(T)
-
-    _fxx = invokelatest(fxx,x,u,t,θ)
-    _fxu = invokelatest(fxu,x,u,t,θ)
-    _fuu = invokelatest(fuu,x,u,t,θ)
-
-    _lxx = invokelatest(lxx,x,u,t,θ)
-    _lxu = invokelatest(lxu,x,u,t,θ)
-    _luu = invokelatest(luu,x,u,t,θ)
-
-    Lxx = _lxx .+ sum(λ[k]*_fxx[k,:,:] for k in 1:NX)
-    Lxu = _lxu .+ sum(λ[k]*_fxu[k,:,:] for k in 1:NX)
-    Luu = _luu .+ sum(λ[k]*_fuu[k,:,:] for k in 1:NX)
-
-    build(Size(NX,NX), :(Lxx(λ,x,u,t,θ::$M)), Lxx, M)
-    build(Size(NX,NU), :(Lxu(λ,x,u,t,θ::$M)), Lxu, M)
-    build(Size(NU,NU), :(Luu(λ,x,u,t,θ::$M)), Luu, M)
-    return nothing
-end
 
 
 
@@ -269,7 +255,7 @@ function define_methods(T, sz::Size{S}, sym, name, args...) where S
         def_inplace(name, T, body, args...) |> string, "\n\n",
     )
     Base.include(Main, file)
-    hdr = "$name($(["$a, " for a in args]...)θ::$T)" |> x->x*repeat(" ", max(30-length(x),0))
+    hdr = "PRONTO.$name($(["$a, " for a in args]...)θ::$T)" |> x->x*repeat(" ", max(36-length(x),0))
     iinfo("$hdr "*as_color(crayon"dark_gray", "[$file]"))
 end
 
