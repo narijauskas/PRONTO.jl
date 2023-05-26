@@ -5,12 +5,18 @@ using Base: @kwdef
 
 NX = 4
 NU = 1
-NΘ = 2
+# NΘ = 2
 
-@kwdef struct TwoSpin{T} <: PRONTO.Model{NX,NU,NΘ}
-    kr::T = 1.0
-    kq::T = 1.0
+@kwdef struct TwoSpin <: Model{NX,NU}
+    kr::Float64 = 1.0
+    kq::Float64 = 1.0
 end
+
+
+# @kwdef struct TwoSpin{T} <: PRONTO.Model{NX,NU,NΘ}
+#     kr::T = 1.0
+#     kq::T = 1.0
+# end
 
 @dynamics TwoSpin begin
     H0 = [0 0 1 0;0 0 0 -1;-1 0 0 0;0 1 0 0]

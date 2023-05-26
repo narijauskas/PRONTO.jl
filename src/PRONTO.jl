@@ -50,15 +50,27 @@ export preview
 export Model
 export nx,nu,nθ
 
-abstract type Model{NX,NU,NΘ} <: FieldVector{NΘ,Float64} end
+# abstract type Model{NX,NU,NΘ} <: FieldVector{NΘ,Float64} end
 
-nx(::Model{NX,NU,NΘ}) where {NX,NU,NΘ} = NX
-nu(::Model{NX,NU,NΘ}) where {NX,NU,NΘ} = NU
-nθ(::Model{NX,NU,NΘ}) where {NX,NU,NΘ} = NΘ
+# nx(::Model{NX,NU,NΘ}) where {NX,NU,NΘ} = NX
+# nu(::Model{NX,NU,NΘ}) where {NX,NU,NΘ} = NU
+# nθ(::Model{NX,NU,NΘ}) where {NX,NU,NΘ} = NΘ
 
-nx(::Type{<:Model{NX,NU,NΘ}}) where {NX,NU,NΘ} = NX
-nu(::Type{<:Model{NX,NU,NΘ}}) where {NX,NU,NΘ} = NU
-nθ(::Type{<:Model{NX,NU,NΘ}}) where {NX,NU,NΘ} = NΘ
+# nx(::Type{<:Model{NX,NU,NΘ}}) where {NX,NU,NΘ} = NX
+# nu(::Type{<:Model{NX,NU,NΘ}}) where {NX,NU,NΘ} = NU
+# nθ(::Type{<:Model{NX,NU,NΘ}}) where {NX,NU,NΘ} = NΘ
+
+abstract type Model{NX,NU} end
+# fields can be Scalars or SArrays
+#MAYBE: restrict this?
+
+nx(::Model{NX,NU}) where {NX,NU} = NX
+nu(::Model{NX,NU}) where {NX,NU} = NU
+nθ(::T) where {T<:Model} = nθ(T)
+
+nx(::Type{<:Model{NX,NU}}) where {NX,NU} = NX
+nu(::Type{<:Model{NX,NU}}) where {NX,NU} = NU
+nθ(T::Type{<:Model}) = fieldcount(T)
 
 # not used
 inv!(A) = LinearAlgebra.inv!(LinearAlgebra.cholesky!(Hermitian(A)))
@@ -83,6 +95,38 @@ end
 # struct SymbolicModel{T}
 #     vars
 # end
+export SymModel
+struct SymModel{T} end
+
+# symmodel.kq -> variables fitting 
+getproperty(::SymModel{T}, name::Symbol) where {T<:Model} = symbolic(name, fieldtype(T, name))
+propertynames(::SymModel{T}) where T = fieldnames(T)
+
+symbolic(T::Type{<:Model}) = SymModel{T}()
+export symbolic
+
+# for models
+# symbolic(T::Model)
+
+# for tracing functions
+# symbolic(fxn::Function, T::Model)
+
+# scalar variables and fields (default)
+symbolic(name::Symbol, ::Type{<:Any}) = symbolic(name)
+symbolic(name::Symbol) = first(@variables $name)
+
+# array variables and fields
+symbolic(name::Symbol, T::Type{<:StaticArray}) = symbolic(name, Size(T))
+function symbolic(name::Symbol, ::Size{S}) where S
+    dims = [1:N for N in S]
+    collect(first(@variables $name[dims...]))
+end
+
+# non-static arrays
+symbolic(name::Symbol, T::Type{<:AbstractArray}) = error("Cannot create symbolic representation of variable-sized array. Consider using StaticArrays.")
+
+# symfield(::SArray{S,T}, name) where {S,T} = first(@variables name[])
+# getproperty(::SymModel{T}, name::Symbol) where {T<:Model} = fieldtype(T, name)
 
 # function SymbolicModel(T::DataType)
 #     @variables θ[1:nθ(T)]
@@ -92,20 +136,20 @@ end
 # getindex(θ::SymbolicModel{T}, i::Integer) where {T} = getindex(getfield(θ, :vars), i)
 # getproperty(θ::SymbolicModel{T}, name::Symbol) where {T} = getindex(θ, fieldindex(T, name))
 
-symindex(T, name) = findfirst(isequal(name), fieldnames(T))
-symfields(T,θ) = Tuple(θ[symindex(T, name)] for name in fieldnames(T))
+# symindex(T, name) = findfirst(isequal(name), fieldnames(T))
+# symfields(T,θ) = Tuple(θ[symindex(T, name)] for name in fieldnames(T))
 
-function SymbolicModel(T)
-    @variables θ[1:nθ(T)]
-    T{Num}(; zip(fieldnames(T), symfields(T, collect(θ)))...)
-end
+# function SymbolicModel(T)
+#     @variables θ[1:nθ(T)]
+#     T{Num}(; zip(fieldnames(T), symfields(T, collect(θ)))...)
+# end
 
 # ----------------------------------- #. helpers ----------------------------------- #
 include("helpers.jl")
 
 
 #can I finally deprecate this? :)
-views(::Model{NX,NU,NΘ},ξ) where {NX,NU,NΘ} = (@view ξ[1:NX]),(@view ξ[NX+1:end])
+# views(::Model{NX,NU,NΘ},ξ) where {NX,NU,NΘ} = (@view ξ[1:NX]),(@view ξ[NX+1:end])
 
 
 # ----------------------------------- #. model functions ----------------------------------- #
@@ -156,7 +200,7 @@ bkwd(τ) = reverse(fwd(τ))
 
 
 # solves for x(t),u(t)'
-function pronto(θ::Model{NX,NU,NΘ}, x0::StaticVector, φ, τ; limitγ=false, tol = 1e-5, maxiters = 20,verbose=true) where {NX,NU,NΘ}
+function pronto(θ::Model{NX,NU}, x0::StaticVector, φ, τ; limitγ=false, tol = 1e-5, maxiters = 20,verbose=true) where {NX,NU}
     t0,tf = τ
     verbose && info(0, "starting PRONTO")
 

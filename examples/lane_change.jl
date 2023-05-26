@@ -4,7 +4,30 @@ using LinearAlgebra, StaticArrays
 
 
 NX = 6; NU = 2
-@kwdef struct LaneChange <: PRONTO.Model{6,2,17}
+# @kwdef struct LaneChange <: PRONTO.Model{6,2,17}
+#     M::Float64 = 2041    # [kg]     Vehicle mass
+#     J::Float64 = 4964    # [kg m^2] Vehicle inertia (yaw)
+#     g::Float64 = 9.81    # [m/s^2]  Gravity acceleration
+#     Lf::Float64 = 1.56   # [m]      CG distance, front
+#     Lr::Float64 = 1.64   # [m]      CG distance, back
+#     μ::Float64 = 0.8     # []       Coefficient of friction
+#     b::Float64 = 12      # []       Tire parameter (Pacejka model)
+#     c::Float64 = 1.285   # []       Tire parameter (Pacejka model)
+#     s::Float64 = 30      # [m/s]    Vehicle speed
+#     r1::Float64 = 0.1    # LQR
+#     r2::Float64 = 0.1    # LQR
+#     q1::Float64 = 1      # LQR
+#     q2::Float64 = 0      # LQR
+#     q3::Float64 = 1      # LQR
+#     q4::Float64 = 0      # LQR
+#     q5::Float64 = 0      # LQR
+#     q6::Float64 = 0      # LQR
+#     # kr::SVector{2,Float64} = [0.1,0.1]      # LQR
+#     # kq::SVector{6,Float64} = [1,0,1,0,0,0]  # LQR
+#     # xeq::SVector{6,Float64} = zeros(6)      # equilibrium
+# end
+
+@kwdef struct LaneChange2 <: PRONTO.Model{6,2}
     M::Float64 = 2041    # [kg]     Vehicle mass
     J::Float64 = 4964    # [kg m^2] Vehicle inertia (yaw)
     g::Float64 = 9.81    # [m/s^2]  Gravity acceleration
@@ -14,17 +37,9 @@ NX = 6; NU = 2
     b::Float64 = 12      # []       Tire parameter (Pacejka model)
     c::Float64 = 1.285   # []       Tire parameter (Pacejka model)
     s::Float64 = 30      # [m/s]    Vehicle speed
-    r1::Float64 = 0.1    # LQR
-    r2::Float64 = 0.1    # LQR
-    q1::Float64 = 1      # LQR
-    q2::Float64 = 0      # LQR
-    q3::Float64 = 1      # LQR
-    q4::Float64 = 0      # LQR
-    q5::Float64 = 0      # LQR
-    q6::Float64 = 0      # LQR
-    # kr::SVector{2} = [0.1,0.1]      # LQR
-    # kq::SVector{6} = [1,0,1,0,0,0]  # LQR
-    # xeq::SVector{6} = zeros(6)      # equilibrium
+    kr::SVector{2,Float64} = [0.1,0.1]      # LQR
+    kq::SVector{6,Float64} = [1,0,1,0,0,0]  # LQR
+    xeq::SVector{6,Float64} = zeros(6)      # equilibrium
 end
 
 # sideslip angles
@@ -35,7 +50,7 @@ end
 F(α,θ) = θ.μ*θ.g*θ.M*sin(θ.c*atan(θ.b*α))
 
 # define model dynamics
-function dynamics(x,u,t,θ)
+@dynamics LaneChange2 begin
     [
         θ.s*sin(x[3]) + x[2]*cos(x[3]),
         -θ.s*x[4] + ( F(αf(x,θ),θ)*cos(x[5]) + F(αr(x,θ),θ)*cos(x[6]) )/θ.M,

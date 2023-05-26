@@ -1,4 +1,4 @@
-# using FastClosures
+using FastClosures
 # include("TwoSpin.jl")
 
 θ = TwoSpin()
