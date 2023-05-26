@@ -22,7 +22,7 @@ function x_eig(i)
     x_eig = kron([1;0],w[:,i])
 end
 
-@kwdef struct Spin2 <: PRONTO.Model{4,1,3}
+@kwdef struct spin2 <: Model{4,1,3}
     kl::Float64 # stage cost gain
     kr::Float64 # regulator r gain
     kq::Float64 # regulator q gain
@@ -36,7 +36,7 @@ end
 function dynamics(x,u,t,θ)
     H0 = [0 1;1 0]
     H1 = [0 -im;im 0]
-    return mprod(-im*(H0 + u[1]*H1) )*x
+    return mprod(-im*ω*(H0 + u[1]*H1) )*x
 end
 
 stagecost(x,u,t,θ) = 1/2 *θ[1]*collect(u')I*u
@@ -50,17 +50,16 @@ function regQ(x,u,t,θ)
     θ.kq*mprod(I(2) - ψ*ψ')
 end
 
-PRONTO.Pf(α,μ,tf,θ::Spin2) = SMatrix{4,4,Float64}(I(4) - α*α')
+PRONTO.Pf(α,μ,tf,θ::spin2) = SMatrix{4,4,Float64}(I(4) - α*α')
 
-PRONTO.generate_model(Spin2, dynamics, stagecost, termcost, regQ, regR)
+PRONTO.generate_model(spin2, dynamics, stagecost, termcost, regQ, regR)
 
 x0 = SVector{4}(x_eig(1))
-t0,tf = τ = (0,10)
+t0,tf = τ = (0,2)
 
-θ = Spin2(kl=0.01, kr=1, kq=1)
+θ = Split8(kl=0.01, kr=1, kq=1)
 
 μ = @closure t->SVector{1}(0.5*sin(t))
 φ = open_loop(θ,x0,μ,τ)
 
-@time ξ = pronto(θ,x0,φ,τ; tol = 1e-5, maxiters = 50, limitγ = true)
-
+@time ξ = pronto(θ,x0,φ,τ; tol = 1e-6, maxiters = 50, limitγ = true)
