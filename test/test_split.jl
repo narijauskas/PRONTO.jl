@@ -20,7 +20,7 @@ end
 
 # get the ith eigenstate
 function x_eig(i)
-    n = 5
+    n = 4
     α = 10
     v = -α/4
     H0 = SymTridiagonal(promote([4.0i^2 for i in -n:n], v*ones(2n))...)
@@ -35,50 +35,24 @@ end
 
 # ------------------------------- split system to eigenstate 2 ------------------------------- ##
 
-@kwdef struct Split2 <: Model{22,1,3}
+@kwdef struct Split1 <: Model{18,1,3}
     kl::Float64 # stage cost gain
     kr::Float64 # regulator r gain
     kq::Float64 # regulator q gain
 end
 
 
-function termcost2(x,u,t,θ)
-    P = I(22) - inprod(x_eig(2))
+function termcost1(x,u,t,θ)
+    P = I(18) - inprod(x_eig(1))
     1/2 * collect(x')*P*x
 end
-
-
-# ------------------------------- split system to eigenstate 4 ------------------------------- ##
-
-@kwdef struct Split4 <: Model{22,1,3}
-    kl::Float64 # stage cost gain
-    kr::Float64 # regulator r gain
-    kq::Float64 # regulator q gain
-end
-
-
-function termcost4(x,u,t,θ)
-    # xf = (x_eig(4)-x_eig(5))/sqrt(2)
-    xf = zeros(22)
-    xf[4] = 1
-    xf[8] = 1
-    xf = xf/sqrt(2)
-    P = I(22) - inprod(xf)
-    1/2 * collect(x')*P*x
-end
-
-# function termcost4(x,u,t,θ)
-#     xf = (x_eig(4) + x_eig(5)) / sqrt(2)
-#     P = I(22) - inprod(xf)
-#     1/2 * collect(x')*P*x
-# end
 
 
 # ------------------------------- split system definitions ------------------------------- ##
 
 function dynamics(x,u,t,θ)
     ω = 1.0
-    n = 5
+    n = 4
     α = 10
     v = -α/4
     H0 = SymTridiagonal(promote([4.0i^2 for i in -n:n], v*ones(2n))...)
@@ -92,21 +66,21 @@ stagecost(x,u,t,θ) = 1/2 *θ[1]*collect(u')I*u
 
 regR(x,u,t,θ) = θ.kr*I(1)
 function regQ(x,u,t,θ)
-    x_re = x[1:11]
-    x_im = x[12:22]
+    x_re = x[1:9]
+    x_im = x[10:18]
     ψ = x_re + im*x_im
-    θ.kq*mprod(I(11) - ψ*ψ')
+    θ.kq*mprod(I(9) - ψ*ψ')
 end
 
 
 
 # PRONTO.Pf(α,μ,tf,θ::Split2) = SMatrix{22,22,Float64}(I(22) - α*α')
-PRONTO.Pf(α,μ,tf,θ::Split4) = SMatrix{22,22,Float64}(I(22) - α*α')
+PRONTO.Pf(α,μ,tf,θ::Split1) = SMatrix{18,18,Float64}(I(18) - α*α')
 
 # ------------------------------- generate model and derivatives ------------------------------- ##
 
 # PRONTO.generate_model(Split2, dynamics, stagecost, termcost2, regQ, regR)
-PRONTO.generate_model(Split4, dynamics, stagecost, termcost4, regQ, regR)
+PRONTO.generate_model(Split1, dynamics, stagecost, termcost1, regQ, regR)
 
 
 ## ------------------------------- plots ------------------------------- ##
@@ -162,24 +136,24 @@ end
 
 ## ------------------------------- demo: eigenstate 1->4 in 10s ------------------------------- ##
 
-x0 = SVector{22}(x_eig(1))
+x0 = SVector{18}((x_eig(4)-x_eig(5))/sqrt(2))
 # xf = SVector{22}((x_eig(4) + x_eig(5))/sqrt(2))
-t0,tf = τ = (0,1.5)
+t0,tf = τ = (0,2)
 
 
-θ = Split4(kl=0.01, kr=1, kq=1)
+θ = Split1(kl=0.01, kr=1, kq=1)
 μ = @closure t->SVector{1}(0.5*sin(t))
 φ = open_loop(θ,x0,μ,τ)
-@time ξ = pronto(θ,x0,φ,τ; tol = 1e-3, maxiters = 100, limitγ = true)
+@time ξ = pronto(θ,x0,φ,τ; tol = 1e-4, maxiters = 100, limitγ = true)
 
-plot_split(ξ,τ)
+# plot_split(ξ,τ)
 
 ##
 using MAT
 ts = t0:0.001:tf
 is = eachindex(ξ.u)
 us = [ξ.u(t)[i] for t∈ts, i∈is]
-file = matopen("Uopt_4hk_1.5T.mat", "w")
+file = matopen("Uopt_4-21_2T.mat", "w")
 write(file, "Uopt", us)
 close(file)
 
