@@ -11,7 +11,6 @@ NU = 1
     kq::Float64 = 1.0
 end
 
-
 @dynamics TwoSpin begin
     H0 = [0 0 1 0;0 0 0 -1;-1 0 0 0;0 1 0 0]
     H1 = [0 -1 0 0;1 0 0 0;0 0 0 -1;0 0 1 0]
@@ -20,7 +19,7 @@ end
 
 @stage_cost TwoSpin begin
     Rl = [0.01;;]
-    1/2 * u'*Rl*u
+    1/2*u'*Rl*u
 end
 
 @terminal_cost TwoSpin begin
@@ -39,7 +38,6 @@ PRONTO.Pf(α,μ,tf,θ::TwoSpin) = SMatrix{4,4,Float64}(I(4))
 # PRONTO.Pf(model::TwoSpin,α,μ,tf) = SMatrix{4,4,Float64}(I(4))
 
 
-
 ## ----------------------------------- run optimization ----------------------------------- ##
 
 θ = TwoSpin()
@@ -50,4 +48,4 @@ xf = @SVector [1.0, 0.0, 0.0, 0.0]
 μ = t->[0.1]
 φ = open_loop(θ, xf, μ, τ) # guess trajectory
 @time ξ = pronto(θ, x0, φ, τ) # optimal trajectory
-@profview ξ = pronto(θ, x0, φ, τ) # optimal trajectory
+

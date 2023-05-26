@@ -1,10 +1,12 @@
 # Dev Notes and Version History
 
 ## Code Gen
-  - unit testing codegen #TODO: finish TwoSpin, verify
+  - unit testing codegen #DONE: finish TwoSpin, verify
   - support partial model regeneration #DONE:
   - fix needing to collect(x') #DONE:
   - codegen interface rework #DONE:
+  - codegen rewrite #DONE:
+  - support for vector/matrix parameters #DONE:
 
 ## Package
   - remove unneeded dependencies #DONE:
@@ -22,8 +24,8 @@
   - solver options interface #FUTURE:
   - save intermediate steps #FUTURE:
   - Dh plots #FUTURE:
-  - finalize model type #FIX: not too broken, just important
-  - vectorized parameters #TODO: #MAYBE:
+  - finalize model type #DONE:
+  - vectorized parameters #DONE:
 
 ## Don't Forget
   - LinearOperators

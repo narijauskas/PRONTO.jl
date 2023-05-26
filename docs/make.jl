@@ -13,11 +13,8 @@ makedocs(
 )
 
 
-# deploydocs(
-#     repo = "github.com/narijauskas/PRONTO.jl.git",
-#     devbranch = "main",
-#     devurl = "dev",
-#     push_preview = true,
-#     versions = [devurl => devurl, ],
-# )
+deploydocs(
+    repo = "github.com/narijauskas/PRONTO.jl.git",
+    push_preview = true,
+)
 
