@@ -4,7 +4,7 @@ using Documenter
 makedocs(
     sitename = "PRONTO.jl",
     # modules = PRONTO
-    authors = "Mantas Naris",
+    authors = ["Mantas Naris", "Jay Shao"],
     pages = Any[
             "index.md"
         ],
@@ -15,10 +15,6 @@ makedocs(
 
 deploydocs(
     repo = "github.com/narijauskas/PRONTO.jl.git",
-    # versions = ["stable" => "v^",],
-    versions = nothing, # temporary
-    devbranch = "main",
-    devurl = "dev",
     push_preview = true,
 )
 
