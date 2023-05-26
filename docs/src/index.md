@@ -4,41 +4,7 @@ Hello and welcome to the julia implementation of the **PR**ojection-**O**perator
 
 
 # An Example
-```julia
-using PRONTO
-using StaticArrays, LinearAlgebra
-```
-The wave function $|\psi(t)\rangle$ is a complex vector evolve in time $t$. We define our state vector 
-```math
-x = \begin{bmatrix}
-Re(|\psi\rangle)\\
-Im(|\psi\rangle) 
-\end{bmatrix},
-``` 
-and any complex square matrix $\mathcal{H}$ can be represented in its real form 
-```math
-H = \begin{bmatrix}
-Re(\mathcal{H}) & -Im(\mathcal{H}) \\
-Im(\mathcal{H}) & Re(\mathcal{H})
-\end{bmatrix}.
-```
 
-```julia
-function mprod(x) 
-    Re = I(2) 
-    Im = [0 -1; 1 0] 
-    M = kron(Re,real(x)) + kron(Im,imag(x)); 
-    return M 
-end
-
-function inprod(x) 
-    i = Int(length(x)/2) 
-    a = x[1:i] 
-    b = x[i+1:end] 
-    P = [a*a'+b*b' -(a*b'+b*a'); a*b'+b*a' a*a'+b*b'] 
-    return P
-end
-```
 
 ## Two Spin System
 We consider the Schrödinger equation
@@ -51,7 +17,53 @@ where $\mathcal{H_0} = \sigma_z = \begin{bmatrix}
 \end{bmatrix}$, and $\mathcal{H_1} = \sigma_y = \begin{bmatrix}
 0 & -i \\
 i & 0
-\end{bmatrix}$ are the Pauli matrices. The real control input $\phi(t)$ drives the system between 2 qubit states $|0\rangle$ and $|1\rangle$, which are the two eigenstates of the free Hamiltonian $\mathcal{H_0}$. Note that $|\psi \rangle$ is a $2 \times 1$ complex vector here; as a result, $x$ is a $4 \times 1$ real vector. 
+\end{bmatrix}$ are the Pauli matrices. The real control input $\phi(t)$ drives the system between 2 qubit states $|0\rangle$ and $|1\rangle$, which are the two eigenstates of the free Hamiltonian $\mathcal{H_0}$. We wish to find the optimal control input $\phi^{\star}(t)$ that performs the state-to-state transfer from $|0\rangle$ to $|1\rangle$. 
+
+```math
+\min h(\xi) = p(x(T)) + \int^T_0 l(x(t),u(t),t) dt \\
+s.t.    \quad \dot{x} = f(x,u,t), x(0) = x_0,
+```
+where $\xi(\cdot) = [x(\cdot);u(\cdot)]$.
+
+To solve this problem, we first need to load some dependencies:
+```julia
+using PRONTO
+using StaticArrays, LinearAlgebra
+```
+
+Also, note that $|\psi \rangle$ is a $2 \times 1$ complex vector, and we wish to have the state vector $x$ in the real form. We can define our state vector 
+```math
+x = \begin{bmatrix}
+Re(|\psi\rangle)\\
+Im(|\psi\rangle) 
+\end{bmatrix},
+```   
+which in this case is a $4 \times 1$ vector of real numbers. Moreover, any complex square matrix $\mathcal{H}$ can be represented in its real form using the function `mprod`
+```math
+H_{re} = \begin{bmatrix}
+Re(\mathcal{H}) & -Im(\mathcal{H}) \\
+Im(\mathcal{H}) & Re(\mathcal{H})
+\end{bmatrix}.
+```
+
+```julia
+function mprod(H) 
+    Re = I(2) 
+    Im = [0 -1; 1 0] 
+    H_re = kron(Re,real(H)) + kron(Im,imag(H)); 
+    return H_re 
+end
+```
+The function `inprod` computes the real representation of $|\psi\rangle \langle \psi|$ using $x$
+```julia
+function inprod(x) 
+    i = Int(length(x)/2) 
+    a = x[1:i] 
+    b = x[i+1:end] 
+    P = [a*a'+b*b' -(a*b'+b*a'); a*b'+b*a' a*a'+b*b'] 
+    return P
+end
+```
 
 We decide to name our model `Spin2`, where `{4,1,3}` represents the 4 state vector $x (|\psi\rangle)$, the single input $u (\phi)$ and the 3 parameters `kl, kr, kq`.
 
