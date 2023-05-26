@@ -4,7 +4,7 @@ using Documenter
 makedocs(
     sitename = "PRONTO.jl",
     # modules = PRONTO
-    authors = ["Mantas Naris", "Jay Shao"],
+    authors = "Mantas Naris and Jay Shao",
     pages = Any[
             "index.md"
         ],

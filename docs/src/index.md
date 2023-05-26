@@ -3,10 +3,7 @@
 Hello and welcome to the julia implementation of the **PR**ojection-**O**perator-Based **N**ewton’s Method for **T**rajectory **O**ptimization (PRONTO).
 
 
-# An Example
-
-
-## Two Spin System
+## An Example: Two Spin System
 We consider the Schrödinger equation
 ```math
 i|\dot{\psi}(t)\rangle = (\mathcal{H_0} + \phi(t)\mathcal{H_1})|\psi(t)\rangle,
@@ -17,28 +14,28 @@ where $\mathcal{H_0} = \sigma_z = \begin{bmatrix}
 \end{bmatrix}$, and $\mathcal{H_1} = \sigma_y = \begin{bmatrix}
 0 & -i \\
 i & 0
-\end{bmatrix}$ are the Pauli matrices. The real control input $\phi(t)$ drives the system between 2 qubit states $|0\rangle$ and $|1\rangle$, which are the two eigenstates of the free Hamiltonian $\mathcal{H_0}$. We wish to find the optimal control input $\phi^{\star}(t)$ that performs the state-to-state transfer from $|0\rangle$ to $|1\rangle$. 
+\end{bmatrix}$ are the Pauli matrices. The real control input $\phi(t)$ drives the system between 2 qubit states $|0\rangle$ and $|1\rangle$, which are the two eigenstates of the free Hamiltonian $\mathcal{H_0}$. We wish to find the optimal control input $\phi^{\star}(t)$ that performs the state-to-state transfer from $|0\rangle$ to $|1\rangle$. To do this, we will solve:
 
 ```math
 \min h(\xi) = p(x(T)) + \int^T_0 l(x(t),u(t),t) dt \\
-s.t.    \quad \dot{x} = f(x,u,t), x(0) = x_0,
+s.t.    \quad \dot{x} = f(x,u,t), x(0) = x_0,\\
+\text{where:} \quad \xi(\cdot) = [x(\cdot);u(\cdot)]
 ```
-where $\xi(\cdot) = [x(\cdot);u(\cdot)]$.
 
-To solve this problem, we first need to load some dependencies:
+First, we load some dependencies:
 ```julia
 using PRONTO
 using StaticArrays, LinearAlgebra
 ```
 
-Also, note that $|\psi \rangle$ is a $2 \times 1$ complex vector, and we wish to have the state vector $x$ in the real form. We can define our state vector 
+Note that $|\psi \rangle$ is a $2 \times 1$ complex vector, and we wish to have the state vector $x$ in the real form. We can define our state vector 
 ```math
 x = \begin{bmatrix}
 Re(|\psi\rangle)\\
 Im(|\psi\rangle) 
 \end{bmatrix},
 ```   
-which in this case is a $4 \times 1$ vector of real numbers. Moreover, any complex square matrix $\mathcal{H}$ can be represented in its real form using the function `mprod`
+which in this case is a $4 \times 1$ vector of real numbers. Moreover, any complex square matrix $\mathcal{H}$ can be represented in its real form using the helper function `mprod`:
 ```math
 H_{re} = \begin{bmatrix}
 Re(\mathcal{H}) & -Im(\mathcal{H}) \\
@@ -54,7 +51,7 @@ function mprod(H)
     return H_re 
 end
 ```
-The function `inprod` computes the real representation of $|\psi\rangle \langle \psi|$ using $x$
+We also define a function `inprod` to compute the real representation of $|\psi\rangle \langle \psi|$ using $x$:
 ```julia
 function inprod(x) 
     i = Int(length(x)/2) 
@@ -64,7 +61,7 @@ function inprod(x)
     return P
 end
 ```
-
+## Model Definition
 We decide to name our model `Spin2`, where `{4,1,3}` represents the 4 state vector $x (|\psi\rangle)$, the single input $u (\phi)$ and the 3 parameters `kl, kr, kq`.
 
 ```julia
@@ -185,7 +182,7 @@ For example, we take a look into `fu`, which is the first derivative of our dyna
 0 & 0 & 1 & 0
 \end{bmatrix}x
 ``` 
-respect to `u`. Mathematically, `fu` is
+with respect to `u`. Mathematically, `fu` is
 ```math
 \begin{bmatrix}
 0 & -1 & 0 & 0 \\
@@ -213,11 +210,11 @@ function PRONTO.fu(x, u, t, θ::TwoSpin)
     return (SMatrix{4, 1, Float64})(out)
 end
 ```
-They are exactly the same!
+They are exactly the same! However, PRONTO.jl has generated an efficient implementation for us automatically.
 
 
 
-We now show how to solve the problem. The initial state is the $|0\rangle$ state `x_eig(1)`, and we start the system at time $0$ `t0` and end at $2$ `tf`.
+We now show how to solve the problem. The initial state is the $|0\rangle$ state `x_eig(1)`, and we will solve the system from time `t0=0` to `tf=10`.
 
 ```julia
 x0 = SVector{4}(x_eig(1))
@@ -229,8 +226,7 @@ t0,tf = τ = (0,10)
 θ = Spin2(kl=0.01, kr=1, kq=1)
 ```
 
-To initialize our solver, we set the initial guess input $\mu(t) = 0.5\sin(t)$, and then we obtain the intial trajectory $\xi_0 = (\mu,\varphi)$ by solving the open loop problem
-
+To initialize our solver, we set the initial guess input $\mu(t) = 0.5\sin(t)$, and then we obtain the intial trajectory $\varphi$ by solving the open loop problem:
 ```julia
 μ = @closure t->SVector{1}(0.5*sin(t))
 φ = open_loop(θ,x0,μ,τ)
