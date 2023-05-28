@@ -19,22 +19,22 @@ function inprod(x)
 end
 
 
-function x_eig(i)
+function x_eig(i,θ)
     n = 5
-    α = 20
-    v = -α/4
+    v = -θ.α/4
     H0 = SymTridiagonal(promote([4.0i^2 for i in -n:n], v*ones(2n))...)
-    w = eigvecs(collect(H0)) # symbolic doesn't work here
+    w = eigvecs(collect(H0)) 
     x_eig = kron([1;0],w[:,i])
 end
 
 
-# ------------------------------- split system to eigenstate 8 ------------------------------- ##
+# ------------------------------- bs to 6th eigenstate ------------------------------- ##
 
-@kwdef struct Split6 <: Model{22,1,3}
+@kwdef struct Split6 <: Model{22,1,4}
     kl::Float64 # stage cost gain
     kr::Float64 # regulator r gain
     kq::Float64 # regulator q gain
+    α::Float64 # depth of lattice
 end
 
 
@@ -44,20 +44,19 @@ function termcost6(x,u,t,θ)
 end
 
 
-# ------------------------------- split system definitions ------------------------------- ##
+# ------------------------------- bs system definitions ------------------------------- ##
 
 function dynamics(x,u,t,θ)
     ω = 1.0
     n = 5
-    α = 20
-    v = -α/4
+    v = -θ.α/4
     H0 = SymTridiagonal(promote([4.0i^2 for i in -n:n], v*ones(2n))...)
     H1 = v*im*Tridiagonal(ones(2n), zeros(2n+1), -ones(2n))
     H2 = v*Tridiagonal(-ones(2n), zeros(2n+1), -ones(2n))
     return mprod(-im*ω*(H0 + sin(u[1])*H1 + (1-cos(u[1]))*H2) )*x
 end
 
-stagecost(x,u,t,θ) = 1/2 *θ[1]*collect(u')I*u
+stagecost(x,u,t,θ) = 1/2 *θ.kl*collect(u')I*u
 
 
 regR(x,u,t,θ) = θ.kr*I(1)
