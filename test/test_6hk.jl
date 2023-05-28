@@ -19,29 +19,30 @@ function inprod(x)
 end
 
 
-function x_eig(i,θ)
-    n = 5
-    v = -θ.α/4
-    H0 = SymTridiagonal(promote([4.0i^2 for i in -n:n], v*ones(2n))...)
-    w = eigvecs(collect(H0)) 
-    x_eig = kron([1;0],w[:,i])
-end
+# function x_eig(i,θ)
+#     n = 5
+#     v = -θ.α/4
+#     H0 = SymTridiagonal(promote([4.0i^2 for i in -n:n], v*ones(2n))...)
+#     w = eigvecs(collect(H0)) 
+#     x_eig = kron([1;0],w[:,i])
+# end
 
 
 # ------------------------------- bs to 6th eigenstate ------------------------------- ##
 
-@kwdef struct Split6 <: Model{22,1,4}
+@kwdef struct Split6 <: Model{22,1,5}
     kl::Float64 # stage cost gain
     kr::Float64 # regulator r gain
     kq::Float64 # regulator q gain
     α::Float64 # depth of lattice
+    i::Float64 # target ith eigenstate
 end
 
 
-function termcost6(x,u,t,θ)
-    P = I(22) - inprod(x_eig(6))
-    1/2 * collect(x')*P*x
-end
+# function termcost6(x,u,t,θ)
+#     P = I(22) - inprod(x_eig(6,θ))
+#     1/2 * collect(x')*P*x
+# end
 
 
 # ------------------------------- bs system definitions ------------------------------- ##
@@ -58,6 +59,17 @@ end
 
 stagecost(x,u,t,θ) = 1/2 *θ.kl*collect(u')I*u
 
+function termcost(x,u,t,θ)
+    n = 5
+    v = -θ.α/4
+    i = θ.i
+    H0 = SymTridiagonal(promote([4.0i^2 for i in -n:n], v*ones(2n))...)
+    w = eigvecs(collect(H0)) 
+    x_eig = kron([1;0],w[:,i])
+    P = I(22) - inprod(x_eig)
+    return 1/2 * collect(x')*P*x
+end
+
 
 regR(x,u,t,θ) = θ.kr*I(1)
 
@@ -72,7 +84,7 @@ PRONTO.Pf(α,μ,tf,θ::Split6) = SMatrix{22,22,Float64}(I(22) - α*α')
 
 # ------------------------------- generate model and derivatives ------------------------------- ##
 
-PRONTO.generate_model(Split6, dynamics, stagecost, termcost6, regQ, regR)
+PRONTO.generate_model(Split6, dynamics, stagecost, termcost, regQ, regR)
 
 
 ## ------------------------------- demo: eigenstate 1->8 in 10 ------------------------------- ##
