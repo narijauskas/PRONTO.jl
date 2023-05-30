@@ -1,19 +1,18 @@
-# PRONTO.jl dev_0.4
+# PRONTO.jl v0.4.0
 module PRONTO
 
 using FunctionWrappers: FunctionWrapper
 using StaticArrays
 using FastClosures
-export @closure
+export @closure #FUTURE: remove reexport
 
 using Base: @kwdef
-export @kwdef
+export @kwdef #FUTURE: remove reexport
 
 import LinearAlgebra
 using LinearAlgebra: mul!, I
 using UnicodePlots
 using MacroTools
-using SparseArrays
 using MatrixEquations
 
 #FUTURE: using OrdinaryDiffEq?
@@ -38,9 +37,6 @@ import Base: extrema, length, eachindex, show, size, eltype, getproperty, getind
 
 export pronto
 export info
-
-export @tick,@tock,@clock
-
 export ODE, Buffer
 export preview
 

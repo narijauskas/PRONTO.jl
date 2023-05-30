@@ -70,7 +70,7 @@ t0,tf = τ = (0,4)
 
 # plot_lane_change(ξ,τ)
 ## -------------------------------  ------------------------------- ##
-
+#=
 
 function plot_lane_change(ξ,τ)
     fig = Figure()
@@ -184,7 +184,7 @@ model = (
 η = pronto(model)
 ts = model.ts
 
-
+=#
 #= plot result
     using GLMakie
     fig = Figure()
