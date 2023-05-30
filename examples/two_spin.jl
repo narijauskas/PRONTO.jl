@@ -42,10 +42,9 @@ PRONTO.Pf(α,μ,tf,θ::TwoSpin) = SMatrix{4,4,Float64}(I(4))
 
 θ = TwoSpin()
 τ = t0,tf = 0,10
-
 x0 = @SVector [0.0, 1.0, 0.0, 0.0]
 xf = @SVector [1.0, 0.0, 0.0, 0.0]
-μ = t->[0.1]
+μ = t->[0.1] # open loop input μ(t)
 φ = open_loop(θ, xf, μ, τ) # guess trajectory
 @time ξ = pronto(θ, x0, φ, τ) # optimal trajectory
 

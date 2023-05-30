@@ -2,32 +2,8 @@
 using PRONTO
 using LinearAlgebra, StaticArrays
 
-
-NX = 6; NU = 2
-# @kwdef struct LaneChange <: PRONTO.Model{6,2,17}
-#     M::Float64 = 2041    # [kg]     Vehicle mass
-#     J::Float64 = 4964    # [kg m^2] Vehicle inertia (yaw)
-#     g::Float64 = 9.81    # [m/s^2]  Gravity acceleration
-#     Lf::Float64 = 1.56   # [m]      CG distance, front
-#     Lr::Float64 = 1.64   # [m]      CG distance, back
-#     μ::Float64 = 0.8     # []       Coefficient of friction
-#     b::Float64 = 12      # []       Tire parameter (Pacejka model)
-#     c::Float64 = 1.285   # []       Tire parameter (Pacejka model)
-#     s::Float64 = 30      # [m/s]    Vehicle speed
-#     r1::Float64 = 0.1    # LQR
-#     r2::Float64 = 0.1    # LQR
-#     q1::Float64 = 1      # LQR
-#     q2::Float64 = 0      # LQR
-#     q3::Float64 = 1      # LQR
-#     q4::Float64 = 0      # LQR
-#     q5::Float64 = 0      # LQR
-#     q6::Float64 = 0      # LQR
-#     # kr::SVector{2,Float64} = [0.1,0.1]      # LQR
-#     # kq::SVector{6,Float64} = [1,0,1,0,0,0]  # LQR
-#     # xeq::SVector{6,Float64} = zeros(6)      # equilibrium
-# end
-
-@kwdef struct LaneChange2 <: PRONTO.Model{6,2}
+# NX = 6; NU = 2
+@kwdef struct LaneChange <: PRONTO.Model{6,2}
     M::Float64 = 2041    # [kg]     Vehicle mass
     J::Float64 = 4964    # [kg m^2] Vehicle inertia (yaw)
     g::Float64 = 9.81    # [m/s^2]  Gravity acceleration
@@ -50,38 +26,27 @@ end
 F(α,θ) = θ.μ*θ.g*θ.M*sin(θ.c*atan(θ.b*α))
 
 # define model dynamics
-@dynamics LaneChange2 begin
-    [
-        θ.s*sin(x[3]) + x[2]*cos(x[3]),
-        -θ.s*x[4] + ( F(αf(x,θ),θ)*cos(x[5]) + F(αr(x,θ),θ)*cos(x[6]) )/θ.M,
-        x[4],
-        ( F(αf(x,θ),θ)*cos(x[5])*θ.Lf - F(αr(x,θ),θ)*cos(x[6])*θ.Lr )/θ.J,
-        u[1],
-        u[2],
-    ]
-end
+@dynamics LaneChange [
+    θ.s*sin(x[3]) + x[2]*cos(x[3])
+    -θ.s*x[4] + ( F(αf(x,θ),θ)*cos(x[5]) + F(αr(x,θ),θ)*cos(x[6]) )/θ.M
+    x[4]
+    ( F(αf(x,θ),θ)*cos(x[5])*θ.Lf - F(αr(x,θ),θ)*cos(x[6])*θ.Lr )/θ.J
+    u[1]
+    u[2]
+]
 
-@stage_cost LaneChange2 begin
-    1/2*x'*I*x + 1/2*u'*I*u
-end
+@stage_cost LaneChange 1/2*x'*I*x + 1/2*u'*I*u
 
 # should be solution to DARE at desired equilibrium
-@terminal_cost LaneChange2 begin
-    1/2*x'*I*x
-end
+@terminal_cost LaneChange 1/2*x'*I*x
 
-@regulatorR LaneChange2 diagm(θ.kr)
-@regulatorQ LaneChange2 diagm(θ.kq)
+@regulatorR LaneChange diagm(θ.kr)
+@regulatorQ LaneChange diagm(θ.kq)
 
-# regR(x,u,t,θ) = diagm([θ.r1,θ.r2])
-# regQ(x,u,t,θ) = diagm([θ.q1,θ.q2,θ.q3,θ.q4,θ.q5,θ.q6])
-
-# PRONTO.generate_model(LaneChange, dynamics, stagecost, termcost, regQ, regR)
-
-resolve_model(LaneChange2)
+resolve_model(LaneChange)
 
 ## -------------------------------  ------------------------------- ##
-θ = LaneChange2()
+θ = LaneChange()
 x0 = SVector{6}(-5.0,zeros(5)...)
 xf = @SVector zeros(6)
 t0,tf = τ = (0,4)

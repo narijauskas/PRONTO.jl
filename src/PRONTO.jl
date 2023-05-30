@@ -102,29 +102,6 @@ struct SymModel{T} end
 getproperty(::SymModel{T}, name::Symbol) where {T<:Model} = symbolic(name, fieldtype(T, name))
 propertynames(::SymModel{T}) where T = fieldnames(T)
 
-symbolic(T::Type{<:Model}) = SymModel{T}()
-export symbolic
-
-# for models
-# symbolic(T::Model)
-
-# for tracing functions
-# symbolic(fxn::Function, T::Model)
-
-# scalar variables and fields (default)
-symbolic(name::Symbol, ::Type{<:Any}) = symbolic(name)
-symbolic(name::Symbol) = first(@variables $name)
-
-# array variables and fields
-symbolic(name::Symbol, T::Type{<:StaticArray}) = symbolic(name, Size(T))
-function symbolic(name::Symbol, ::Size{S}) where S
-    dims = [1:N for N in S]
-    collect(first(@variables $name[dims...]))
-end
-
-# non-static arrays
-symbolic(name::Symbol, T::Type{<:AbstractArray}) = error("Cannot create symbolic representation of variable-sized array. Consider using StaticArrays.")
-
 # symfield(::SArray{S,T}, name) where {S,T} = first(@variables name[])
 # getproperty(::SymModel{T}, name::Symbol) where {T<:Model} = fieldtype(T, name)
 

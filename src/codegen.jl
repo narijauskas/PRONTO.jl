@@ -206,13 +206,30 @@ end
 # trace(f, model, x, u, t)
 
 
+export symbolic
+
+# for models
+symbolic(T::Type{<:Model}) = SymModel{T}()
+
+# scalar variables and fields (default)
+symbolic(name::Symbol, ::Type{<:Any}) = symbolic(name)
+symbolic(name::Symbol) = first(@variables $name)
+
+# array variables and fields
+symbolic(name::Symbol, T::Type{<:StaticArray}) = symbolic(name, Size(T))
+symbolic(name::Symbol, ::Size{S}) where S = collect(first(@variables $name[[1:N for N in S]...]))
+symbolic(name::Symbol, S::Vararg{Int}) = collect(first(@variables $name[[1:N for N in S]...]))
+
+# non-static arrays
+symbolic(name::Symbol, T::Type{<:AbstractArray}) = error("Cannot create symbolic representation of variable-sized array. Consider using StaticArrays.")
+
 
 
 # θ = symbolic(T)
 function trace(T::Type{<:Model{NX,NU}}, f) where {NX,NU}
-    x = collect(first(@variables x[1:NX]))
-    u = collect(first(@variables u[1:NU]))
-    t = first(@variables t)
+    x = symbolic(:x, NX)
+    u = symbolic(:u, NU)
+    t = symbolic(:t)
     θ = symbolic(T)
     return collect(invokelatest(f, x, u, t, θ))
     # return Symbolics.scalarize(invokelatest(f, x, u, t, θ))
