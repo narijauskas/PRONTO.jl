@@ -38,7 +38,7 @@ SymbolicUtils = "0.19.11"
 Symbolics = "4.6"
 ThreadTools = "0.2"
 UnicodePlots = "3.5"
-Statistics = "1.9"
+Statistics = "1.0"
 
 
 [extras]
