@@ -24,7 +24,7 @@ function x_eig(i)
     E0 = 0.0
     E2 = 3.4
     E9 = 8.1
-    H0 = diagm([E0, E2, E9])
+    H0 = 2π*diagm([E0, E2, E9])
     w = eigvecs(collect(H0)) 
     x_eig = kron([1;0],w[:,i])
 end
@@ -51,7 +51,7 @@ function dynamics(x,u,t,θ)
     E0 = 0.0
     E2 = 3.4
     E9 = 8.1
-    H0 = diagm([E0, E2, E9])
+    H0 = 2π*diagm([E0, E2, E9])
 
     H1 = [0.0103673+3.73069e-16im 0.00010414+0.000263476im 0.00744436-0.0582357im;
          0.00010414-0.000263476im 0.0103349+1.54752e-15im 0.0300912+0.0165778im;
