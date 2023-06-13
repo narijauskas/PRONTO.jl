@@ -50,6 +50,7 @@ begin
 	# Make the drive Hamiltonian
 	Hdrive = sparse(beta_phi*tensor(id_theta,n_phi) + beta_theta*tensor(n_theta, id_phi))
 end
+
 ##
 
 begin
@@ -216,8 +217,10 @@ end
 
 H0 = H_full.operators[1].data
 # H0 = 2π*diagm([0, 3.4, 8.1, 9.1, 12.54])
-H1 = H_full.operators[2].data
-
+H0 = diagm(diag(H0)[1:3])
+H0[1,1] = 0
+H1 = H_full.operators[2].data[1:3,1:3]
+# H1 = real(H1)
 
 function x_eig(i)
     w = eigvecs(collect(H0)) 
@@ -227,7 +230,7 @@ end
 
 # ------------------------------- 5lvl system to eigenstate 2 ------------------------------- ##
 
-@kwdef struct lvl5 <: Model{10,1,3}
+@kwdef struct lvl5 <: Model{6,1,3}
     kl::Float64 # stage cost gain
     kr::Float64 # regulator r gain
     kq::Float64 # regulator q gain
@@ -235,7 +238,8 @@ end
 
 
 function termcost(x,u,t,θ)
-    P = I(10) - inprod(x_eig(2))
+    P = I(6) - inprod(x_eig(2))
+	# P = inprod(x_eig(1))
     1/2 * collect(x')*P*x
 end
 
@@ -252,13 +256,13 @@ stagecost(x,u,t,θ) = 1/2*θ.kl*collect(u')I*u #+ 0.0*collect(x')*mprod(diagm([0
 regR(x,u,t,θ) = θ.kr*I(1)
 
 function regQ(x,u,t,θ)
-    x_re = x[1:5]
-    x_im = x[6:10]
+    x_re = x[1:3]
+    x_im = x[4:6]
     ψ = x_re + im*x_im
-    θ.kq*mprod(I(5) - ψ*ψ')
+    θ.kq*mprod(I(3) - ψ*ψ')
 end
 
-PRONTO.Pf(α,μ,tf,θ::lvl5) = SMatrix{10,10,Float64}(I(10) - α*α')
+PRONTO.Pf(α,μ,tf,θ::lvl5) = SMatrix{6,6,Float64}(I(6) - α*α')
 
 # ------------------------------- generate model and derivatives ------------------------------- ##
 
@@ -266,11 +270,11 @@ PRONTO.generate_model(lvl5, dynamics, stagecost, termcost, regQ, regR)
 
 ## ------------------------------- demo: Simulation in 2000 ------------------------------- ##
 
-x0 = SVector{10}(x_eig(1))
+x0 = SVector{6}(x_eig(3))
 
-θ = lvl5(kl=0.0001, kr=1, kq=1)
+θ = lvl5(kl=0.01, kr=1, kq=1)
 
-t0,tf = τ = (0,2000)
+t0,tf = τ = (0,100)
 tgate = tf
 
 μ = @closure t->SVector{1}(drive(t, t_gate, w09, w29, amp1, amp2))
@@ -281,15 +285,26 @@ tgate = tf
 ##
 
 ts = 0:0.01:tf
-is = eachindex(φ.x)
-xs = [φ.x(t)[i] for t∈ts, i∈is]
-ps = ([I(5) I(5)] * (xs.^2)')'
-us = [φ.u(t) for t∈ts]
+is = eachindex(ξ.x)
+xs = [ξ.x(t)[i] for t∈ts, i∈is]
+ps = ([I(3) I(3)] * (xs.^2)')'
+us = [ξ.u(t) for t∈ts]
 
 begin
 	plt.close("all")
 	plt.plot(ts,ps)
 	plt.xlabel("time (ns)")
 	plt.ylabel("population")
+	plt.legend(["0", "2", "9"])
 	plt.gcf()
 end
+
+##
+
+using MAT
+ts = t0:0.001:tf
+is = eachindex(ξ.u)
+us = [ξ.u(t)[i] for t∈ts, i∈is]
+file = matopen("Uopt2_0pi_100T.mat", "w")
+write(file, "Uopt2", us)
+close(file)
