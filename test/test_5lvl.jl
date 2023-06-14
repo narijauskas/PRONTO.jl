@@ -7,7 +7,7 @@ using LazyGrids: ndgrid_array
 import PlutoUI: combine
 include("cqed.jl")
 
-##
+
 begin
 	# Parameters from https://journals.aps.org/prxquantum/pdf/10.1103/PRXQuantum.2.010339
 	# Units of GHz*h
@@ -51,7 +51,7 @@ begin
 	Hdrive = sparse(beta_phi*tensor(id_theta,n_phi) + beta_theta*tensor(n_theta, id_phi))
 end
 
-##
+
 
 begin
 	ev, es = eigenstates(Hzp, 50)
@@ -59,7 +59,7 @@ begin
 	ev = real.(ev .- shift)
 end
 
-##
+
 
 begin
 	plt.close("all")
@@ -76,7 +76,7 @@ begin
 	plt.gcf()
 end
 
-##
+
 
 begin
 	function plot_mat_elems(mat, to_show, title = L"$\log_{10}H_{drive}$")
@@ -95,7 +95,7 @@ begin
 	plot_mat_elems(Hdrive, [1,3,10])
 end
 
-##
+
 
 begin
 	all_elems = abs.(mat_elems(es, Hdrive))
@@ -113,7 +113,7 @@ begin
 	plt.gcf()
 end
 
-##
+
 
 begin
 	plt.close("all")
@@ -132,21 +132,21 @@ begin
 	plt.gcf()
 end
 
-##
+
 
 begin
 	proj, trunc_basis = trunc_subspace(es[to_show])
 	const H_full = LazySum([1.0, 0.0], hermitify.([trunc_op(proj, Hzp)-identityoperator(trunc_op(proj, Hzp))*shift, trunc_op(proj, Hdrive)]))
 end
 
-##
+
 
 begin
 	envelope(t, tgate, sigma, drive_amp) = drive_amp*(exp(-(t-tgate/2)^2/(2*sigma^2))-exp(-(tgate/2)^2/(2*sigma^2)))
 	drive(t, t_gate, ωd1, ωd2, amp1, amp2) = envelope(t,t_gate, t_gate/4, amp1)*cos(ωd1*t) + envelope(t, t_gate, t_gate/4, amp2)*cos(ωd2*t)
 end
 
-##
+
 
 begin
 	
@@ -165,7 +165,7 @@ begin
 	w09, w29, amp1, amp2
 end
 
-##
+
 
 begin
 	times = range(0, t_gate, 1000)
@@ -182,7 +182,7 @@ begin
 	plt.gcf()
 end
 
-##
+
 
 begin
 	plt.close("all")
@@ -215,11 +215,12 @@ function inprod(x)
     return P
 end
 
+# H0 = round.(H_full.operators[1].data, digits=12)[1:3,1:3]
 H0 = H_full.operators[1].data
 # H0 = 2π*diagm([0, 3.4, 8.1, 9.1, 12.54])
-H0 = diagm(diag(H0)[1:3])
+H0 = diagm(diag(H0))
 H0[1,1] = 0
-H1 = H_full.operators[2].data[1:3,1:3]
+H1 = H_full.operators[2].data
 # H1 = real(H1)
 
 function x_eig(i)
@@ -230,7 +231,7 @@ end
 
 # ------------------------------- 5lvl system to eigenstate 2 ------------------------------- ##
 
-@kwdef struct lvl5 <: Model{6,1,3}
+@kwdef struct lvl5 <: Model{10,1,3}
     kl::Float64 # stage cost gain
     kr::Float64 # regulator r gain
     kq::Float64 # regulator q gain
@@ -238,8 +239,8 @@ end
 
 
 function termcost(x,u,t,θ)
-    P = I(6) - inprod(x_eig(2))
-	# P = inprod(x_eig(1))
+    P = I(10) - inprod(x_eig(2)) + inprod(x_eig(5))
+	# P = inprod(x_eig(1)) + inprod(x_eig(4))
     1/2 * collect(x')*P*x
 end
 
@@ -251,18 +252,18 @@ function dynamics(x,u,t,θ)
 end
 
 
-stagecost(x,u,t,θ) = 1/2*θ.kl*collect(u')I*u #+ 0.0*collect(x')*mprod(diagm([0, 0, 0, 1, 0]))*x + 0.0*collect(x')*mprod(diagm([0, 0, 0, 0, 1]))*x
+stagecost(x,u,t,θ) = 1/2*θ.kl*collect(u')I*u + 0.0*collect(x')*mprod(diagm([0, 0, 0, 1, 0]))*x + 0.1*collect(x')*mprod(diagm([0, 0, 0, 0, 1]))*x
 
 regR(x,u,t,θ) = θ.kr*I(1)
 
 function regQ(x,u,t,θ)
-    x_re = x[1:3]
-    x_im = x[4:6]
+    x_re = x[1:5]
+    x_im = x[6:10]
     ψ = x_re + im*x_im
-    θ.kq*mprod(I(3) - ψ*ψ')
+    θ.kq*mprod(I(5) - ψ*ψ')
 end
 
-PRONTO.Pf(α,μ,tf,θ::lvl5) = SMatrix{6,6,Float64}(I(6) - α*α')
+PRONTO.Pf(α,μ,tf,θ::lvl5) = SMatrix{10,10,Float64}(I(10) - α*α')
 
 # ------------------------------- generate model and derivatives ------------------------------- ##
 
@@ -270,15 +271,15 @@ PRONTO.generate_model(lvl5, dynamics, stagecost, termcost, regQ, regR)
 
 ## ------------------------------- demo: Simulation in 2000 ------------------------------- ##
 
-x0 = SVector{6}(x_eig(3))
+x0 = SVector{10}(x_eig(3))
 
 θ = lvl5(kl=0.01, kr=1, kq=1)
 
-t0,tf = τ = (0,100)
+t0,tf = τ = (0,200)
 tgate = tf
 
-μ = @closure t->SVector{1}(drive(t, t_gate, w09, w29, amp1, amp2))
-# μ = @closure t->SVector{1}(0.4*cos(40*t))
+# μ = @closure t->SVector{1}(drive(t, t_gate, w09, w29, amp1, amp2))
+μ = @closure t->SVector{1}(0.4*cos((H0[3,3]-H0[2,2])*t))
 φ = open_loop(θ,x0,μ,τ)
 @time ξ = pronto(θ,x0,φ,τ; tol = 1e-4, maxiters = 50, limitγ = true)
 
@@ -287,7 +288,7 @@ tgate = tf
 ts = 0:0.01:tf
 is = eachindex(ξ.x)
 xs = [ξ.x(t)[i] for t∈ts, i∈is]
-ps = ([I(3) I(3)] * (xs.^2)')'
+ps = ([I(5) I(5)] * (xs.^2)')'
 us = [ξ.u(t) for t∈ts]
 
 begin
@@ -295,7 +296,7 @@ begin
 	plt.plot(ts,ps)
 	plt.xlabel("time (ns)")
 	plt.ylabel("population")
-	plt.legend(["0", "2", "9"])
+	plt.legend(["0", "2", "9","11","18"])
 	plt.gcf()
 end
 
@@ -305,6 +306,6 @@ using MAT
 ts = t0:0.001:tf
 is = eachindex(ξ.u)
 us = [ξ.u(t)[i] for t∈ts, i∈is]
-file = matopen("Uopt2_0pi_100T.mat", "w")
+file = matopen("Uopt2_0pi_200T.mat", "w")
 write(file, "Uopt2", us)
 close(file)
