@@ -239,8 +239,8 @@ end
 
 
 function termcost(x,u,t,θ)
-    P = I(10) - inprod(x_eig(2)) + inprod(x_eig(5))
-	# P = inprod(x_eig(1)) + inprod(x_eig(4))
+    P = I(10) - inprod(x_eig(2)) #+ inprod(x_eig(5))
+	# P = inprod(x_eig(1))  + inprod(x_eig(4))
     1/2 * collect(x')*P*x
 end
 
@@ -252,7 +252,7 @@ function dynamics(x,u,t,θ)
 end
 
 
-stagecost(x,u,t,θ) = 1/2*θ.kl*collect(u')I*u + 0.0*collect(x')*mprod(diagm([0, 0, 0, 1, 0]))*x + 0.1*collect(x')*mprod(diagm([0, 0, 0, 0, 1]))*x
+stagecost(x,u,t,θ) = 1/2*θ.kl*collect(u')I*u + 0.1*collect(x')*mprod(diagm([0, 0, 0, 1, 0]))*x + 0.1*collect(x')*mprod(diagm([0, 0, 0, 0, 1]))*x
 
 regR(x,u,t,θ) = θ.kr*I(1)
 
@@ -271,15 +271,15 @@ PRONTO.generate_model(lvl5, dynamics, stagecost, termcost, regQ, regR)
 
 ## ------------------------------- demo: Simulation in 2000 ------------------------------- ##
 
-x0 = SVector{10}(x_eig(3))
+x0 = SVector{10}(x_eig(1))
 
 θ = lvl5(kl=0.01, kr=1, kq=1)
 
-t0,tf = τ = (0,200)
+t0,tf = τ = (0,300)
 tgate = tf
 
 # μ = @closure t->SVector{1}(drive(t, t_gate, w09, w29, amp1, amp2))
-μ = @closure t->SVector{1}(0.4*cos((H0[3,3]-H0[2,2])*t))
+μ = @closure t->SVector{1}(0.4*cos((H0[3,3]-0.0*H0[2,2])*t))
 φ = open_loop(θ,x0,μ,τ)
 @time ξ = pronto(θ,x0,φ,τ; tol = 1e-4, maxiters = 50, limitγ = true)
 
@@ -306,6 +306,6 @@ using MAT
 ts = t0:0.001:tf
 is = eachindex(ξ.u)
 us = [ξ.u(t)[i] for t∈ts, i∈is]
-file = matopen("Uopt2_0pi_200T.mat", "w")
-write(file, "Uopt2", us)
+file = matopen("Uopt_0pi_300T.mat", "w")
+write(file, "Uopt", us)
 close(file)
