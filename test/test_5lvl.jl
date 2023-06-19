@@ -275,7 +275,7 @@ x0 = SVector{10}(x_eig(1))
 
 θ = lvl5(kl=0.01, kr=1, kq=1)
 
-t0,tf = τ = (0,300)
+t0,tf = τ = (0,400)
 tgate = tf
 
 # μ = @closure t->SVector{1}(drive(t, t_gate, w09, w29, amp1, amp2))
