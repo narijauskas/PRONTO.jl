@@ -22,15 +22,20 @@ using PRONTO: symbolic
 
 # first, create symbolic versions of everything
 θ = symbolic(TwoSpin)
-λ = symbolic(:λ, 1:NX)
-x = symbolic(:x, 1:NX)
-u = symbolic(:u, 1:NU)
+θ = symbolic(LaneChange)
+λ = Symbolics.variables(:λ, 1:NX)
+x = Symbolics.variables(:x, 1:NX)
+u = Symbolics.variables(:u, 1:NU)
 t = symbolic(:t)
 
-symbolic(TwoSpin, PRONTO.f)
+# symbolic(TwoSpin, PRONTO.f)
 
 # can now symbolically trace any PRONTO kernel function by calling it, eg.
 PRONTO.f(x,u,t,θ) # returns a symbolic representation of dynamics
+PRONTO.fx(x,u,t,θ) # or dynamics jacobian
+PRONTO.Lxu(λ,x,u,t,θ) # or lagrangian hessian 
+
+
 
 # this is useful, especially combined with other packages
 using Latexify

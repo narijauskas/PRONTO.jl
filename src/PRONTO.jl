@@ -102,29 +102,6 @@ struct SymModel{T} end
 getproperty(::SymModel{T}, name::Symbol) where {T<:Model} = symbolic(name, fieldtype(T, name))
 propertynames(::SymModel{T}) where T = fieldnames(T)
 
-symbolic(T::Type{<:Model}) = SymModel{T}()
-export symbolic
-
-# for models
-# symbolic(T::Model)
-
-# for tracing functions
-# symbolic(fxn::Function, T::Model)
-
-# scalar variables and fields (default)
-symbolic(name::Symbol, ::Type{<:Any}) = symbolic(name)
-symbolic(name::Symbol) = first(@variables $name)
-
-# array variables and fields
-symbolic(name::Symbol, T::Type{<:StaticArray}) = symbolic(name, Size(T))
-function symbolic(name::Symbol, ::Size{S}) where S
-    dims = [1:N for N in S]
-    collect(first(@variables $name[dims...]))
-end
-
-# non-static arrays
-symbolic(name::Symbol, T::Type{<:AbstractArray}) = error("Cannot create symbolic representation of variable-sized array. Consider using StaticArrays.")
-
 # symfield(::SArray{S,T}, name) where {S,T} = first(@variables name[])
 # getproperty(::SymModel{T}, name::Symbol) where {T<:Model} = fieldtype(T, name)
 
@@ -198,11 +175,13 @@ include("armijo.jl") # armijo step and projection
 fwd(τ) = extrema(τ)
 bkwd(τ) = reverse(fwd(τ))
 
+# preview(θ::Model, ξ) = nothing
 
 # solves for x(t),u(t)'
-function pronto(θ::Model{NX,NU}, x0::StaticVector, φ, τ; limitγ=false, tol = 1e-5, maxiters = 20,verbose=true) where {NX,NU}
+function pronto(θ::Model{NX,NU}, x0::StaticVector, φ, τ; limitγ=false, tol = 1e-6, maxiters = 20,verbose=false) where {NX,NU}
     t0,tf = τ
-    verbose && info(0, "starting PRONTO")
+    # verbose && 
+    info(0, "starting PRONTO")
 
     for i in 1:maxiters
         # info(i, "iteration")
@@ -235,24 +214,28 @@ function pronto(θ::Model{NX,NU}, x0::StaticVector, φ, τ; limitγ=false, tol =
 
         # compute cost
         h = cost(ξ, τ)
-        # verbose && iinfo(as_bold("h = $(h)\n"))
-        # print(ξ)
 
         # -------------- select γ via armijo step -------------- #
         # γ = γmax; 
         aα=0.4; aβ=0.7
         γ = limitγ ? min(1, 1/maximum(maximum(ζ.x(t) for t in t0:0.0001:tf))) : 1.0
 
-        local η
+        local η # defined to exist outside of while loop
         while γ > aβ^25
             verbose && iinfo("armijo γ = $(round(γ; digits=6))")
             η = armijo_projection(θ,x0,ξ,ζ,γ,Kr,τ)
             g = cost(η, τ)
             h-g >= -aα*γ*Dh ? break : (γ *= aβ)
         end
-        verbose && info(i, "Dh = $Dh, h = $h, γ = $γ") #TODO: 1st/2nd order
-
         φ = η
+
+        # verbose && 
+        info(i, "Dh = $Dh, h = $h, γ = $γ, order = $(is2ndorder(Ko) ? "2nd" : "1st")") #TODO: 1st/2nd order
+
+        # println(preview(φ.x, 1))
+        println(preview(ξ.x, (1,3)))
+        # println(preview(ξ.x, (2,4)))
+        # println(preview(ξ.u, 1))
     end
     return φ
 end

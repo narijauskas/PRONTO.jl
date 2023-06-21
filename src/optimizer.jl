@@ -71,7 +71,7 @@ function asymmetry(A)
 end
 
 retcode(x::ODE) = x.soln.retcode
-isstable(x::ODE) = retcode(x) == :Success
+isstable(x::ODE) = retcode(x) == ReturnCode.Success
 
 struct InstabilityException <: Exception
 end
