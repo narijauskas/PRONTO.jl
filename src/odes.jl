@@ -105,10 +105,16 @@ end
 # ----------------------------------- ODE display ----------------------------------- #
 # I find it much more intuitive to show a trace of an ODE solution
 
-PLOT_HEIGHT::Int = 12
+PLOT_HEIGHT::Int = 10
 PLOT_WIDTH::Int = 120
 t_plot(t0,tf) = LinRange(t0,tf,4*PLOT_WIDTH)
 t_plot(x) = t_plot(extrema(x)...)
+
+
+# for convenience more than anything
+function Base.getindex(ode::ODE, i)
+    [ode(t)[ix] for t in t_plot(ode), ix in i]
+end
 
 function set_plot_scale(height, width)
     global PLOT_HEIGHT = convert(Int, height)
@@ -116,9 +122,10 @@ function set_plot_scale(height, width)
 end
 
 
-preview(x; kw...) = preview(x, t_plot(x), eachindex(x); kw...)
+preview(x; kw...) = preview(x, eachindex(x), t_plot(x); kw...)
+preview(x, is; kw...) = preview(x, is, t_plot(x); kw...)
 
-function preview(x, ts, is; kw...)
+function preview(x, is, ts; kw...)
     lineplot(ts, [x(t)[i] for t∈ts, i∈is];
                 height = PLOT_HEIGHT,
                 width = PLOT_WIDTH,
@@ -152,68 +159,10 @@ end
 
 
 
-
-
-# trajectories are DAEs, pass the mass matrix via the kwarg dae=()
-dae(M)::Matrix{Float64} = mass_matrix(M)
-mass_matrix(M) = cat(diagm(ones(nx(M))), diagm(zeros(nu(M))); dims=(1,2))
-
-
-
-# fnw = FunctionWrapper{T, Tuple{Real}}() do t
-#     out = MArray{...}(undef)
-#     sln(out,t)
-#     return SArray(out)
-# end
-
-
-@inline set_static(A) = A
-@inline set_static(A::MArray) = SVector(A)
-
-
-function _preview(ode::ODE)
-    T = LinRange(extrema(ode.soln.t)..., 240)
-    x = [ode(t)[i] for t in T, i in 1:length(ode)]
-    lineplot(T, x; height=30, width=120, labels=false)
-end
-
-function preview(ode::ODE)
-    println(stdout)
-    println(stdout,_preview(ode))
-    return nothing
-end
-
-function plot_trajectory(M, ode::ODE)
-    T = LinRange(extrema(ode.sln.t)..., 240)
-    x = [ode(t)[i] for t in T, i in 1:nx(M)]
-    u = [ode(t)[i] for t in T, i in nx(M)+1:nx(M)+nu(M)]
-    
-    println(stdout)
-    println(stdout, lineplot(T, x; height=20, width=80))
-    println(stdout, lineplot(T, u; height=20, width=80))
-    return nothing
-end
-
-# function Base.show(io::IO, ode::ODE)
-#     compact = get(io, :compact, false)
-#     print(io, typeof(ode))
-#     if !compact
-#         println(io)
-#         print(io, preview(ode))
-#     end
-#     return nothing
-# end
-#FUTURE: show size, length, time span, solver method?
-
 # this is type piracy... but it prevents some obscenely long error messages
 function Base.show(io::IO, fn::FunctionWrapper{T,A}) where {T,A}
     print(io, "FunctionWrapper: $A -> $T $(fn.ptr)")
 end
 
-# for convenience more than anything
-function Base.getindex(ode::ODE, i)
-    T = LinRange(extrema(ode.sln.t)..., 1001)
-    [ode(t)[ix] for t in T, ix in i]
-end
 
 =#

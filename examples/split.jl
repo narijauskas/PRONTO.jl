@@ -35,7 +35,7 @@ end
 
 # ------------------------------- split system to eigenstate 2 ------------------------------- ##
 
-@kwdef struct Split2 <: Model{22,1,3}
+@kwdef struct Split2 <: PRONTO.Model{22,1}
     kl::Float64 # stage cost gain
     kr::Float64 # regulator r gain
     kq::Float64 # regulator q gain

@@ -14,38 +14,41 @@ struct InPlace end
 # symbolic(T::Type{<:Model}) = SymbolicModel(T)
 # export symbolic
 
-macro dynamics(T, ex)
+macro define_f(T, ex)
     fn = :((x,u,t,θ)->$ex)
     :(define_f($(esc(T)), $(esc(fn))))
 end
 
-macro stage_cost(T, ex)
+macro define_l(T, ex)
     fn = :((x,u,t,θ)->$ex)
     :(define_l($(esc(T)), $(esc(fn))))
 end
 
-macro terminal_cost(T, ex)
+macro define_m(T, ex)
     fn = :((x,u,t,θ)->$ex)
-    :(define_p($(esc(T)), $(esc(fn))))
+    :(define_m($(esc(T)), $(esc(fn))))
 end
 
-macro regulatorQ(T, ex)
+macro define_Q(T, ex)
     fn = :((x,u,t,θ)->$ex)
     :(define_Q($(esc(T)), $(esc(fn))))
 end
 
-macro regulatorR(T, ex)
+macro define_R(T, ex)
     fn = :((x,u,t,θ)->$ex)
     :(define_R($(esc(T)), $(esc(fn))))
 end
 
-macro lagrangian(T)
-    :(define_L($(esc(T))))
-end
+export @define_f, @define_l, @define_m, @define_Q, @define_R
 
-#TODO: resolve_model
+var"@dynamics" = var"@define_f"
+var"@stage_cost" = var"@define_l"
+var"@terminal_cost" = var"@define_m"
+var"@regulatorQ" = var"@define_Q"
+var"@regulatorR" = var"@define_R"
 
-export @dynamics, @stage_cost, @terminal_cost, @regulatorQ, @regulatorR, resolve_model
+export @dynamics, @stage_cost, @terminal_cost, @regulatorQ, @regulatorR
+export resolve_model
 
 
 function resolve_model(T::Type{<:Model})
@@ -85,14 +88,14 @@ function define_l(T::Type{<:Model{NX,NU}}, user_l) where {NX,NU}
     return nothing
 end
 
-function define_p(T::Type{<:Model{NX,NU}}, user_p) where {NX,NU}
+function define_m(T::Type{<:Model{NX,NU}}, user_m) where {NX,NU}
     info("defining terminal cost and derivatives for $(as_bold(T))")
-    p = trace(T, user_p)
+    m = trace(T, user_m)
     Jx,Ju = jacobians(T)
-    px = reshape(Jx(p), NX)
-    define_methods(T, Size(1), p, :p, :x, :u, :t)
-    define_methods(T, Size(NX), px, :px, :x, :u, :t)
-    define_methods(T, Size(NX,NX), Jx(px), :pxx, :x, :u, :t)
+    mx = reshape(Jx(m), NX)
+    define_methods(T, Size(1), m, :p, :x, :u, :t)
+    define_methods(T, Size(NX), mx, :px, :x, :u, :t)
+    define_methods(T, Size(NX,NX), Jx(mx), :pxx, :x, :u, :t)
     return nothing
 end
 
@@ -223,7 +226,11 @@ symbolic(name::Symbol, S::Vararg{Int}) = collect(first(@variables $name[[1:N for
 # non-static arrays
 symbolic(name::Symbol, T::Type{<:AbstractArray}) = error("Cannot create symbolic representation of variable-sized array. Consider using StaticArrays.")
 
+# for pretty versions of symbols
+symbolic(name::Symbol, ix::UnitRange) = Symbolics.variables(name, ix)
 
+# for PRONTO functions
+# symbolic(T::Type{<:Model}, f::Function) = trace(T, f)
 
 # θ = symbolic(T)
 function trace(T::Type{<:Model{NX,NU}}, f) where {NX,NU}

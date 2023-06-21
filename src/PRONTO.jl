@@ -214,20 +214,25 @@ function pronto(θ::Model{NX,NU}, x0::StaticVector, φ, τ; limitγ=false, tol =
         h = cost(ξ, τ)
         # verbose && iinfo(as_bold("h = $(h)\n"))
         # print(ξ)
+        # println(preview(ξ.x))
+        println(preview(ξ.x, (1,3)))
+        # println(preview(ξ.x, (2,4)))
+        # println(preview(ξ.u, 1))
 
         # -------------- select γ via armijo step -------------- #
         # γ = γmax; 
         aα=0.4; aβ=0.7
         γ = limitγ ? min(1, 1/maximum(maximum(ζ.x(t) for t in t0:0.0001:tf))) : 1.0
 
-        local η
+        local η # defined to exist outside of while loop
         while γ > aβ^25
             verbose && iinfo("armijo γ = $(round(γ; digits=6))")
             η = armijo_projection(θ,x0,ξ,ζ,γ,Kr,τ)
             g = cost(η, τ)
             h-g >= -aα*γ*Dh ? break : (γ *= aβ)
         end
-        verbose && info(i, "Dh = $Dh, h = $h, γ = $γ") #TODO: 1st/2nd order
+        # verbose && 
+        info(i, "Dh = $Dh, h = $h, γ = $γ") #TODO: 1st/2nd order
 
         φ = η
     end

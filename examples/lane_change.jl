@@ -2,7 +2,7 @@
 using PRONTO
 using LinearAlgebra, StaticArrays
 
-# NX = 6; NU = 2
+NX = 6; NU = 2
 @kwdef struct LaneChange <: PRONTO.Model{6,2}
     M::Float64 = 2041    # [kg]     Vehicle mass
     J::Float64 = 4964    # [kg m^2] Vehicle inertia (yaw)
@@ -26,7 +26,7 @@ end
 F(α,θ) = θ.μ*θ.g*θ.M*sin(θ.c*atan(θ.b*α))
 
 # define model dynamics
-@dynamics LaneChange [
+@define_f LaneChange [
     θ.s*sin(x[3]) + x[2]*cos(x[3])
     -θ.s*x[4] + ( F(αf(x,θ),θ)*cos(x[5]) + F(αr(x,θ),θ)*cos(x[6]) )/θ.M
     x[4]
@@ -35,13 +35,13 @@ F(α,θ) = θ.μ*θ.g*θ.M*sin(θ.c*atan(θ.b*α))
     u[2]
 ]
 
-@stage_cost LaneChange 1/2*x'*I*x + 1/2*u'*I*u
+@define_l LaneChange 1/2*x'*I*x + 1/2*u'*I*u
 
 # should be solution to DARE at desired equilibrium
-@terminal_cost LaneChange 1/2*x'*I*x
+@define_m LaneChange 1/2*x'*I*x
 
-@regulatorR LaneChange diagm(θ.kr)
-@regulatorQ LaneChange diagm(θ.kq)
+@define_R LaneChange diagm(θ.kr)
+@define_Q LaneChange diagm(θ.kq)
 
 resolve_model(LaneChange)
 
@@ -52,8 +52,8 @@ xf = @SVector zeros(6)
 t0,tf = τ = (0,4)
 μ = t->zeros(2)
 # μ = @closure t->SVector{2}(zeros(2))
-φ = open_loop(θ,x0,μ,τ)
-@time ξ = pronto(θ,x0,φ,τ; tol = 1e-6, maxiters = 50)
+η = open_loop(θ,x0,μ,τ)
+@time ξ = pronto(θ,x0,η,τ; tol = 1e-6, maxiters = 50)
 
 # plot_lane_change(ξ,τ)
 ## -------------------------------  ------------------------------- ##
