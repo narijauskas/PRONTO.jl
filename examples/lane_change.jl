@@ -53,7 +53,7 @@ t0,tf = τ = (0,4)
 μ = t->zeros(2)
 # μ = @closure t->SVector{2}(zeros(2))
 η = open_loop(θ,x0,μ,τ)
-@time ξ = pronto(θ,x0,η,τ; tol = 1e-6, maxiters = 50)
+ξ = pronto(θ,x0,η,τ; tol = 1e-6, maxiters = 50)
 
 # plot_lane_change(ξ,τ)
 ## -------------------------------  ------------------------------- ##

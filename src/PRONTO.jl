@@ -175,11 +175,13 @@ include("armijo.jl") # armijo step and projection
 fwd(τ) = extrema(τ)
 bkwd(τ) = reverse(fwd(τ))
 
+# preview(θ::Model, ξ) = nothing
 
 # solves for x(t),u(t)'
-function pronto(θ::Model{NX,NU}, x0::StaticVector, φ, τ; limitγ=false, tol = 1e-5, maxiters = 20,verbose=true) where {NX,NU}
+function pronto(θ::Model{NX,NU}, x0::StaticVector, φ, τ; limitγ=false, tol = 1e-6, maxiters = 20,verbose=false) where {NX,NU}
     t0,tf = τ
-    verbose && info(0, "starting PRONTO")
+    # verbose && 
+    info(0, "starting PRONTO")
 
     for i in 1:maxiters
         # info(i, "iteration")
@@ -212,12 +214,6 @@ function pronto(θ::Model{NX,NU}, x0::StaticVector, φ, τ; limitγ=false, tol =
 
         # compute cost
         h = cost(ξ, τ)
-        # verbose && iinfo(as_bold("h = $(h)\n"))
-        # print(ξ)
-        # println(preview(ξ.x))
-        println(preview(ξ.x, (1,3)))
-        # println(preview(ξ.x, (2,4)))
-        # println(preview(ξ.u, 1))
 
         # -------------- select γ via armijo step -------------- #
         # γ = γmax; 
@@ -231,10 +227,15 @@ function pronto(θ::Model{NX,NU}, x0::StaticVector, φ, τ; limitγ=false, tol =
             g = cost(η, τ)
             h-g >= -aα*γ*Dh ? break : (γ *= aβ)
         end
-        # verbose && 
-        info(i, "Dh = $Dh, h = $h, γ = $γ") #TODO: 1st/2nd order
-
         φ = η
+
+        # verbose && 
+        info(i, "Dh = $Dh, h = $h, γ = $γ, order = $(is2ndorder(Ko) ? "2nd" : "1st")") #TODO: 1st/2nd order
+
+        # println(preview(φ.x, 1))
+        println(preview(ξ.x, (1,3)))
+        # println(preview(ξ.x, (2,4)))
+        # println(preview(ξ.u, 1))
     end
     return φ
 end
