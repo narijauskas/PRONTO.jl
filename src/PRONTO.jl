@@ -15,7 +15,9 @@ using MatrixEquations # provides arec
 
 
 #TODO: #FUTURE: using OrdinaryDiffEq
-using DifferentialEquations
+# using DifferentialEquations
+using OrdinaryDiffEq
+using DiffEqCallbacks
 
 using Symbolics # code generation
 import Symbolics: derivative # code generation
@@ -233,8 +235,8 @@ function pronto(θ::Model{NX,NU}, x0::StaticVector, φ, τ; limitγ=false, tol =
         info(i, "Dh = $Dh, h = $h, γ = $γ, order = $(is2ndorder(Ko) ? "2nd" : "1st")") #TODO: 1st/2nd order
 
         # println(preview(φ.x, 1))
-        println(preview(ξ.x, (1,3)))
-        # println(preview(ξ.x, (2,4)))
+        # println(preview(ξ.x, (1,3)))
+        println(preview(ξ.x, (2,4)))
         # println(preview(ξ.u, 1))
     end
     return φ

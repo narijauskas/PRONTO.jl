@@ -37,6 +37,11 @@ end
 resolve_model(TwoSpin)
 
 
+@dynamics TwoSpin begin
+    H0 = [0 0 1 0;0 0 0 -1;-1 0 0 0;0 1 0 0]
+    H1 = [0 -1 0 0;1 0 0 0;0 0 0 -1;0 0 1 0]
+    (H0 + u[1]*H1)*x
+end
 
 
 
@@ -83,7 +88,9 @@ xf = @SVector [1.0, 0.0, 0.0, 0.0] # final state
 η = open_loop(θ, xf, μ, τ) # guess trajectory
 η0 = open_loop(θ, x0, μ, τ) # guess trajectory
 ξ = pronto(θ, x0, η0, τ) # optimal trajectory
+@time ξ = pronto(θ, x0, η0, τ) # optimal trajectory
 
+##
 preview(ξ.x, (1,3))
 preview(η0.x, (1,3))
 preview(η.x, (1,3))
