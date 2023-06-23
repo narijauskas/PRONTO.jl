@@ -144,6 +144,8 @@ function Base.showerror(io::IO, e::ModelDefError)
 end
 
 
+# TODO: γlimit
+# must result in γ∈[β^maxiters,1]
 
 
 # by default, this is the solution to the algebraic riccati equation at tf

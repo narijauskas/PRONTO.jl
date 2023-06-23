@@ -407,7 +407,7 @@ end
 
 
 
-
+#=
 #MAYBE: do we actually want to save the whole model to a file?
 #TODO: deprecate
 function build(sz, hdr, sym, M; file=nothing)
@@ -508,3 +508,4 @@ function tmaparr(f, args...)
 end
 
 # build_inplace(:f, body, :(model::TwoSpin), :x, :u, :t)
+=#
