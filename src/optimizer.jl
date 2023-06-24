@@ -11,7 +11,8 @@ function dλ_dt(λ, (θ,ξ,Kr), t)
 end
 
 # for convenience:
-function lagrangian(θ,ξ,φ,Kr,τ)
+function lagrangian(θ,ξ,φ,Kr,τ; verbosity)
+    iinfo("lagrangian"; verbosity)
     t0,tf = τ
     αf = φ.x(tf)
     μf = φ.u(tf)
@@ -76,7 +77,8 @@ isstable(x::ODE) = retcode(x) == ReturnCode.Success
 struct InstabilityException <: Exception
 end
 
-function optimizer(θ,λ,ξ,φ,τ)
+function optimizer(θ,λ,ξ,φ,τ; verbosity)
+    iinfo("optimizer"; verbosity)
     t0,tf = τ
     αf = φ.x(tf)
     μf = φ.u(tf)
@@ -95,7 +97,9 @@ function optimizer(θ,λ,ξ,φ,τ)
         (P,N)
     end
 
-    return Optimizer(N,θ,λ,ξ,P)
+    Ko = Optimizer(N,θ,λ,ξ,P)
+    iinfo("using $(is2ndorder(Ko) ? "2nd" : "1st") order search"; verbosity)
+    return Ko
 end
 
 # for debugging - only first order descent
@@ -172,7 +176,8 @@ function dr_dt(r, (θ,λ,ξ,Ko), t)
     -(A - B*Ko)'r - a + Ko'b
 end
 
-function costate(θ,λ,ξ,φ,Ko,τ)
+function costate(θ,λ,ξ,φ,Ko,τ; verbosity)
+    iinfo("costate"; verbosity)
     t0,tf = τ
     αf = φ.x(tf)
     μf = φ.u(tf)
@@ -198,7 +203,8 @@ is2ndorder(::Any) = false
 
 
 
-function search_direction(θ::Model{NX,NU},ξ,Ko,vo,τ; dt=0.001) where {NX,NU}
+function search_direction(θ::Model{NX,NU},ξ,Ko,vo,τ; verbosity=1, dt=0.001) where {NX,NU}
+    iinfo("search_direction"; verbosity)
     t0,tf = τ
     ts = t0:dt:tf
     vbuf = Vector{SVector{NU,Float64}}()

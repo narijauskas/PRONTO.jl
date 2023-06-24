@@ -14,7 +14,8 @@ dh_dt(h, (θ,x,u), t) = l(x(t), u(t), t, θ)
 # ----------------------------------- cost derivatives ----------------------------------- #
 
 #TODO: decide on appropriate names for intermediate variables!
-function cost_derivs(θ,λ,φ,ξ,ζ,τ)
+function cost_derivs(θ,λ,φ,ξ,ζ,τ; verbosity)
+    iinfo("cost/derivs"; verbosity)
     t0,tf = τ
 
     🐱_f = solve(ODEProblem(d🐱_dt, 0, (t0,tf), (θ,ξ,ζ)), Tsit5(); reltol=1e-7)(tf)

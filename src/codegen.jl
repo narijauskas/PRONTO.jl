@@ -8,6 +8,13 @@ global format::Function = identity
 # builds buffered versions by default, for an in-place version, use:
 struct InPlace end
 
+
+export @define_f, @define_l, @define_m, @define_Q, @define_R
+export @dynamics, @stage_cost, @terminal_cost, @regulatorQ, @regulatorR
+export resolve_model
+
+
+
 # export generate_model, InPlace
 # export build
 # symbolic(name::Symbol, indices...) = Symbolics.variables(name::Symbol, indices...)
@@ -39,7 +46,6 @@ macro define_R(T, ex)
     :(define_R($(esc(T)), $(esc(fn))))
 end
 
-export @define_f, @define_l, @define_m, @define_Q, @define_R
 
 var"@dynamics" = var"@define_f"
 var"@stage_cost" = var"@define_l"
@@ -47,13 +53,11 @@ var"@terminal_cost" = var"@define_m"
 var"@regulatorQ" = var"@define_Q"
 var"@regulatorR" = var"@define_R"
 
-export @dynamics, @stage_cost, @terminal_cost, @regulatorQ, @regulatorR
-export resolve_model
 
 
 function resolve_model(T::Type{<:Model})
-    #TODO: verify existence of all kernel methods
     define_L(T)
+    #MAYBE: verify existence of all kernel methods
     info(PRONTO.as_bold(T)*" model ready")
     return nothing
 end
@@ -136,77 +140,16 @@ function define_L(T::Type{<:Model{NX,NU}}) where {NX,NU}
 end
 
 
-# #FUTURE: options to make pretty (or add other postprocessing), save to file, etc.
-# function build_f(T, user_f)
-#     info("building dynamics methods for $(as_bold(T))")
-#     NX,NU,x,u,t,θ,λ,Jx,Ju,M = init_syms(T)
-
-#     f = invokelatest(user_f, x, u, t, θ)
-
-#     build(Size(NX), :(f(x,u,t,θ::$M)), f, M)
-
-#     build(Size(NX,NX), :(fx(x,u,t,θ::$M)), Jx(f), M)
-#     build(Size(NX,NU), :(fu(x,u,t,θ::$M)), Ju(f), M)
-
-#     build(Size(NX,NX,NX), :(fxx(x,u,t,θ::$M)), Jx(Jx(f)), M)
-#     build(Size(NX,NX,NU), :(fxu(x,u,t,θ::$M)), Ju(Jx(f)), M)
-#     build(Size(NX,NU,NU), :(fuu(x,u,t,θ::$M)), Ju(Ju(f)), M)
-    
-#     return nothing
+# # facilitate symbolic differentiation of model
+# struct SymbolicModel{T}
+#     vars
 # end
+export SymModel
+struct SymModel{T} end
 
-# function build_l(T, user_l)
-#     info("building stage cost methods for $(as_bold(T))")
-#     NX,NU,x,u,t,θ,λ,Jx,Ju,M = init_syms(T)
-
-#     l = invokelatest(user_l, x, u, t, θ)
-#     lx = reshape(Jx(l), NX)
-#     lu = reshape(Ju(l), NU)
-
-#     build(Size(1), :(l(x,u,t,θ::$M)), l, M)
-#     build(Size(NX), :(lx(x,u,t,θ::$M)), lx, M)
-#     build(Size(NU), :(lu(x,u,t,θ::$M)), lu, M)
-
-#     build(Size(NX,NX), :(lxx(x,u,t,θ::$M)), Jx(lx), M)
-#     build(Size(NX,NU), :(lxu(x,u,t,θ::$M)), Ju(lx), M)
-#     build(Size(NU,NU), :(luu(x,u,t,θ::$M)), Ju(lu), M)
-#     return nothing
-# end
-
-# function build_p(T, user_p)
-#     info("building terminal cost methods for $(as_bold(T))")
-#     NX,NU,x,u,t,θ,λ,Jx,Ju,M = init_syms(T)
-
-#     p = invokelatest(user_p, x, u, t, θ)
-#     px = reshape(Jx(p), NX)
-
-#     build(Size(1), :(p(x,u,t,θ::$M)), p, M)
-#     build(Size(NX), :(px(x,u,t,θ::$M)), px, M)
-#     build(Size(NX,NX), :(pxx(x,u,t,θ::$M)), Jx(px), M)
-#     return nothing
-# end
-
-# function build_Q(T, user_Q)
-#     info("building regulator Q method for $(as_bold(T))")
-#     NX,NU,x,u,t,θ,λ,Jx,Ju,M = init_syms(T)
-
-#     Q = invokelatest(user_Q, x, u, t, θ)
-#     build(Size(NX,NX), :(Q(x,u,t,θ::$M)), Q, M)
-#     return nothing
-# end
-
-# function build_R(T, user_R)
-#     info("building regulator R method for $(as_bold(T))")
-#     NX,NU,x,u,t,θ,λ,Jx,Ju,M = init_syms(T)
-
-#     R = invokelatest(user_R, x, u, t, θ)
-#     build(Size(NU,NU), :(R(x,u,t,θ::$M)), R, M)
-#     return nothing
-# end
-
-# trace(f, vars...) = invokelatest(f, vars...)
-# fxx = symbolic(T, PRONTO.fxx)
-# trace(f, model, x, u, t)
+# symmodel.kq -> variables fitting 
+getproperty(::SymModel{T}, name::Symbol) where {T<:Model} = symbolic(name, fieldtype(T, name))
+propertynames(::SymModel{T}) where T = fieldnames(T)
 
 
 export symbolic

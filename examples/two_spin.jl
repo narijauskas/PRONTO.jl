@@ -12,40 +12,6 @@ NU = 1
 end
 
 
-## --------------------- option 1 --------------------- ##
-
-@dynamics TwoSpin begin
-    H0 = [0 0 1 0;0 0 0 -1;-1 0 0 0;0 1 0 0]
-    H1 = [0 -1 0 0;1 0 0 0;0 0 0 -1;0 0 1 0]
-    (H0 + u[1]*H1)*x
-end
-
-@stage_cost TwoSpin begin
-    Rl = [0.01;;]
-    1/2*u'*Rl*u
-end
-
-@terminal_cost TwoSpin begin
-    Pl = [0 0 0 0;0 1 0 0;0 0 0 0;0 0 0 1]
-    1/2*x'*Pl*x
-end
-
-@regulatorQ TwoSpin θ.kq*I(NX)
-@regulatorR TwoSpin θ.kr*I(NU)
-
-# must be run after any changes to model definition
-resolve_model(TwoSpin)
-
-
-@dynamics TwoSpin begin
-    H0 = [0 0 1 0;0 0 0 -1;-1 0 0 0;0 1 0 0]
-    H1 = [0 -1 0 0;1 0 0 0;0 0 0 -1;0 0 1 0]
-    (H0 + u[1]*H1)*x
-end
-
-
-
-
 ## --------------------- option 2 --------------------- ##
 
 @define_f TwoSpin begin
@@ -71,6 +37,8 @@ end
 resolve_model(TwoSpin)
 
 
+# PRONTO.runtime_info(θ::TwoSpin, ξ; verbosity=1) = verbosity >= 1 && println(preview(ξ.x, (1,3)))
+PRONTO.runtime_info(θ::TwoSpin, ξ; verbosity=1) = verbosity >= 1 && println(preview(ξ.u, 1))
 
 
 # overwrite default behavior of Pf for TwoSpin models

@@ -29,7 +29,8 @@ show(io::IO, Kr::Regulator) = println(io, preview(Kr))
 
 # regulator(θ,φ,τ) = regulator(θ, φ.x, φ.u, τ)
 # design the regulator, solving dPr_dt
- function regulator(θ::Model{NX,NU}, φ, τ) where {NX,NU}
+ function regulator(θ::Model{NX,NU}, φ, τ; verbosity) where {NX,NU}
+    iinfo("regulator"; verbosity)
     t0,tf = τ
     #FUTURE: Pf provided by user or auto-generated as P(α,μ,θ)
     # α 
