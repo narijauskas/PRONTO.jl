@@ -37,13 +37,15 @@ end
 resolve_model(TwoSpin)
 
 
-# PRONTO.runtime_info(θ::TwoSpin, ξ; verbosity=1) = verbosity >= 1 && println(preview(ξ.x, (1,3)))
-PRONTO.runtime_info(θ::TwoSpin, ξ; verbosity=1) = verbosity >= 1 && println(preview(ξ.u, 1))
+PRONTO.runtime_info(θ::TwoSpin, ξ; verbosity=1) = verbosity >= 1 && println(preview(ξ.x, (1,3)))
+PRONTO.runtime_info(θ::TwoSpin, ξ; verbosity=1) = verbosity >= 1 && println(preview(ξ.x, (2,4)))
+
+# PRONTO.runtime_info(θ::TwoSpin, ξ; verbosity=1) = verbosity >= 1 && println(preview(ξ.u, 1))
 
 
 # overwrite default behavior of Pf for TwoSpin models
-PRONTO.Pf(α,μ,tf,θ::TwoSpin) = SMatrix{4,4,Float64}(I(4))
-# PRONTO.Pf(θ::TwoSpin,α,μ,tf) = SMatrix{4,4,Float64}(I(4))
+# PRONTO.Pf(α,μ,tf,θ::TwoSpin) = SMatrix{4,4,Float64}(I(4))
+PRONTO.Pf(θ::TwoSpin,α,μ,tf) = SMatrix{4,4,Float64}(I(4))
 # PRONTO.Pf(model::TwoSpin,α,μ,tf) = SMatrix{4,4,Float64}(I(4))
 
 ## --------------------- run optimization --------------------- ##

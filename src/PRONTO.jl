@@ -7,6 +7,7 @@ import FunctionWrappers: FunctionWrapper
 using StaticArrays
 using FastClosures #TODO: test speed
 using Base: @kwdef
+using Printf
 
 using Interpolations # data storage/resampling
 
@@ -122,11 +123,11 @@ runtime_info(θ::Model, ξ; verbosity) = nothing
 
 # by default, this is the solution to the algebraic riccati equation at tf
 # user can override this behavior for a model type by defining PRONTO.Pf(α,μ,tf,θ::MyModel)
-function Pf(α,μ,tf,θ::Model{NX}) where {NX}
-    Ar = fx(α, μ, tf, θ)
-    Br = fu(α, μ, tf, θ)
-    Qr = Q(α, μ, tf, θ)
-    Rr = R(α, μ, tf, θ)
+function Pf(θ::Model{NX},α,μ,tf) where {NX}
+    Ar = fx(θ, α, μ, tf)
+    Br = fu(θ, α, μ, tf)
+    Qr = Q(θ, α, μ, tf)
+    Rr = R(θ, α, μ, tf)
     Pf,_ = arec(Ar,Br*(Rr\Br'),Qr)
     return SMatrix{NX,NX,Float64}(Pf)
 end
@@ -203,7 +204,10 @@ function pronto(θ::Model, x0::StaticVector, φ, τ;
         φ = η
 
         #TODO: store intermediates Kr,ξ,λ,Ko,vo,ζ,h,Dh,D2g,γ,        
-        info(i, "Dh = $Dh, h = $h, γ = $γ, order = $(is2ndorder(Ko) ? "2nd" : "1st")"; verbosity)
+        infostr = @sprintf("Dh = %.3e, h = %.3e, γ = %.3e, ", Dh, h, γ)
+        infostr *= ", order = $(is2ndorder(Ko) ? "2nd" : "1st")"
+        # info(i, "Dh = $Dh, h = $h, γ = $γ, order = $(is2ndorder(Ko) ? "2nd" : "1st")"; verbosity)
+        info(i, infostr; verbosity)
         runtime_info(θ, ξ; verbosity)
         # println(preview(φ.x, 1))
         # println(preview(ξ.x, (1,3)))

@@ -72,7 +72,7 @@ function dxdt(x, (θ,α,μ,Kr), t)
     μ = μ(t)
     Kr = Kr(α,μ,t)
     u = μ - Kr*(x-α)
-    f(x,u,t,θ)
+    f(θ,x,u,t)
 end
 
 

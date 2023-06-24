@@ -22,27 +22,27 @@ export resolve_model
 # export symbolic
 
 macro define_f(T, ex)
-    fn = :((x,u,t,θ)->$ex)
+    fn = :((θ,x,u,t)->$ex)
     :(define_f($(esc(T)), $(esc(fn))))
 end
 
 macro define_l(T, ex)
-    fn = :((x,u,t,θ)->$ex)
+    fn = :((θ,x,u,t)->$ex)
     :(define_l($(esc(T)), $(esc(fn))))
 end
 
 macro define_m(T, ex)
-    fn = :((x,u,t,θ)->$ex)
+    fn = :((θ,x,u,t)->$ex)
     :(define_m($(esc(T)), $(esc(fn))))
 end
 
 macro define_Q(T, ex)
-    fn = :((x,u,t,θ)->$ex)
+    fn = :((θ,x,u,t)->$ex)
     :(define_Q($(esc(T)), $(esc(fn))))
 end
 
 macro define_R(T, ex)
-    fn = :((x,u,t,θ)->$ex)
+    fn = :((θ,x,u,t)->$ex)
     :(define_R($(esc(T)), $(esc(fn))))
 end
 
@@ -181,7 +181,7 @@ function trace(T::Type{<:Model{NX,NU}}, f) where {NX,NU}
     u = symbolic(:u, NU)
     t = symbolic(:t)
     θ = symbolic(T)
-    return collect(invokelatest(f, x, u, t, θ))
+    return collect(invokelatest(f, θ, x, u, t))
     # return Symbolics.scalarize(invokelatest(f, x, u, t, θ))
     # return collect(invokelatest(f, x, u, t, θ))
 end
@@ -222,7 +222,7 @@ function define_methods(T, sz::Size{S}, sym, name, args...) where S
         def_inplace(name, T, body, args...) |> string, "\n\n",
     )
     Base.include(Main, file)
-    hdr = "PRONTO.$name($(["$a, " for a in args]...)θ::$T)" |> x->x*repeat(" ", max(36-length(x),0))
+    hdr = "PRONTO.$name(θ::$(T)$([", $a" for a in args]...))" |> x->x*repeat(" ", max(36-length(x),0))
     iinfo("$hdr "*as_color(crayon"dark_gray", "[$file]"))
 end
 
@@ -238,7 +238,7 @@ end
 function def_inplace(name, T, body, args...)
     name! = _!(name)
     ex =  quote
-        function PRONTO.$name!(out, $(args...), θ::Union{$T,SymModel{$T}})
+        function PRONTO.$name!(out, θ::Union{$T,SymModel{$T}}, $(args...))
             @inbounds begin
                 $(body...)
             end
@@ -258,9 +258,9 @@ end
 function def_symbolic(name, T, sz::Size{S}, args...) where S
     name! = _!(name)
     return quote
-        function PRONTO.$name($(args...), θ::SymModel{$T})
+        function PRONTO.$name(θ::SymModel{$T}, $(args...))
             out = Array{Num}(undef, $(S...))
-            PRONTO.$name!(out, $(args...), θ)
+            PRONTO.$name!(out, θ, $(args...))
             return SArray{Tuple{$(S...)}, Num}(out)
         end
     end |> clean
@@ -269,9 +269,9 @@ end
 function def_generic(name, T, sz::Size{S}, args...) where S
     name! = _!(name)
     return quote
-        function PRONTO.$name($(args...), θ::$T)
+        function PRONTO.$name(θ::$T, $(args...))
             out = $(MType(sz))(undef)
-            PRONTO.$name!(out, $(args...), θ)
+            PRONTO.$name!(out, θ, $(args...))
             return $(SType(sz))(out)
         end
     end |> clean
