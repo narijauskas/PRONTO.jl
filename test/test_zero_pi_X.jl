@@ -117,7 +117,7 @@ end
 
 begin
 	plt.close("all")
-	to_show = [1,3,10,12,19]
+	to_show = [1,3,10,12,19,25]
 	# to_show = [1,3,10]
 	to_plot = mat_elems(es[to_show], Hdrive)
 	plt.imshow(log10.(abs.(to_plot)))
@@ -215,17 +215,15 @@ function inprod(x)
     return P
 end
 
-# H0 = round.(H_full.operators[1].data, digits=12)[1:3,1:3]
 H0 = H_full.operators[1].data
 H0 = diagm(diag(H0))
 H0[1,1] = 0
-# H1 = H_full.operators[2].data[1:3,1:3]
 H1 = H_full.operators[2].data
 
 
-# ------------------------------- 5lvl system Xgate ------------------------------- ##
+# ------------------------------- 6lvl system Xgate ------------------------------- ##
 
-@kwdef struct lvl5X <: Model{20,1,3}
+@kwdef struct lvl6X <: Model{24,1,3}
     kl::Float64 # stage cost gain
     kr::Float64 # regulator r gain
     kq::Float64 # regulator q gain
@@ -233,15 +231,15 @@ end
 
 
 function termcost(x,u,t,θ)
-    ψ1 = [1;0;0;0;0]
-    ψ2 = [0;1;0;0;0]
+    ψ1 = [1;0;0;0;0;0]
+    ψ2 = [0;1;0;0;0;0]
     xf = vec([ψ2;ψ1;0*ψ2;0*ψ1])
-    P = I(20)
+    P = I(24)
     1/2 * collect((x-xf)')*P*(x-xf)
 end
 
 
-# ------------------------------- 5lvl system definitions ------------------------------- ##
+# ------------------------------- 6lvl system definitions ------------------------------- ##
 
 function dynamics(x,u,t,θ)
     H00 = kron(I(2),H0)
@@ -250,32 +248,32 @@ function dynamics(x,u,t,θ)
 end
 
 
-stagecost(x,u,t,θ) = 1/2*θ.kl*collect(u')I*u + 0.1*collect(x')*mprod(diagm([0,0,0,1,0,0,0,0,1,0]))*x + 0.1*collect(x')*mprod(diagm([0,0,0,0,1,0,0,0,0,1]))*x
+stagecost(x,u,t,θ) = 1/2*θ.kl*collect(u')I*u + 0.1*collect(x')*mprod(diagm([0,0,0,1,0,0,0,0,0,1,0,0]))*x + 0.1*collect(x')*mprod(diagm([0,0,0,0,1,0,0,0,0,0,1,0]))*x + 0.1*collect(x')*mprod(diagm([0,0,0,0,0,1,0,0,0,0,0,1]))*x
 
 regR(x,u,t,θ) = θ.kr*I(1)
 
 function regQ(x,u,t,θ)
-    θ.kq*I(20)
+    θ.kq*I(24)
 end
 
-PRONTO.Pf(α,μ,tf,θ::lvl5X) = SMatrix{20,20,Float64}(I(20))
+PRONTO.Pf(α,μ,tf,θ::lvl6X) = SMatrix{24,24,Float64}(I(24))
 
 # ------------------------------- generate model and derivatives ------------------------------- ##
 
-PRONTO.generate_model(lvl5X, dynamics, stagecost, termcost, regQ, regR)
+PRONTO.generate_model(lvl6X, dynamics, stagecost, termcost, regQ, regR)
 
 ## ------------------------------- demo: Simulation in 300 ------------------------------- ##
 
-ψ1 = [1;0;0;0;0]
-ψ2 = [0;1;0;0;0]
-x0 = SVector{20}(vec([ψ1;ψ2;0*ψ1;0*ψ2]))
+ψ1 = [1;0;0;0;0;0]
+ψ2 = [0;1;0;0;0;0]
+x0 = SVector{24}(vec([ψ1;ψ2;0*ψ1;0*ψ2]))
 
-θ = lvl5X(kl=0.01, kr=1, kq=1)
+θ = lvl6X(kl=0.01, kr=1, kq=1)
 
 t0,tf = τ = (0,300)
 
 # μ = @closure t->SVector{1}(drive(t, t_gate, w09, w29, amp1, amp2))
-μ = @closure t->SVector{1}(0.4*cos((H0[3,3]-0.0*H0[2,2])*t))
+μ = @closure t->SVector{1}(0.4*cos((H0[3,3]-H0[1,1])*t))
 φ = open_loop(θ,x0,μ,τ)
 @time ξ = pronto(θ,x0,φ,τ; tol = 1e-4, maxiters = 50, limitγ = true)
 
