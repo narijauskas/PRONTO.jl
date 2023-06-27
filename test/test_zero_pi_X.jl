@@ -283,6 +283,6 @@ using MAT
 ts = t0:0.001:tf
 is = eachindex(ξ.u)
 us = [ξ.u(t)[i] for t∈ts, i∈is]
-file = matopen("Uopt_0pi_X_300T.mat", "w")
+file = matopen("Uopt_0pi_X_300T_6lvl.mat", "w")
 write(file, "Uopt", us)
 close(file)
