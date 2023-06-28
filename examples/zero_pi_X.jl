@@ -64,4 +64,12 @@ PRONTO.runtime_info(θ::lvl3, ξ; verbosity=1) = verbosity >= 1 && println(previ
 x0 = SVector{NX}(vec([ψ1;ψ2;0*ψ1;0*ψ2]))
 μ = t->SVector{NU}(0.4*cos(H0[3,3]*t))
 φ = open_loop(θ, x0, μ, τ) # guess trajectory
-@time ξ = pronto(θ, x0, φ, τ;verbose=1, tol=1e-3, maxiters=2) # optimal trajectory
+@time ξ = pronto(θ, x0, φ, τ;verbose=1, tol=1e-4) # optimal trajectory
+
+##
+ts = t0:0.001:tf
+is = eachindex(ξ.u)
+us = [ξ.u(t)[i] for t∈ts, i∈is]
+open("3lvl_control_1.0.csv", "w") do io
+    writedlm(io, us)
+end
