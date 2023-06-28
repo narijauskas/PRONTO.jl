@@ -1,11 +1,13 @@
-# PRONTO.jl v0.5.0_dev
+# PRONTO.jl v1.0.0_dev
 module PRONTO
 
+using Crayons
 using FunctionWrappers
 import FunctionWrappers: FunctionWrapper
 using StaticArrays
 using FastClosures #TODO: test speed
 using Base: @kwdef
+using Printf
 
 using Interpolations # data storage/resampling
 
@@ -15,7 +17,9 @@ using MatrixEquations # provides arec
 
 
 #TODO: #FUTURE: using OrdinaryDiffEq
-using DifferentialEquations
+# using DifferentialEquations
+using OrdinaryDiffEq
+using DiffEqCallbacks
 
 using Symbolics # code generation
 import Symbolics: derivative # code generation
@@ -39,7 +43,6 @@ import Base: extrema, length, eachindex, show, size, eltype, getproperty, getind
 export pronto
 export info #TODO: does this need to be exported?
 
-export @tick,@tock,@clock #TODO: get rid of alltogether?
 
 #TODO: reconsider export
 export ODE, Buffer
@@ -50,19 +53,9 @@ export preview
 export Model
 export nx,nu,nθ
 
-# abstract type Model{NX,NU,NΘ} <: FieldVector{NΘ,Float64} end
-
-# nx(::Model{NX,NU,NΘ}) where {NX,NU,NΘ} = NX
-# nu(::Model{NX,NU,NΘ}) where {NX,NU,NΘ} = NU
-# nθ(::Model{NX,NU,NΘ}) where {NX,NU,NΘ} = NΘ
-
-# nx(::Type{<:Model{NX,NU,NΘ}}) where {NX,NU,NΘ} = NX
-# nu(::Type{<:Model{NX,NU,NΘ}}) where {NX,NU,NΘ} = NU
-# nθ(::Type{<:Model{NX,NU,NΘ}}) where {NX,NU,NΘ} = NΘ
 
 abstract type Model{NX,NU} end
 # fields can be Scalars or SArrays
-#MAYBE: restrict this?
 
 nx(::Model{NX,NU}) where {NX,NU} = NX
 nu(::Model{NX,NU}) where {NX,NU} = NU
@@ -91,42 +84,21 @@ function show(io::IO,::MIME"text/plain", θ::T) where {T<:Model}
 end
 
 
-# # facilitate symbolic differentiation of model
-# struct SymbolicModel{T}
-#     vars
-# end
-export SymModel
-struct SymModel{T} end
-
-# symmodel.kq -> variables fitting 
-getproperty(::SymModel{T}, name::Symbol) where {T<:Model} = symbolic(name, fieldtype(T, name))
-propertynames(::SymModel{T}) where T = fieldnames(T)
-
-# symfield(::SArray{S,T}, name) where {S,T} = first(@variables name[])
-# getproperty(::SymModel{T}, name::Symbol) where {T<:Model} = fieldtype(T, name)
-
-# function SymbolicModel(T::DataType)
-#     @variables θ[1:nθ(T)]
-#     SymbolicModel{T}(collect(θ))
-# end
-
-# getindex(θ::SymbolicModel{T}, i::Integer) where {T} = getindex(getfield(θ, :vars), i)
-# getproperty(θ::SymbolicModel{T}, name::Symbol) where {T} = getindex(θ, fieldindex(T, name))
-
-# symindex(T, name) = findfirst(isequal(name), fieldnames(T))
-# symfields(T,θ) = Tuple(θ[symindex(T, name)] for name in fieldnames(T))
-
-# function SymbolicModel(T)
-#     @variables θ[1:nθ(T)]
-#     T{Num}(; zip(fieldnames(T), symfields(T, collect(θ)))...)
-# end
 
 # ----------------------------------- #. helpers ----------------------------------- #
-include("helpers.jl")
+# include("helpers.jl") #TODO: remove file
 
+as_tag(str) = as_tag(crayon"default", str)
+as_tag(c::Crayon, str) = as_color(c, as_bold("[$str: "))
+as_color(c::Crayon, str) = "$c" * str * "$(crayon"default")"
+as_bold(ex) = as_bold(string(ex))
+as_bold(str::String) = "$(crayon"bold")" * str * "$(crayon"!bold")"
+clearln() = print("\e[2K","\e[1G")
 
-#can I finally deprecate this? :)
-# views(::Model{NX,NU,NΘ},ξ) where {NX,NU,NΘ} = (@view ξ[1:NX]),(@view ξ[NX+1:end])
+info(str; verbosity=1) = verbosity >= 1 && println(as_tag(crayon"magenta","PRONTO"), str)
+info(i, str; verbosity=1) = verbosity >= 1 && println(as_tag(crayon"magenta","PRONTO[$i]"), str)
+iinfo(str; verbosity=2) = verbosity >= 2 && println("    > ", str) # secondary-level
+iiinfo(str; verbosity=3) = verbosity >= 3 && println("        > ", str) # tertiary-level
 
 
 # ----------------------------------- #. model functions ----------------------------------- #
@@ -142,15 +114,20 @@ function Base.showerror(io::IO, e::ModelDefError)
 end
 
 
+# TODO: γlimit
+# must result in γ∈[β^maxiters,1]
+
+runtime_info(θ::Model, ξ; verbosity) = nothing
+
 
 
 # by default, this is the solution to the algebraic riccati equation at tf
 # user can override this behavior for a model type by defining PRONTO.Pf(α,μ,tf,θ::MyModel)
-function Pf(α,μ,tf,θ::Model{NX}) where {NX}
-    Ar = fx(α, μ, tf, θ)
-    Br = fu(α, μ, tf, θ)
-    Qr = Q(α, μ, tf, θ)
-    Rr = R(α, μ, tf, θ)
+function Pf(θ::Model{NX},α,μ,tf) where {NX}
+    Ar = fx(θ, α, μ, tf)
+    Br = fu(θ, α, μ, tf)
+    Qr = Q(θ, α, μ, tf)
+    Rr = R(θ, α, μ, tf)
     Pf,_ = arec(Ar,Br*(Rr\Br'),Qr)
     return SMatrix{NX,NX,Float64}(Pf)
 end
@@ -178,7 +155,14 @@ bkwd(τ) = reverse(fwd(τ))
 # preview(θ::Model, ξ) = nothing
 
 # solves for x(t),u(t)'
-function pronto(θ::Model{NX,NU}, x0::StaticVector, φ, τ; limitγ=false, tol = 1e-6, maxiters = 20,verbose=false) where {NX,NU}
+function pronto(θ::Model, x0::StaticVector, φ, τ; 
+                limitγ=false, 
+                tol = 1e-6, 
+                maxiters = 20,
+                armijo_maxiters = 25,
+                verbosity = 1,
+                verbose = false,
+                )
     t0,tf = τ
     # verbose && 
     info(0, "starting PRONTO")
@@ -187,51 +171,44 @@ function pronto(θ::Model{NX,NU}, x0::StaticVector, φ, τ; limitγ=false, tol =
         # info(i, "iteration")
         # -------------- build regulator -------------- #
         # α,μ -> Kr,x,u
-        verbose && iinfo("regulator")
-        Kr = regulator(θ, φ, τ)
-        verbose && iinfo("projection")
-        ξ = projection(θ, x0, φ, Kr, τ)
+        Kr = regulator(θ, φ, τ; verbosity)
+        ξ = projection(θ, x0, φ, Kr, τ; verbosity)
 
         # -------------- search direction -------------- #
         # Kr,x,u -> z,v
-        verbose && iinfo("lagrangian")
-        λ = lagrangian(θ,ξ,φ,Kr,τ)
-        verbose && iinfo("optimizer")
-        Ko = optimizer(θ,λ,ξ,φ,τ)
-        verbose && iinfo("using $(is2ndorder(Ko) ? "2nd" : "1st") order search")
-        verbose && iinfo("costate")
-        vo = costate(θ,λ,ξ,φ,Ko,τ)
-        verbose && iinfo("search_direction")
-        ζ = search_direction(θ,ξ,Ko,vo,τ)
+        λ = lagrangian(θ,ξ,φ,Kr,τ; verbosity)
+        Ko = optimizer(θ,λ,ξ,φ,τ; verbosity)
+        vo = costate(θ,λ,ξ,φ,Ko,τ; verbosity)
+        ζ = search_direction(θ,ξ,Ko,vo,τ; verbosity)
 
         # -------------- cost/derivatives -------------- #
-        verbose && iinfo("cost/derivs")
-
-        Dh,D2g = cost_derivs(θ,λ,φ,ξ,ζ,τ)
-        
+        h = cost(ξ, τ)
+        Dh,D2g = cost_derivs(θ,λ,φ,ξ,ζ,τ; verbosity)
         Dh > 0 && (info(i, "increased cost - quitting"); (return φ))
         -Dh < tol && (info(i-1, as_bold("PRONTO converged")); (return φ))
 
-        # compute cost
-        h = cost(ξ, τ)
 
         # -------------- select γ via armijo step -------------- #
         # γ = γmax; 
-        aα=0.4; aβ=0.7
+        α=0.4; β=0.7
+        γmin = β^armijo_maxiters
         γ = limitγ ? min(1, 1/maximum(maximum(ζ.x(t) for t in t0:0.0001:tf))) : 1.0
 
         local η # defined to exist outside of while loop
-        while γ > aβ^25
-            verbose && iinfo("armijo γ = $(round(γ; digits=6))")
+        while γ > γmin
+            iinfo("armijo γ = $(round(γ; digits=6))"; verbosity)
             η = armijo_projection(θ,x0,ξ,ζ,γ,Kr,τ)
             g = cost(η, τ)
-            h-g >= -aα*γ*Dh ? break : (γ *= aβ)
+            h-g >= -α*γ*Dh ? break : (γ *= β)
         end
         φ = η
 
-        # verbose && 
-        info(i, "Dh = $Dh, h = $h, γ = $γ, order = $(is2ndorder(Ko) ? "2nd" : "1st")") #TODO: 1st/2nd order
-
+        #TODO: store intermediates Kr,ξ,λ,Ko,vo,ζ,h,Dh,D2g,γ,        
+        infostr = @sprintf("Dh = %.3e, h = %.3e, γ = %.3e, ", Dh, h, γ)
+        infostr *= ", order = $(is2ndorder(Ko) ? "2nd" : "1st")"
+        # info(i, "Dh = $Dh, h = $h, γ = $γ, order = $(is2ndorder(Ko) ? "2nd" : "1st")"; verbosity)
+        info(i, infostr; verbosity)
+        runtime_info(θ, ξ; verbosity)
         # println(preview(φ.x, 1))
         # println(preview(ξ.x, (1,3)))
         # println(preview(ξ.x, (2,4)))

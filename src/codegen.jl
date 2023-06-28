@@ -8,6 +8,13 @@ global format::Function = identity
 # builds buffered versions by default, for an in-place version, use:
 struct InPlace end
 
+
+export @define_f, @define_l, @define_m, @define_Q, @define_R
+export @dynamics, @stage_cost, @terminal_cost, @regulatorQ, @regulatorR
+export resolve_model
+
+
+
 # export generate_model, InPlace
 # export build
 # symbolic(name::Symbol, indices...) = Symbolics.variables(name::Symbol, indices...)
@@ -15,31 +22,30 @@ struct InPlace end
 # export symbolic
 
 macro define_f(T, ex)
-    fn = :((x,u,t,θ)->$ex)
+    fn = :((θ,x,u,t)->$ex)
     :(define_f($(esc(T)), $(esc(fn))))
 end
 
 macro define_l(T, ex)
-    fn = :((x,u,t,θ)->$ex)
+    fn = :((θ,x,u,t)->$ex)
     :(define_l($(esc(T)), $(esc(fn))))
 end
 
 macro define_m(T, ex)
-    fn = :((x,u,t,θ)->$ex)
+    fn = :((θ,x,u,t)->$ex)
     :(define_m($(esc(T)), $(esc(fn))))
 end
 
 macro define_Q(T, ex)
-    fn = :((x,u,t,θ)->$ex)
+    fn = :((θ,x,u,t)->$ex)
     :(define_Q($(esc(T)), $(esc(fn))))
 end
 
 macro define_R(T, ex)
-    fn = :((x,u,t,θ)->$ex)
+    fn = :((θ,x,u,t)->$ex)
     :(define_R($(esc(T)), $(esc(fn))))
 end
 
-export @define_f, @define_l, @define_m, @define_Q, @define_R
 
 var"@dynamics" = var"@define_f"
 var"@stage_cost" = var"@define_l"
@@ -47,13 +53,11 @@ var"@terminal_cost" = var"@define_m"
 var"@regulatorQ" = var"@define_Q"
 var"@regulatorR" = var"@define_R"
 
-export @dynamics, @stage_cost, @terminal_cost, @regulatorQ, @regulatorR
-export resolve_model
 
 
 function resolve_model(T::Type{<:Model})
-    #TODO: verify existence of all kernel methods
     define_L(T)
+    #MAYBE: verify existence of all kernel methods
     info(PRONTO.as_bold(T)*" model ready")
     return nothing
 end
@@ -136,77 +140,16 @@ function define_L(T::Type{<:Model{NX,NU}}) where {NX,NU}
 end
 
 
-# #FUTURE: options to make pretty (or add other postprocessing), save to file, etc.
-# function build_f(T, user_f)
-#     info("building dynamics methods for $(as_bold(T))")
-#     NX,NU,x,u,t,θ,λ,Jx,Ju,M = init_syms(T)
-
-#     f = invokelatest(user_f, x, u, t, θ)
-
-#     build(Size(NX), :(f(x,u,t,θ::$M)), f, M)
-
-#     build(Size(NX,NX), :(fx(x,u,t,θ::$M)), Jx(f), M)
-#     build(Size(NX,NU), :(fu(x,u,t,θ::$M)), Ju(f), M)
-
-#     build(Size(NX,NX,NX), :(fxx(x,u,t,θ::$M)), Jx(Jx(f)), M)
-#     build(Size(NX,NX,NU), :(fxu(x,u,t,θ::$M)), Ju(Jx(f)), M)
-#     build(Size(NX,NU,NU), :(fuu(x,u,t,θ::$M)), Ju(Ju(f)), M)
-    
-#     return nothing
+# # facilitate symbolic differentiation of model
+# struct SymbolicModel{T}
+#     vars
 # end
+export SymModel
+struct SymModel{T} end
 
-# function build_l(T, user_l)
-#     info("building stage cost methods for $(as_bold(T))")
-#     NX,NU,x,u,t,θ,λ,Jx,Ju,M = init_syms(T)
-
-#     l = invokelatest(user_l, x, u, t, θ)
-#     lx = reshape(Jx(l), NX)
-#     lu = reshape(Ju(l), NU)
-
-#     build(Size(1), :(l(x,u,t,θ::$M)), l, M)
-#     build(Size(NX), :(lx(x,u,t,θ::$M)), lx, M)
-#     build(Size(NU), :(lu(x,u,t,θ::$M)), lu, M)
-
-#     build(Size(NX,NX), :(lxx(x,u,t,θ::$M)), Jx(lx), M)
-#     build(Size(NX,NU), :(lxu(x,u,t,θ::$M)), Ju(lx), M)
-#     build(Size(NU,NU), :(luu(x,u,t,θ::$M)), Ju(lu), M)
-#     return nothing
-# end
-
-# function build_p(T, user_p)
-#     info("building terminal cost methods for $(as_bold(T))")
-#     NX,NU,x,u,t,θ,λ,Jx,Ju,M = init_syms(T)
-
-#     p = invokelatest(user_p, x, u, t, θ)
-#     px = reshape(Jx(p), NX)
-
-#     build(Size(1), :(p(x,u,t,θ::$M)), p, M)
-#     build(Size(NX), :(px(x,u,t,θ::$M)), px, M)
-#     build(Size(NX,NX), :(pxx(x,u,t,θ::$M)), Jx(px), M)
-#     return nothing
-# end
-
-# function build_Q(T, user_Q)
-#     info("building regulator Q method for $(as_bold(T))")
-#     NX,NU,x,u,t,θ,λ,Jx,Ju,M = init_syms(T)
-
-#     Q = invokelatest(user_Q, x, u, t, θ)
-#     build(Size(NX,NX), :(Q(x,u,t,θ::$M)), Q, M)
-#     return nothing
-# end
-
-# function build_R(T, user_R)
-#     info("building regulator R method for $(as_bold(T))")
-#     NX,NU,x,u,t,θ,λ,Jx,Ju,M = init_syms(T)
-
-#     R = invokelatest(user_R, x, u, t, θ)
-#     build(Size(NU,NU), :(R(x,u,t,θ::$M)), R, M)
-#     return nothing
-# end
-
-# trace(f, vars...) = invokelatest(f, vars...)
-# fxx = symbolic(T, PRONTO.fxx)
-# trace(f, model, x, u, t)
+# symmodel.kq -> variables fitting 
+getproperty(::SymModel{T}, name::Symbol) where {T<:Model} = symbolic(name, fieldtype(T, name))
+propertynames(::SymModel{T}) where T = fieldnames(T)
 
 
 export symbolic
@@ -238,7 +181,7 @@ function trace(T::Type{<:Model{NX,NU}}, f) where {NX,NU}
     u = symbolic(:u, NU)
     t = symbolic(:t)
     θ = symbolic(T)
-    return collect(invokelatest(f, x, u, t, θ))
+    return collect(invokelatest(f, θ, x, u, t))
     # return Symbolics.scalarize(invokelatest(f, x, u, t, θ))
     # return collect(invokelatest(f, x, u, t, θ))
 end
@@ -279,7 +222,7 @@ function define_methods(T, sz::Size{S}, sym, name, args...) where S
         def_inplace(name, T, body, args...) |> string, "\n\n",
     )
     Base.include(Main, file)
-    hdr = "PRONTO.$name($(["$a, " for a in args]...)θ::$T)" |> x->x*repeat(" ", max(36-length(x),0))
+    hdr = "PRONTO.$name(θ::$(T)$([", $a" for a in args]...))" |> x->x*repeat(" ", max(36-length(x),0))
     iinfo("$hdr "*as_color(crayon"dark_gray", "[$file]"))
 end
 
@@ -295,7 +238,7 @@ end
 function def_inplace(name, T, body, args...)
     name! = _!(name)
     ex =  quote
-        function PRONTO.$name!(out, $(args...), θ::Union{$T,SymModel{$T}})
+        function PRONTO.$name!(out, θ::Union{$T,SymModel{$T}}, $(args...))
             @inbounds begin
                 $(body...)
             end
@@ -315,9 +258,9 @@ end
 function def_symbolic(name, T, sz::Size{S}, args...) where S
     name! = _!(name)
     return quote
-        function PRONTO.$name($(args...), θ::SymModel{$T})
+        function PRONTO.$name(θ::SymModel{$T}, $(args...))
             out = Array{Num}(undef, $(S...))
-            PRONTO.$name!(out, $(args...), θ)
+            PRONTO.$name!(out, θ, $(args...))
             return SArray{Tuple{$(S...)}, Num}(out)
         end
     end |> clean
@@ -326,9 +269,9 @@ end
 function def_generic(name, T, sz::Size{S}, args...) where S
     name! = _!(name)
     return quote
-        function PRONTO.$name($(args...), θ::$T)
+        function PRONTO.$name(θ::$T, $(args...))
             out = $(MType(sz))(undef)
-            PRONTO.$name!(out, $(args...), θ)
+            PRONTO.$name!(out, θ, $(args...))
             return $(SType(sz))(out)
         end
     end |> clean
@@ -407,7 +350,7 @@ end
 
 
 
-
+#=
 #MAYBE: do we actually want to save the whole model to a file?
 #TODO: deprecate
 function build(sz, hdr, sym, M; file=nothing)
@@ -508,3 +451,4 @@ function tmaparr(f, args...)
 end
 
 # build_inplace(:f, body, :(model::TwoSpin), :x, :u, :t)
+=#

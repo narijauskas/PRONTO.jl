@@ -44,6 +44,8 @@ F(α,θ) = θ.μ*θ.g*θ.M*sin(θ.c*atan(θ.b*α))
 @define_Q LaneChange diagm(θ.kq)
 
 resolve_model(LaneChange)
+PRONTO.runtime_info(θ::LaneChange, ξ; verbosity=1) = verbosity >= 1 && println(preview(ξ.u))
+
 
 ## -------------------------------  ------------------------------- ##
 θ = LaneChange()

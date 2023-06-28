@@ -31,7 +31,7 @@ t = symbolic(:t)
 # symbolic(TwoSpin, PRONTO.f)
 
 # can now symbolically trace any PRONTO kernel function by calling it, eg.
-PRONTO.f(x,u,t,θ) # returns a symbolic representation of dynamics
+PRONTO.f(θ,x,u,t) # returns a symbolic representation of dynamics
 PRONTO.fx(x,u,t,θ) # or dynamics jacobian
 PRONTO.Lxu(λ,x,u,t,θ) # or lagrangian hessian 
 

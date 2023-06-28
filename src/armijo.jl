@@ -28,5 +28,5 @@ function dxdt_armijo(x1, (θ,x,u,z,v,γ,Kr), t)
     μ = u(t) + γ*v(t)
     Kr = Kr(t)
     u = μ - Kr*(x1-α)
-    f(x1,u,t,θ)
+    f(θ,x1,u,t)
 end

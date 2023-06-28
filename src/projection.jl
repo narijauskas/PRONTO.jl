@@ -37,12 +37,13 @@ function open_loop(θ::Model{NX,NU}, x0, μ, τ) where {NX,NU}
 end
 
 
-projection(θ::Model, x0, φ, Kr, τ) = projection(θ, x0, φ.x, φ.u, Kr, τ)
+projection(θ::Model, x0, φ, Kr, τ; kw...) = projection(θ, x0, φ.x, φ.u, Kr, τ; kw...)
 
 
 #TODO: a function that returns buf,cb
 
-function projection(θ::Model{NX,NU}, x0, α, μ, Kr, (t0,tf); dt=0.001) where {NX,NU}
+function projection(θ::Model{NX,NU}, x0, α, μ, Kr, (t0,tf); verbosity=1, dt=0.001) where {NX,NU}
+    iinfo("projection"; verbosity)
     # xbuf = Vector{SVector{NX,Float64}}()
     ubuf = Vector{SVector{NU,Float64}}()
     ts = t0:dt:tf
@@ -71,7 +72,7 @@ function dxdt(x, (θ,α,μ,Kr), t)
     μ = μ(t)
     Kr = Kr(α,μ,t)
     u = μ - Kr*(x-α)
-    f(x,u,t,θ)
+    f(θ,x,u,t)
 end
 
 

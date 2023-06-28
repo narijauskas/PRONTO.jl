@@ -2,21 +2,22 @@
 function dλ_dt(λ, (θ,ξ,Kr), t)
     x = ξ.x(t); u = ξ.u(t); Kr = Kr(t)
 
-    A = fx(x,u,t,θ)
-    B = fu(x,u,t,θ)
-    a = lx(x,u,t,θ)
-    b = lu(x,u,t,θ)
+    A = fx(θ,x,u,t)
+    B = fu(θ,x,u,t)
+    a = lx(θ,x,u,t)
+    b = lu(θ,x,u,t)
 
     -(A - B*Kr)'λ - a + Kr'b
 end
 
 # for convenience:
-function lagrangian(θ,ξ,φ,Kr,τ)
+function lagrangian(θ,ξ,φ,Kr,τ; verbosity)
+    iinfo("lagrangian"; verbosity)
     t0,tf = τ
     αf = φ.x(tf)
     μf = φ.u(tf)
 
-    λf = px(αf, μf, tf, θ)
+    λf = px(θ, αf, μf, tf)
     λ = ODE(dλ_dt, λf, (tf,t0), (θ,ξ,Kr))
     return λ
 end
@@ -41,17 +42,17 @@ struct Optimizer{Tθ,Tλ,Tξ,TP}
 end
 
 (Ko::Optimizer)(t) = Ko(Ko.ξ.x(t), Ko.ξ.u(t), t)
-(Ko::Optimizer)(x,u,t) = Ko(x,u,t,Ko.θ)
+(Ko::Optimizer)(x,u,t) = Ko(Ko.θ,x,u,t)
 
-function (Ko::Optimizer)(x,u,t,θ)
+function (Ko::Optimizer)(θ,x,u,t)
 
     λ = is2ndorder(Ko) ? Ko.λ(t) : nothing
-    Q = is2ndorder(Ko) ? Lxx(λ,x,u,t,θ) : lxx(x,u,t,θ)
-    S = is2ndorder(Ko) ? Lxu(λ,x,u,t,θ) : lxu(x,u,t,θ)
-    R = is2ndorder(Ko) ? Luu(λ,x,u,t,θ) : luu(x,u,t,θ)
+    Q = is2ndorder(Ko) ? Lxx(θ,λ,x,u,t) : lxx(θ,x,u,t)
+    S = is2ndorder(Ko) ? Lxu(θ,λ,x,u,t) : lxu(θ,x,u,t)
+    R = is2ndorder(Ko) ? Luu(θ,λ,x,u,t) : luu(θ,x,u,t)
 
     P = Ko.P(t)
-    B = fu(x,u,t,θ)
+    B = fu(θ,x,u,t)
 
     return R\(S' + B'P)
 end
@@ -76,12 +77,13 @@ isstable(x::ODE) = retcode(x) == ReturnCode.Success
 struct InstabilityException <: Exception
 end
 
-function optimizer(θ,λ,ξ,φ,τ)
+function optimizer(θ,λ,ξ,φ,τ; verbosity)
+    iinfo("optimizer"; verbosity)
     t0,tf = τ
     αf = φ.x(tf)
     μf = φ.u(tf)
     
-    Pf = pxx(αf,μf,tf,θ)
+    Pf = pxx(θ,αf,μf,tf)
 
     #FIX: this implementation is not the most robust
     P,N = try
@@ -95,7 +97,9 @@ function optimizer(θ,λ,ξ,φ,τ)
         (P,N)
     end
 
-    return Optimizer(N,θ,λ,ξ,P)
+    Ko = Optimizer(N,θ,λ,ξ,P)
+    iinfo("using $(is2ndorder(Ko) ? "2nd" : "1st") order search"; verbosity)
+    return Ko
 end
 
 # for debugging - only first order descent
@@ -104,7 +108,7 @@ function optimizer1(θ,λ,ξ,φ,τ)
     αf = φ.x(tf)
     μf = φ.u(tf)
     
-    Pf = pxx(αf,μf,tf,θ)
+    Pf = pxx(θ,αf,μf,tf)
     N = FirstOrder()
     P = ODE(dP_dt, Pf, (tf,t0), (θ,λ,ξ,N))
     
@@ -114,13 +118,13 @@ end
 function dP_dt(P, (θ,λ,ξ,N), t)
     x = ξ.x(t); u = ξ.u(t)
 
-    A = fx(x,u,t,θ)
-    B = fu(x,u,t,θ)
+    A = fx(θ,x,u,t)
+    B = fu(θ,x,u,t)
 
     λ = is2ndorder(N) ? λ(t) : nothing
-    Q = is2ndorder(N) ? Lxx(λ,x,u,t,θ) : lxx(x,u,t,θ)
-    S = is2ndorder(N) ? Lxu(λ,x,u,t,θ) : lxu(x,u,t,θ)
-    R = is2ndorder(N) ? Luu(λ,x,u,t,θ) : luu(x,u,t,θ)
+    Q = is2ndorder(N) ? Lxx(θ,λ,x,u,t) : lxx(θ,x,u,t)
+    S = is2ndorder(N) ? Lxu(θ,λ,x,u,t) : lxu(θ,x,u,t)
+    R = is2ndorder(N) ? Luu(θ,λ,x,u,t) : luu(θ,x,u,t)
 
     Ko = R\(S' + B'P)
     return - A'P - P*A + Ko'R*Ko - Q
@@ -145,13 +149,13 @@ end
 
 
 (vo::Costate)(t) = vo(vo.ξ.x(t), vo.ξ.u(t), t)
-(vo::Costate)(x,u,t) = vo(x,u,t,vo.θ)
+(vo::Costate)(x,u,t) = vo(vo.θ,x,u,t)
 
-function (vo::Costate)(x,u,t,θ)
+function (vo::Costate)(θ,x,u,t)
 
-    R = is2ndorder(vo) ? Luu(vo.λ(t),x,u,t,θ) : luu(x,u,t,θ)
-    B = fu(x,u,t,θ)
-    b = lu(x,u,t,θ)
+    R = is2ndorder(vo) ? Luu(θ,vo.λ(t),x,u,t) : luu(θ,x,u,t)
+    B = fu(θ,x,u,t)
+    b = lu(θ,x,u,t)
     r = vo.r(t)
 
     return -R\(B'r + b)
@@ -164,20 +168,21 @@ function dr_dt(r, (θ,λ,ξ,Ko), t)
     x = ξ.x(t); u = ξ.u(t)
     Ko = Ko(x,u,t)
 
-    A = fx(x,u,t,θ)
-    B = fu(x,u,t,θ)
-    a = lx(x,u,t,θ)
-    b = lu(x,u,t,θ)
+    A = fx(θ,x,u,t)
+    B = fu(θ,x,u,t)
+    a = lx(θ,x,u,t)
+    b = lu(θ,x,u,t)
 
     -(A - B*Ko)'r - a + Ko'b
 end
 
-function costate(θ,λ,ξ,φ,Ko,τ)
+function costate(θ,λ,ξ,φ,Ko,τ; verbosity)
+    iinfo("costate"; verbosity)
     t0,tf = τ
     αf = φ.x(tf)
     μf = φ.u(tf)
     N = order(Ko)
-    rf = px(αf,μf,tf,θ)
+    rf = px(θ,αf,μf,tf)
     r = ODE(dr_dt, rf, (tf,t0), (θ,λ,ξ,Ko))
     return Costate(N,θ,λ,ξ,r)
 end
@@ -198,7 +203,8 @@ is2ndorder(::Any) = false
 
 
 
-function search_direction(θ::Model{NX,NU},ξ,Ko,vo,τ; dt=0.001) where {NX,NU}
+function search_direction(θ::Model{NX,NU},ξ,Ko,vo,τ; verbosity=1, dt=0.001) where {NX,NU}
+    iinfo("search_direction"; verbosity)
     t0,tf = τ
     ts = t0:dt:tf
     vbuf = Vector{SVector{NU,Float64}}()
@@ -222,8 +228,8 @@ end
 function dz_dt(z, (θ,ξ,Ko,vo), t)
     x = ξ.x(t)
     u = ξ.u(t)
-    A = fx(x,u,t,θ)
-    B = fu(x,u,t,θ)
+    A = fx(θ,x,u,t)
+    B = fu(θ,x,u,t)
     v = vo(x,u,t) - Ko(x,u,t)*z
     return A*z + B*v
 end
