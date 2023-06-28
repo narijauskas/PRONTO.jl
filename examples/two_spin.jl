@@ -37,8 +37,14 @@ end
 resolve_model(TwoSpin)
 
 
-PRONTO.runtime_info(θ::TwoSpin, ξ; verbosity=1) = verbosity >= 1 && println(preview(ξ.x, (1,3)))
-PRONTO.runtime_info(θ::TwoSpin, ξ; verbosity=1) = verbosity >= 1 && println(preview(ξ.x, (2,4)))
+# PRONTO.runtime_info(θ::TwoSpin, ξ; verbosity=1) = verbosity >= 1 && println(preview(ξ.x, (1,3)))
+function PRONTO.runtime_info(θ::TwoSpin, ξ; verbosity=1)
+    if verbosity >= 1
+        println(preview(ξ.x, (1,3)))
+        println(preview(ξ.x, (2,4)))
+        println(preview(ξ.u))
+    end
+end
 
 # PRONTO.runtime_info(θ::TwoSpin, ξ; verbosity=1) = verbosity >= 1 && println(preview(ξ.u, 1))
 
@@ -57,9 +63,12 @@ xf = @SVector [1.0, 0.0, 0.0, 0.0] # final state
 μ = t->[0.1] # open loop input μ(t)
 η = open_loop(θ, xf, μ, τ) # guess trajectory
 η0 = open_loop(θ, x0, μ, τ) # guess trajectory
-ξ = pronto(θ, x0, η0, τ) # optimal trajectory
-@time ξ = pronto(θ, x0, η0, τ) # optimal trajectory
+ξ = pronto(θ, x0, η0, τ; verbosity=0); # optimal trajectory
+@allocated ξ = pronto(θ, x0, η0, τ) # optimal trajectory
 
+for _ in 1:100
+    ξ = pronto(θ, x0, η0, τ) # optimal trajectory
+end
 ##
 preview(ξ.x, (1,3))
 preview(η0.x, (1,3))
