@@ -93,9 +93,17 @@ t0,tf = τ = (0,10)
 θ = bs2(kl=0.01, kr=1, kq=1)
 μ = t->SVector{NU}(0.4*sin(t))
 φ = open_loop(θ,x0,μ,τ)
-@time ξ = pronto(θ,x0,φ,τ; tol = 1e-6, maxiters = 50, limitγ = true, verbose=1)
+@time ξ = pronto(θ,x0,φ,τ; tol = 1e-6, maxiters = 50, limitγ = true, verbosity=2)
 
+##
 
+using MAT
+ts = t0:0.001:tf
+is = eachindex(ξ.u)
+us = [ξ.u(t)[i] for t∈ts, i∈is]
+file = matopen("Uopt_nu2_10_1.0.mat","w")
+write(file,"Uopt",us)
+close(file)
 
 ## ------------------------------- demo: eigenstate 1->4 in 10s ------------------------------- ##
 
