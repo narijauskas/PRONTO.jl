@@ -72,6 +72,10 @@ x0 = SVector{12}(vec([ψ1;ψ2;0*ψ1;0*ψ2]))
 φ = open_loop(θ, x0, μ, τ) # guess trajectory
 @time ξ = pronto(θ, x0, φ, τ;verbose=1) # optimal trajectory
 
+# μ = ξ.u
+# φ = open_loop(θ, x0, μ, τ)
+# ξ = pronto(θ, x0, φ, τ;verbose=1, tol=1e-4)
+
 ##
 import Pkg: activate
 activate()

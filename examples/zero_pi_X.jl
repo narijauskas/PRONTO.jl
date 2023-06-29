@@ -55,6 +55,7 @@ PRONTO.Pf(θ::lvl3,α,μ,tf) = SMatrix{NX,NX,Float64}(I(NX))
 PRONTO.runtime_info(θ::lvl3, ξ; verbosity=1) = verbosity >= 1 && println(preview(ξ.u, 1))
 
 ## ----------------------------------- run optimization ----------------------------------- ##
+using Interpolations
 
 θ = lvl3()
 τ = t0,tf = 0,300
@@ -63,8 +64,12 @@ PRONTO.runtime_info(θ::lvl3, ξ; verbosity=1) = verbosity >= 1 && println(previ
 ψ2 = [0;1;0]
 x0 = SVector{NX}(vec([ψ1;ψ2;0*ψ1;0*ψ2]))
 μ = t->SVector{NU}(0.4*cos(H0[3,3]*t))
+# u0 = readdlm("3lvl_control_1.0.csv", ';', Float64)[:]
+# t = 0:0.001:300
+# μ = SVector{NU}(linear_interpolation(t, u0))
 φ = open_loop(θ, x0, μ, τ) # guess trajectory
 @time ξ = pronto(θ, x0, φ, τ;verbose=1, tol=1e-4) # optimal trajectory
+
 
 ##
 ts = t0:0.001:tf
