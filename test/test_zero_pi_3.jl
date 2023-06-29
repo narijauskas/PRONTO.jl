@@ -1,6 +1,7 @@
 using PRONTO
 using StaticArrays
 using DelimitedFiles
+using LinearAlgebra
 
 H0 = readdlm("H0.csv", ',', ComplexF64)
 H1 = readdlm("H1.csv", ',', ComplexF64)
@@ -13,7 +14,7 @@ function mprod(x)
     return M   
 end
 
-# ------------------------------- 3lvl system Xgate ------------------------------- ##
+## ------------------------------- 3lvl system Xgate ------------------------------- ##
 
 @kwdef struct lvl3X <: Model{12,1,3}
     kl::Float64 # stage cost gain
@@ -63,6 +64,62 @@ x0 = SVector{12}(vec([ψ1;ψ2;0*ψ1;0*ψ2]))
 
 t0,tf = τ = (0,300)
 
+μ = @closure t->SVector{1}(0.4*cos((H0[3,3]-H0[1,1])*t))
+φ = open_loop(θ,x0,μ,τ)
+@time ξ = pronto(θ,x0,φ,τ; tol = 1e-4, maxiters = 50, limitγ = true)
+
+## ------------------------------- 5lvl system Xgate ------------------------------- ##
+
+@kwdef struct lvl5X <: Model{20,1,3}
+    kl::Float64 # stage cost gain
+    kr::Float64 # regulator r gain
+    kq::Float64 # regulator q gain
+end
+
+
+function termcost(x,u,t,θ)
+    ψ1 = [1;0;0;0;0]
+    ψ2 = [0;1;0;0;0]
+    xf = vec([ψ2;ψ1;0*ψ2;0*ψ1])
+    P = I(20)
+    1/2 * collect((x-xf)')*P*(x-xf)
+end
+
+
+# ------------------------------- 5lvl system definitions ------------------------------- ##
+
+function dynamics(x,u,t,θ)
+    H00 = kron(I(2),H0[1:5,1:5])
+    H11 = kron(I(2),H1[1:5,1:5])
+    return mprod(-im*(H00+u[1]*H11))*x
+end
+
+
+stagecost(x,u,t,θ) = 1/2*θ.kl*collect(u')I*u + 0.1*collect(x')*mprod(diagm([0,0,0,1,0,0,0,0,1,0]))*x + 0.1*collect(x')*mprod(diagm([0,0,0,0,1,0,0,0,0,1]))*x  
+regR(x,u,t,θ) = θ.kr*I(1)
+
+function regQ(x,u,t,θ)
+    θ.kq*I(20)
+end
+
+PRONTO.Pf(α,μ,tf,θ::lvl5X) = SMatrix{20,20,Float64}(I(20))
+
+# ------------------------------- generate model and derivatives ------------------------------- ##
+
+PRONTO.generate_model(lvl5X, dynamics, stagecost, termcost, regQ, regR)
+
+
+## ------------------------------- demo: Simulation in 300 ------------------------------- ##
+
+ψ1 = [1;0;0;0;0]
+ψ2 = [0;1;0;0;0]
+x0 = SVector{20}(vec([ψ1;ψ2;0*ψ1;0*ψ2]))
+
+θ = lvl5X(kl=0.01, kr=1, kq=1)
+
+t0,tf = τ = (0,300)
+
+# μ = ξ.u
 μ = @closure t->SVector{1}(0.4*cos((H0[3,3]-H0[1,1])*t))
 φ = open_loop(θ,x0,μ,τ)
 @time ξ = pronto(θ,x0,φ,τ; tol = 1e-4, maxiters = 50, limitγ = true)
