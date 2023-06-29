@@ -17,7 +17,7 @@ function mprod(x)
 end
 
 ##
-# @time begin
+
 NX = 12
 NU = 1
 
@@ -47,7 +47,6 @@ end
 @regulatorQ lvl3 θ.kq*I(NX)
 @regulatorR lvl3 θ.kr*I(NU)
 
-##
 # must be run after any changes to model definition
 resolve_model(lvl3)
 
@@ -56,7 +55,7 @@ PRONTO.Pf(θ::lvl3,α,μ,tf) = SMatrix{NX,NX,Float64}(I(NX))
 
 # runtime plots
 PRONTO.runtime_info(θ::lvl3, ξ; verbosity=1) = verbosity >= 1 && println(preview(ξ.u, 1))
-# end
+
 ## ----------------------------------- run optimization ----------------------------------- ##
 
 θ = lvl3()
@@ -67,7 +66,7 @@ PRONTO.runtime_info(θ::lvl3, ξ; verbosity=1) = verbosity >= 1 && println(previ
 x0 = SVector{NX}(vec([ψ1;ψ2;0*ψ1;0*ψ2]))
 μ = t->SVector{NU}(0.4*cos(H0[3,3]*t))
 φ = open_loop(θ, x0, μ, τ) # guess trajectory
-@time ξ = pronto(θ, x0, φ, τ;verbose=1, tol=1e-4) # optimal trajectory
+@time ξ = pronto(θ, x0, φ, τ;verbose=3, tol=1e-4) # optimal trajectory
 
 ##
 

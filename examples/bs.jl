@@ -91,7 +91,7 @@ t0,tf = τ = (0,10)
 
 
 θ = bs2(kl=0.01, kr=1, kq=1)
-μ = @closure t->SVector{1}(0.4*sin(t))
+μ = t->SVector{NU}(0.4*sin(t))
 φ = open_loop(θ,x0,μ,τ)
 @time ξ = pronto(θ,x0,φ,τ; tol = 1e-6, maxiters = 50, limitγ = true, verbose=1)
 
