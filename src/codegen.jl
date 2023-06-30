@@ -140,6 +140,8 @@ function define_L(T::Type{<:Model{NX,NU}}) where {NX,NU}
 end
 
 
+
+
 # # facilitate symbolic differentiation of model
 # struct SymbolicModel{T}
 #     vars

@@ -146,7 +146,31 @@ include("cost.jl") # cost and cost derivatives
 include("armijo.jl") # armijo step and projection
 
 
+struct Data
+    φ::Vector{Trajectory}
+    Kr::Vector{Regulator}
+    ξ::Vector{Trajectory}
+    λ::Vector{ODE}
+    Ko::Vector{Optimizer}
+    vo::Vector{Costate}
+    ζ::Vector{Trajectory}
+    h::Vector{Float64}
+    Dh::Vector{Float64}
+    D2g::Vector{Float64}
+end
 
+Data() = Data(
+    Trajectory[],
+    Regulator[],
+    Trajectory[],
+    ODE[],
+    Optimizer[],
+    Costate[],
+    Trajectory[],
+    Float64[],
+    Float64[],
+    Float64[],
+)
 # ----------------------------------- pronto loop ----------------------------------- #
 
 fwd(τ) = extrema(τ)
@@ -166,6 +190,7 @@ function pronto(θ::Model, x0::StaticVector, φ, τ;
     t0,tf = τ
     # verbose && 
     info(0, "starting PRONTO")
+    data = Data()
 
     for i in 1:maxiters
         # info(i, "iteration")
@@ -184,8 +209,8 @@ function pronto(θ::Model, x0::StaticVector, φ, τ;
         # -------------- cost/derivatives -------------- #
         h = cost(ξ, τ)
         Dh,D2g = cost_derivs(θ,λ,φ,ξ,ζ,τ; verbosity)
-        Dh > 0 && (info(i, "increased cost - quitting"); (return φ))
-        -Dh < tol && (info(i-1, as_bold("PRONTO converged")); (return φ))
+        Dh > 0 && (info(i, "increased cost - quitting"); (return φ,data))
+        -Dh < tol && (info(i-1, as_bold("PRONTO converged")); (return φ,data))
 
 
         # -------------- select γ via armijo step -------------- #
@@ -201,7 +226,18 @@ function pronto(θ::Model, x0::StaticVector, φ, τ;
             g = cost(η, τ)
             h-g >= -α*γ*Dh ? break : (γ *= β)
         end
+        push!(data.φ, φ)
+        push!(data.Kr, Kr)
+        push!(data.ξ, ξ)
+        push!(data.λ, λ)
+        push!(data.Ko, Ko)
+        push!(data.vo, vo)
+        push!(data.ζ, ζ)
+        push!(data.h, h)
+        push!(data.Dh, Dh)
+        push!(data.D2g, D2g)
         φ = η
+
 
         #TODO: store intermediates Kr,ξ,λ,Ko,vo,ζ,h,Dh,D2g,γ,        
         infostr = @sprintf("Dh = %.3e, h = %.3e, γ = %.3e, ", Dh, h, γ)
@@ -214,7 +250,7 @@ function pronto(θ::Model, x0::StaticVector, φ, τ;
         # println(preview(ξ.x, (2,4)))
         # println(preview(ξ.u, 1))
     end
-    return φ
+    return φ,data
 end
 
 
