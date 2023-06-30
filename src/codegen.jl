@@ -118,15 +118,29 @@ function define_R(T::Type{<:Model{NX,NU}}, user_R) where {NX,NU}
 end
 
 function define_L(T::Type{<:Model{NX,NU}}) where {NX,NU}
-    info("defining lagrangian methods for $(as_bold(T))")
+    info("defining Lagrangian methods for $(as_bold(T))")
+    Jx,Ju = jacobians(T)
 
-    fxx = trace(T, PRONTO.fxx)
-    fxu = trace(T, PRONTO.fxu)
-    fuu = trace(T, PRONTO.fuu)
+    # fxx = trace(T, PRONTO.fxx)
+    # fxu = trace(T, PRONTO.fxu)
+    # fuu = trace(T, PRONTO.fuu)
 
-    lxx = trace(T, PRONTO.lxx)
-    lxu = trace(T, PRONTO.lxu)
-    luu = trace(T, PRONTO.luu)
+    f = trace(T, PRONTO.f)
+    fxx = Jx(Jx(f))
+    fxu = Ju(Jx(f))
+    fuu = Ju(Ju(f))
+
+    l = trace(T, PRONTO.l)
+    # Jx,Ju = jacobians(T)
+    lx = reshape(Jx(l), NX)
+    lu = reshape(Ju(l), NU)
+    lxx = Jx(lx)
+    lxu = Ju(lx)
+    luu = Ju(lu)
+
+    # lxx = trace(T, PRONTO.lxx)
+    # lxu = trace(T, PRONTO.lxu)
+    # luu = trace(T, PRONTO.luu)
 
     λ = collect(first(@variables λ[1:NX]))
     Lxx = lxx .+ sum(λ[k]*fxx[k,:,:] for k in 1:NX)
@@ -184,6 +198,8 @@ function trace(T::Type{<:Model{NX,NU}}, f) where {NX,NU}
     t = symbolic(:t)
     θ = symbolic(T)
     return collect(invokelatest(f, θ, x, u, t))
+    # return collect(f(θ, x, u, t))
+
     # return Symbolics.scalarize(invokelatest(f, x, u, t, θ))
     # return collect(invokelatest(f, x, u, t, θ))
 end

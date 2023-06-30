@@ -221,7 +221,7 @@ function pronto(θ::Model, x0::StaticVector, φ, τ;
 
         local η # defined to exist outside of while loop
         while γ > γmin
-            iinfo("armijo γ = $(round(γ; digits=6))"; verbosity)
+            iiinfo("armijo γ = $(round(γ; digits=6))"; verbosity)
             η = armijo_projection(θ,x0,ξ,ζ,γ,Kr,τ)
             g = cost(η, τ)
             h-g >= -α*γ*Dh ? break : (γ *= β)
