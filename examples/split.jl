@@ -33,22 +33,21 @@ end
 # 3. fields = parameters, and can be accessed by, eg. θ.kr ≡ θ[2] and θ.kq ≡ θ[3]
 
 
-# ------------------------------- split system to eigenstate 2 ------------------------------- ##
+## ------------------------------- split system to eigenstate 2 ------------------------------- ##
 
-@kwdef struct Split2 <: PRONTO.Model{22,1}
+@kwdef struct Split2 <: Model{22,1}
     kl::Float64 # stage cost gain
     kr::Float64 # regulator r gain
     kq::Float64 # regulator q gain
 end
 
-
-function termcost2(x,u,t,θ)
+@define_m Split2 begin
     P = I(22) - inprod(x_eig(2))
-    1/2 * collect(x')*P*x
+    1/2*x'*P*x
 end
 
 
-# ------------------------------- split system to eigenstate 4 ------------------------------- ##
+## ------------------------------- split system to eigenstate 4 ------------------------------- ##
 
 @kwdef struct Split4 <: Model{22,1,3}
     kl::Float64 # stage cost gain
@@ -63,9 +62,8 @@ function termcost4(x,u,t,θ)
 end
 
 
-# ------------------------------- split system definitions ------------------------------- ##
-
-function dynamics(x,u,t,θ)
+## ------------------------------- split system definitions ------------------------------- ##
+@dynamics Split2 begin
     ω = 1.0
     n = 5
     α = 10
@@ -73,24 +71,43 @@ function dynamics(x,u,t,θ)
     H0 = SymTridiagonal(promote([4.0i^2 for i in -n:n], v*ones(2n))...)
     H1 = v*im*Tridiagonal(ones(2n), zeros(2n+1), -ones(2n))
     H2 = v*Tridiagonal(-ones(2n), zeros(2n+1), -ones(2n))
-    return mprod(-im*ω*(H0 + sin(u[1])*H1 + (1-cos(u[1]))*H2) )*x
+    mprod(-im*ω*(H0 + sin(u[1])*H1 + (1-cos(u[1]))*H2) )*x
 end
 
-stagecost(x,u,t,θ) = 1/2 *θ[1]*collect(u')I*u
-regR(x,u,t,θ) = θ.kr*I(1)
-function regQ(x,u,t,θ)
+
+# function dynamics(x,u,t,θ)
+#     ω = 1.0
+#     n = 5
+#     α = 10
+#     v = -α/4
+#     H0 = SymTridiagonal(promote([4.0i^2 for i in -n:n], v*ones(2n))...)
+#     H1 = v*im*Tridiagonal(ones(2n), zeros(2n+1), -ones(2n))
+#     H2 = v*Tridiagonal(-ones(2n), zeros(2n+1), -ones(2n))
+#     return mprod(-im*ω*(H0 + sin(u[1])*H1 + (1-cos(u[1]))*H2) )*x
+# end
+
+@define_l Split2 begin
+    1/2*kl*u'*I*u
+end
+
+@define_R Split2 kr*I(1)
+
+# stagecost(x,u,t,θ) = 1/2 *θ[1]*collect(u')I*u
+# regR(x,u,t,θ) = θ.kr*I(1)
+@define_Q Split2 begin
     x_re = x[1:11]
     x_im = x[12:22]
     ψ = x_re + im*x_im
-    θ.kq*mprod(I(11) - ψ*ψ')
+    kq*mprod(I(11) - ψ*ψ')
 end
 
+resolve_model(Split2)
 
+PRONTO.runtime_info(θ::Split2, ξ; verbosity=1) = verbosity >= 1 && println(preview(ξ.u; color=PRONTO.manto_colors))
+PRONTO.Pf(θ::Split2,α,μ,tf) = SMatrix{22,22,Float64}(I(22) - α*α')
+# PRONTO.Pf(θ::Split4,α,μ,tf) = SMatrix{22,22,Float64}(I(22) - α*α')
 
-PRONTO.Pf(α,μ,tf,θ::Split2) = SMatrix{22,22,Float64}(I(22) - α*α')
-PRONTO.Pf(α,μ,tf,θ::Split4) = SMatrix{22,22,Float64}(I(22) - α*α')
-
-# ------------------------------- generate model and derivatives ------------------------------- ##
+## ------------------------------- generate model and derivatives ------------------------------- ##
 
 PRONTO.generate_model(Split2, dynamics, stagecost, termcost2, regQ, regR)
 PRONTO.generate_model(Split4, dynamics, stagecost, termcost4, regQ, regR)
@@ -138,9 +155,9 @@ t0,tf = τ = (0,10)
 
 
 θ = Split2(kl=0.01, kr=1, kq=1)
-μ = @closure t->SVector{1}(0.4*sin(t))
+μ = t->SVector{1}(0.4*sin(t))
 φ = open_loop(θ,x0,μ,τ)
-@time ξ = pronto(θ,x0,φ,τ; tol = 1e-6, maxiters = 50, limitγ = true)
+ξ,data = pronto(θ,x0,φ,τ; tol = 1e-6, maxiters = 50, limitγ = true, verbosity=2);
 
 # plot_split(ξ,τ)
 

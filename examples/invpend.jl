@@ -36,8 +36,8 @@ end
 resolve_model(InvPend)
 
 PRONTO.runtime_info(θ::InvPend, ξ; verbosity) = nothing
-PRONTO.runtime_info(θ::InvPend, ξ; verbosity=1) = verbosity >= 1 && println(preview(ξ.u))
-PRONTO.runtime_info(θ::InvPend, ξ; verbosity=1) = verbosity >= 1 && println(preview(ξ.x))
+PRONTO.runtime_info(θ::InvPend, ξ; verbosity=1) = verbosity >= 1 && println(preview(ξ.u; color=PRONTO.manto_colors[1]))
+PRONTO.runtime_info(θ::InvPend, ξ; verbosity=1) = verbosity >= 1 && println(preview(ξ.x; color=PRONTO.manto_colors))
 # Rreg(x,u,t,θ) = diagm([1e-3])
 # Qreg(x,u,t,θ) = diagm([10, 1])
 
@@ -70,7 +70,7 @@ smooth(t, x0, xf, tf) = @. (xf - x0)*(tanh((2π/tf)*t - π) + 1)/2 + x0
 μ = t->u0*sin(t)
 α = t->smooth(t, x0, xf, tf)
 φ = PRONTO.Trajectory(θ,α,μ);
-pronto(θ,x0,φ,τ; maxiters=1)
+ξ,data = pronto(θ,x0,φ,τ);
 
 ##
 

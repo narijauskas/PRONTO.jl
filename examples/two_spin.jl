@@ -3,10 +3,8 @@ using StaticArrays
 using LinearAlgebra
 using Base: @kwdef
 
-NX = 4
-NU = 1
 
-@kwdef struct TwoSpin <: PRONTO.Model{NX,NU}
+@kwdef struct TwoSpin <: Model{4,1}
     kr::Float64 = 1.0
     kq::Float64 = 1.0
 end
@@ -30,12 +28,12 @@ end
     1/2*x'*Pl*x
 end
 
-@define_Q TwoSpin θ.kq*I(NX)
-@define_R TwoSpin θ.kr*I(NU)
+@define_Q TwoSpin kq*I(4)
+@define_R TwoSpin kr*I(1)
 
 # must be run after any changes to model definition
 resolve_model(TwoSpin)
-
+##
 
 # PRONTO.runtime_info(θ::TwoSpin, ξ; verbosity=1) = verbosity >= 1 && println(preview(ξ.x, (1,3)))
 function PRONTO.runtime_info(θ::TwoSpin, ξ; verbosity=1)
@@ -47,6 +45,7 @@ function PRONTO.runtime_info(θ::TwoSpin, ξ; verbosity=1)
 end
 
 PRONTO.runtime_info(θ::TwoSpin, ξ; verbosity=1) = verbosity >= 1 && println(preview(ξ.u, 1))
+PRONTO.runtime_info(θ::TwoSpin, ξ; verbosity=1) = verbosity >= 1 && println(preview(ξ.x; color=PRONTO.manto_colors))
 
 
 # overwrite default behavior of Pf for TwoSpin models

@@ -134,7 +134,14 @@ function preview(x, is, ts; kw...)
 end
 
 
-
+manto_colors = [
+    crayon"#FFC12E",
+    crayon"#FF7F10",
+    crayon"#FF3C38",
+    crayon"#FF006E",
+    crayon"#2AD599",
+    crayon"#007DC6",
+]
 
 
 #FUTURE: Makie support
