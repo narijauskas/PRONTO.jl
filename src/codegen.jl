@@ -13,6 +13,10 @@ export @define_f, @define_l, @define_m, @define_Q, @define_R
 export @dynamics, @stage_cost, @terminal_cost, @regulatorQ, @regulatorR
 export resolve_model
 
+# for name in fieldnames(T)
+#     name in (:x,:u,:t) && error("model cannot have fields named x,u,t")
+#     ex = crispr(ex, name, :(θ.$name))
+# end
 
 
 # export generate_model, InPlace
@@ -22,27 +26,32 @@ export resolve_model
 # export symbolic
 
 macro define_f(T, ex)
-    fn = :((θ,x,u,t)->$ex)
+    names = fieldnames(eval(:(Main.$T)))
+    fn = :((x,u,t, $(names...)) -> $ex)
     :(define_f($(esc(T)), $(esc(fn))))
 end
 
 macro define_l(T, ex)
-    fn = :((θ,x,u,t)->$ex)
+    names = fieldnames(eval(:(Main.$T)))
+    fn = :((x,u,t, $(names...)) -> $ex)
     :(define_l($(esc(T)), $(esc(fn))))
 end
 
 macro define_m(T, ex)
-    fn = :((θ,x,u,t)->$ex)
+    names = fieldnames(eval(:(Main.$T)))
+    fn = :((x,u,t, $(names...)) -> $ex)
     :(define_m($(esc(T)), $(esc(fn))))
 end
 
 macro define_Q(T, ex)
-    fn = :((θ,x,u,t)->$ex)
+    names = fieldnames(eval(:(Main.$T)))
+    fn = :((x,u,t, $(names...)) -> $ex)
     :(define_Q($(esc(T)), $(esc(fn))))
 end
 
 macro define_R(T, ex)
-    fn = :((θ,x,u,t)->$ex)
+    names = fieldnames(eval(:(Main.$T)))
+    fn = :((x,u,t, $(names...)) -> $ex)
     :(define_R($(esc(T)), $(esc(fn))))
 end
 
@@ -66,7 +75,7 @@ end
 
 function define_f(T::Type{<:Model{NX,NU}}, user_f) where {NX,NU}
     info("defining dynamics and derivatives for $(as_bold(T))")
-    f = trace(T, user_f)
+    f = traceuser(T, user_f)
     Jx,Ju = jacobians(T)
     define_methods(T, Size(NX), f, :f, :x, :u, :t)
     define_methods(T, Size(NX,NX), Jx(f), :fx, :x, :u, :t)
@@ -79,7 +88,7 @@ end
 
 function define_l(T::Type{<:Model{NX,NU}}, user_l) where {NX,NU}
     info("defining stage cost and derivatives for $(as_bold(T))")
-    l = trace(T, user_l)
+    l = traceuser(T, user_l)
     Jx,Ju = jacobians(T)
     lx = reshape(Jx(l), NX)
     lu = reshape(Ju(l), NU)
@@ -94,7 +103,7 @@ end
 
 function define_m(T::Type{<:Model{NX,NU}}, user_m) where {NX,NU}
     info("defining terminal cost and derivatives for $(as_bold(T))")
-    m = trace(T, user_m)
+    m = traceuser(T, user_m)
     Jx,Ju = jacobians(T)
     mx = reshape(Jx(m), NX)
     define_methods(T, Size(1), m, :p, :x, :u, :t)
@@ -105,14 +114,14 @@ end
 
 function define_Q(T::Type{<:Model{NX,NU}}, user_Q) where {NX,NU}
     info("defining regulator Q method for $(as_bold(T))")
-    Q = trace(T, user_Q)
+    Q = traceuser(T, user_Q)
     define_methods(T, Size(NX,NX), Q, :Q, :x, :u, :t)
     return nothing
 end
 
 function define_R(T::Type{<:Model{NX,NU}}, user_R) where {NX,NU}
     info("defining regulator R method for $(as_bold(T))")
-    R = trace(T, user_R)
+    R = traceuser(T, user_R)
     define_methods(T, Size(NU,NU), R, :R, :x, :u, :t)
     return nothing
 end
@@ -166,7 +175,7 @@ struct SymModel{T} end
 # symmodel.kq -> variables fitting 
 getproperty(::SymModel{T}, name::Symbol) where {T<:Model} = symbolic(name, fieldtype(T, name))
 propertynames(::SymModel{T}) where T = fieldnames(T)
-
+Base.all(M::SymModel{T}) where T = [getproperty(M, name) for name in propertynames(M)]
 
 export symbolic
 
@@ -191,6 +200,12 @@ symbolic(name::Symbol, ix::UnitRange) = Symbolics.variables(name, ix)
 # for PRONTO functions
 # symbolic(T::Type{<:Model}, f::Function) = trace(T, f)
 
+function traceuser(T::Type{<:Model{NX,NU}}, fn) where {NX,NU}
+    x = symbolic(:x, NX)
+    u = symbolic(:u, NU)
+    t = symbolic(:t)
+    return collect(fn(x, u, t, all(symbolic(T))...))
+end
 # θ = symbolic(T)
 function trace(T::Type{<:Model{NX,NU}}, f) where {NX,NU}
     x = symbolic(:x, NX)

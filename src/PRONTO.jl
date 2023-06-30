@@ -171,6 +171,8 @@ Data() = Data(
     Float64[],
     Float64[],
 )
+
+Base.show(io::IO, data::Data) = print(io, "PRONTO data: $(length(data.φ)) iterations")
 # ----------------------------------- pronto loop ----------------------------------- #
 
 fwd(τ) = extrema(τ)
@@ -193,6 +195,7 @@ function pronto(θ::Model, x0::StaticVector, φ, τ;
     data = Data()
 
     for i in 1:maxiters
+        loop_start = time_ns()
         # info(i, "iteration")
         # -------------- build regulator -------------- #
         # α,μ -> Kr,x,u
@@ -238,10 +241,12 @@ function pronto(θ::Model, x0::StaticVector, φ, τ;
         push!(data.D2g, D2g)
         φ = η
 
-
+        loop_end = time_ns()
+        loop_time = (loop_end - loop_start)/1e6
         #TODO: store intermediates Kr,ξ,λ,Ko,vo,ζ,h,Dh,D2g,γ,        
         infostr = @sprintf("Dh = %.3e, h = %.3e, γ = %.3e, ", Dh, h, γ)
-        infostr *= ", order = $(is2ndorder(Ko) ? "2nd" : "1st")"
+        infostr *= ", order = $(is2ndorder(Ko) ? "2nd" : "1st"), "
+        infostr *= @sprintf("solved in %.4f ms", loop_time)
         # info(i, "Dh = $Dh, h = $h, γ = $γ, order = $(is2ndorder(Ko) ? "2nd" : "1st")"; verbosity)
         info(i, infostr; verbosity)
         runtime_info(θ, ξ; verbosity)
