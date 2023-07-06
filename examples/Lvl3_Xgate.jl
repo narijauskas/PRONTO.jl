@@ -38,7 +38,7 @@ end
 end
 
 @stage_cost XGate3 begin
-    θ.kl/2*u'*I*u + 0.3*x'*mprod(diagm([0,0,1,0,0,1]))*x
+    θ.kl/2*u'*I*u #+ 0.3*x'*mprod(diagm([0,0,1,0,0,1]))*x
 end
 
 @terminal_cost XGate3 begin
@@ -63,7 +63,7 @@ PRONTO.runtime_info(θ::XGate3, ξ; verbosity=1) = verbosity >= 1 && println(pre
 ## ----------------------------------- run optimization ----------------------------------- ##
 
 θ = XGate3()
-τ = t0,tf = 0,10
+τ = t0,tf = 0,15
 
 ψ1 = [1;0;0]
 ψ2 = [0;1;0]
@@ -76,15 +76,13 @@ x0 = SVector{12}(vec([ψ1;ψ2;0*ψ1;0*ψ2]))
 # φ = open_loop(θ, x0, μ, τ)
 # ξ = pronto(θ, x0, φ, τ;verbose=1, tol=1e-4)
 
-##
-import Pkg: activate
-activate()
-using MAT
-activate(".")
+## ----------------------------------- output results as MAT ----------------------------------- ##
 
-ts = t0:0.01:tf
+using MAT
+
+ts = t0:0.001:tf
 is = eachindex(ξ.u)
 us = [ξ.u(t)[i] for t∈ts, i∈is]
-file = matopen("Uopt_xgate_10_1.0.mat","w")
+file = matopen("Uopt_xgate_15_1.0.mat","w")
 write(file,"Uopt",us)
 close(file)
