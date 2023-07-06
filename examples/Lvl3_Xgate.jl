@@ -83,6 +83,6 @@ using MAT
 ts = t0:0.001:tf
 is = eachindex(ξ.u)
 us = [ξ.u(t)[i] for t∈ts, i∈is]
-file = matopen("Uopt_xgate_15_1.0.mat","w")
+file = matopen("Uopt_xgate_15_1.0_noQ.mat","w")
 write(file,"Uopt",us)
 close(file)
