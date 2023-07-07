@@ -2,8 +2,8 @@
 using PRONTO
 using LinearAlgebra, StaticArrays
 
-NX = 6; NU = 2
-@kwdef struct LaneChange <: PRONTO.Model{6,2}
+# NX = 6; NU = 2
+@kwdef struct LaneChange <: Model{6,2}
     M::Float64 = 2041    # [kg]     Vehicle mass
     J::Float64 = 4964    # [kg m^2] Vehicle inertia (yaw)
     g::Float64 = 9.81    # [m/s^2]  Gravity acceleration
@@ -19,43 +19,49 @@ NX = 6; NU = 2
 end
 
 # sideslip angles
-αf(x,θ) = x[5] - atan((x[2] + θ.Lf*x[4])/θ.s)
-αr(x,θ) = x[6] - atan((x[2] - θ.Lr*x[4])/θ.s)
+# αf(x,Lf,s) = x[5] - atan((x[2] + Lf*x[4])/s)
+# αr(x,Lf,s) = x[6] - atan((x[2] - Lr*x[4])/s)
 
-# tire force
-F(α,θ) = θ.μ*θ.g*θ.M*sin(θ.c*atan(θ.b*α))
+# # tire force
+# F(α,θ) = μ*g*M*sin(c*atan(b*α))
 
 # define model dynamics
-@define_f LaneChange [
-    θ.s*sin(x[3]) + x[2]*cos(x[3])
-    -θ.s*x[4] + ( F(αf(x,θ),θ)*cos(x[5]) + F(αr(x,θ),θ)*cos(x[6]) )/θ.M
-    x[4]
-    ( F(αf(x,θ),θ)*cos(x[5])*θ.Lf - F(αr(x,θ),θ)*cos(x[6])*θ.Lr )/θ.J
-    u[1]
-    u[2]
-]
+@dynamics LaneChange begin
+    # sideslip angles
+    αf = x[5] - atan((x[2] + Lf*x[4])/s)
+    αr = x[6] - atan((x[2] - Lr*x[4])/s)
+    # tire forces
+    F_αf = μ*g*M*sin(c*atan(b*αf))
+    F_αr = μ*g*M*sin(c*atan(b*αr))
 
-@define_l LaneChange 1/2*x'*I*x + 1/2*u'*I*u
+    [
+        s*sin(x[3]) + x[2]*cos(x[3])
+        -s*x[4] + ( F_αf*cos(x[5]) + F_αr*cos(x[6]) )/M
+        x[4]
+        ( F_αf*cos(x[5])*Lf - F_αr*cos(x[6])*Lr )/J
+        u[1]
+        u[2]
+    ]
+end
 
-# should be solution to DARE at desired equilibrium
-@define_m LaneChange 1/2*x'*I*x
-
-@define_R LaneChange diagm(θ.kr)
-@define_Q LaneChange diagm(θ.kq)
-
+@define_l LaneChange 1/2*(x-xeq)'*I*(x-xeq) + 1/2*u'*I*u
+# m should be solution to DARE at desired equilibrium
+@define_m LaneChange 1/2*(x-xeq)'*I*(x-xeq)
+@define_R LaneChange diagm(kr)
+@define_Q LaneChange diagm(kq)
 resolve_model(LaneChange)
-PRONTO.runtime_info(θ::LaneChange, ξ; verbosity=1) = verbosity >= 1 && println(preview(ξ.u))
+PRONTO.runtime_info(θ::LaneChange, ξ; verbosity=1) = verbosity >= 1 && println(preview(ξ.x, 1; color=PRONTO.manto_colors[1]))
 
 
 ## -------------------------------  ------------------------------- ##
-θ = LaneChange()
+θ = LaneChange(xeq = [1,0,0,0,0,0], kq=[0.1,0,1,0,0,0])
 x0 = SVector{6}(-5.0,zeros(5)...)
 xf = @SVector zeros(6)
 t0,tf = τ = (0,4)
 μ = t->zeros(2)
 # μ = @closure t->SVector{2}(zeros(2))
 η = open_loop(θ,x0,μ,τ)
-ξ,data = pronto(θ,x0,η,τ; tol = 1e-6, maxiters = 50)
+ξ,data = pronto(θ,x0,η,τ; tol = 1e-6, maxiters = 50);
 
 # plot_lane_change(ξ,τ)
 ## -------------------------------  ------------------------------- ##

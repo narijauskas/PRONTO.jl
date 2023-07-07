@@ -1,5 +1,12 @@
 # Dev Notes and Version History
 
+## Registration
+ - basic runtest
+ - compat version
+
+ - version bump commit -> run registrator
+
+
 ## Code Gen
   - unit testing codegen #DONE: finish TwoSpin, verify
   - support partial model regeneration #DONE:

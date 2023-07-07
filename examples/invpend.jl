@@ -35,8 +35,8 @@ end
 
 resolve_model(InvPend)
 
-PRONTO.runtime_info(θ::InvPend, ξ; verbosity) = nothing
-PRONTO.runtime_info(θ::InvPend, ξ; verbosity=1) = verbosity >= 1 && println(preview(ξ.u; color=PRONTO.manto_colors[1]))
+# PRONTO.runtime_info(θ::InvPend, ξ; verbosity) = nothing
+# PRONTO.runtime_info(θ::InvPend, ξ; verbosity=1) = verbosity >= 1 && println(preview(ξ.u; color=PRONTO.manto_colors[1]))
 PRONTO.runtime_info(θ::InvPend, ξ; verbosity=1) = verbosity >= 1 && println(preview(ξ.x; color=PRONTO.manto_colors))
 # Rreg(x,u,t,θ) = diagm([1e-3])
 # Qreg(x,u,t,θ) = diagm([10, 1])

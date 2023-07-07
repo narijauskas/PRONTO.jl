@@ -38,9 +38,9 @@ resolve_model(TwoSpin)
 # PRONTO.runtime_info(θ::TwoSpin, ξ; verbosity=1) = verbosity >= 1 && println(preview(ξ.x, (1,3)))
 function PRONTO.runtime_info(θ::TwoSpin, ξ; verbosity=1)
     if verbosity >= 1
-        println(preview(ξ.x, (1,3)))
-        println(preview(ξ.x, (2,4)))
-        println(preview(ξ.u))
+        println(preview(ξ.x, (1,3); color=PRONTO.manto_colors))
+        println(preview(ξ.x, (2,4); color=PRONTO.manto_colors[3:4]))
+        println(preview(ξ.u; color=PRONTO.manto_colors))
     end
 end
 
@@ -79,3 +79,53 @@ opts = Options(
     previewfxn = ξ -> preview(ξ.x, (1,3)),
 )
 # 
+
+
+
+## --------------------- plots --------------------- ##
+using GLMakie
+
+dt = 0.01
+T = t0:dt:tf
+
+fig = Figure()
+
+sl = Slider(fig[3,1:2], range=1:18, startvalue=3)
+ix = sl.value
+
+ax = Axis(fig[1,1])
+ylims!(ax, (-1,1))
+
+for i in 1:4
+    x = @lift [data.ξ[$ix].x(t)[i] for t in T]
+    lines!(ax, T, x)
+end
+
+ax = Axis(fig[1,2])
+u = @lift [data.ξ[$ix].u(t)[1] for t in T]
+lines!(ax, T, u)
+
+
+ax = Axis(fig[2,1])
+# ylims!(ax, (-1,1))
+
+for i in 1:4
+    z = @lift [data.ξ[$ix].x(t)[i] + data.ζ[$ix].x(t)[i] for t in T]
+    lines!(ax, T, z)
+end
+
+ax = Axis(fig[2,2])
+u = @lift [data.ξ[$ix].u(t)[1] for t in T]
+lines!(ax, T, u)
+v = @lift [data.ξ[$ix].u(t)[1]+data.ζ[$ix].u(t)[1] for t in T]
+lines!(ax, T, v)
+
+
+display(fig)
+
+
+
+##
+record(fig, "animated.mp4", 1:18) do jx
+    sl.value[] = jx
+end
