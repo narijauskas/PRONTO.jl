@@ -70,7 +70,7 @@ t0,tf = τ = (0,10)
 θ = Spin2()
 μ = t->SVector{NU}(0.4*sin(t))
 φ = open_loop(θ,x0,μ,τ)
-@time ξ = pronto(θ,x0,φ,τ; tol = 1e-6, maxiters = 50, limitγ = true, verbosity=1)
+@time ξ = pronto(θ,x0,φ,τ; tol = 1e-8, maxiters = 50, limitγ = true, verbosity=1)
 
 ## ----------------------------------- output results as MAT ----------------------------------- ##
 
