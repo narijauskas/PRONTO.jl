@@ -72,30 +72,3 @@ smooth(t, x0, xf, tf) = @. (xf - x0)*(tanh((2π/tf)*t - π) + 1)/2 + x0
 φ = PRONTO.Trajectory(θ,α,μ);
 ξ,data = pronto(θ,x0,φ,τ);
 
-##
-
-
-Kr = regulator(θ,φ,τ)
-φ = projection(θ,x0,φ,Kr,τ)
-
-x0 = @SVector [2π/3;0]
-# φ = open_loop(θ,xf,μ,τ)
-φ = zero_input(θ,xf,τ)
-@time pronto(θ,x0,φ,τ; maxiters=1000, verbose=false)
-# M = InvPend()
-# θ = Float64[]
-# x0 = [2π/3;0]
-# u0 = [0.0]
-# ξ0 = [x0;u0]
-# ξf = [0;0;0]
-# t0 = 0.0; tf = 10.0
-
-
-##
-φg = @closure t->ξf
-φ = guess_φ(M,θ,ξf,t0,tf,φg)
-##
-@time ξ = pronto(M,θ,t0,tf,x0,u0,φ; tol = 1e-8, maxiters=100)
-
-
-##
