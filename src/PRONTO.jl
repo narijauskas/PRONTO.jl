@@ -181,7 +181,7 @@ bkwd(τ) = reverse(fwd(τ))
 # preview(θ::Model, ξ) = nothing
 
 # solves for x(t),u(t)'
-function pronto(θ::Model, x0::StaticVector, φ, τ; 
+function pronto(θ::Model, x0::StaticVector, η, τ; 
                 limitγ=false, 
                 tol = 1e-6, 
                 maxiters = 20,
@@ -193,27 +193,29 @@ function pronto(θ::Model, x0::StaticVector, φ, τ;
     # verbose && 
     info(0, "starting PRONTO")
     data = Data()
+    Kr = regulator(θ, η, τ; verbosity)
+    ξ = projection(θ, x0, η, Kr, τ; verbosity)
 
     for i in 1:maxiters
         loop_start = time_ns()
         # info(i, "iteration")
         # -------------- build regulator -------------- #
         # α,μ -> Kr,x,u
-        Kr = regulator(θ, φ, τ; verbosity)
-        ξ = projection(θ, x0, φ, Kr, τ; verbosity)
+        Kr = regulator(θ, ξ, τ; verbosity)
+        # ξ = projection(θ, x0, φ, Kr, τ; verbosity)
 
         # -------------- search direction -------------- #
         # Kr,x,u -> z,v
-        λ = lagrangian(θ,ξ,φ,Kr,τ; verbosity)
-        Ko = optimizer(θ,λ,ξ,φ,τ; verbosity)
-        vo = costate(θ,λ,ξ,φ,Ko,τ; verbosity)
+        λ = lagrangian(θ,ξ,Kr,τ; verbosity)
+        Ko = optimizer(θ,λ,ξ,τ; verbosity)
+        vo = costate(θ,λ,ξ,Ko,τ; verbosity)
         ζ = search_direction(θ,ξ,Ko,vo,τ; verbosity)
 
         # -------------- cost/derivatives -------------- #
         h = cost(ξ, τ)
-        Dh,D2g = cost_derivs(θ,λ,φ,ξ,ζ,τ; verbosity)
-        Dh > 0 && (info(i, "increased cost - quitting"); (return φ,data))
-        -Dh < tol && (info(i-1, as_bold("PRONTO converged")); (return φ,data))
+        Dh,D2g = cost_derivs(θ,λ,ξ,ζ,τ; verbosity)
+        Dh > 0 && (info(i, "increased cost - quitting"); (return ξ,data))
+        -Dh < tol && (info(i-1, as_bold("PRONTO converged")); (return ξ,data))
 
 
         # -------------- select γ via armijo step -------------- #
@@ -223,15 +225,15 @@ function pronto(θ::Model, x0::StaticVector, φ, τ;
         γ = limitγ ? min(1, 1/maximum(maximum(ζ.x(t) for t in t0:0.0001:tf))) : 1.0
 
         local η # defined to exist outside of while loop
-        while γ > γmin
-            iiinfo("armijo γ = $(round(γ; digits=6))"; verbosity)
-            η = armijo_projection(θ,x0,ξ,ζ,γ,Kr,τ)
-            g = cost(η, τ)
-            h-g >= -α*γ*Dh ? break : (γ *= β)
-        end
-        push!(data.φ, φ)
-        push!(data.Kr, Kr)
+        # while γ > γmin
+        #     iiinfo("armijo γ = $(round(γ; digits=6))"; verbosity)
+        #     φ = armijo_projection(θ,x0,ξ,ζ,γ,Kr,τ)
+        #     g = cost(φ, τ)
+        #     h-g >= -α*γ*Dh ? break : (γ *= β)
+        # end
+        φ,γ = armijo(.)
         push!(data.ξ, ξ)
+        push!(data.Kr, Kr)
         push!(data.λ, λ)
         push!(data.Ko, Ko)
         push!(data.vo, vo)
@@ -239,7 +241,9 @@ function pronto(θ::Model, x0::StaticVector, φ, τ;
         push!(data.h, h)
         push!(data.Dh, Dh)
         push!(data.D2g, D2g)
-        φ = η
+        push!(data.γ, γ)
+        push!(data.φ, φ)
+        ξ = φ
 
         loop_end = time_ns()
         loop_time = (loop_end - loop_start)/1e6
