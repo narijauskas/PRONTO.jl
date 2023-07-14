@@ -9,6 +9,8 @@ using MatrixEquations
 @kwdef struct InvPend <: Model{2,1}
     L::Float64 = 2 # length of pendulum (m)
     g::Float64 = 9.81 # gravity (m/s^2)
+    #TODO: kq::SVector{2} = [10, 1]
+    #TODO: kr::SVector{1} = [1e-3]
 end
 
 @dynamics InvPend [
@@ -72,7 +74,10 @@ smooth(t, x0, xf, tf) = @. (xf - x0)*(tanh((2π/tf)*t - π) + 1)/2 + x0
 φ = PRONTO.Trajectory(θ,α,μ);
 ξ,data = pronto(θ,x0,φ,τ);
 
+
+
 ##
+
 
 
 Kr = regulator(θ,φ,τ)
