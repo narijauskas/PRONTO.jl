@@ -20,6 +20,7 @@ end
     Q = I(2)
     R = I(1)
     1/2*x'*Q*x + 1/2*u'*R*u
+    # 1/2*u'*R*u
 end
 
 @define_m InvPend begin
@@ -63,12 +64,19 @@ PRONTO.runtime_info(θ::InvPend, ξ; verbosity=1) = verbosity >= 1 && println(pr
 ##
 θ = InvPend()
 τ = t0,tf = 0,10
-x0 = @SVector [π;0]
+x0 = @SVector [2π/3;0]
 xf = @SVector [0;0]
 u0 = @SVector [0.0]
-smooth(t, x0, xf, tf) = @. (xf - x0)*(tanh((2π/tf)*t - π) + 1)/2 + x0
+# smooth(t, x0, xf, tf) = @. (xf - x0)*(tanh((2π/tf)*t - π) + 1)/2 + x0
 μ = t->u0*sin(t)
-α = t->smooth(t, x0, xf, tf)
+# α = t->smooth(t, x0, xf, tf)
+α = t->xf*t
 φ = PRONTO.Trajectory(θ,α,μ);
-ξ,data = pronto(θ,x0,φ,τ);
+ξ,data = pronto(θ,x0,φ,τ;maxiters=34);
 
+##
+using MAT
+
+file = matopen("Descent.mat","w")
+write(file,"Dh",data.Dh)
+close(file)
