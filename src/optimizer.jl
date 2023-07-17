@@ -103,7 +103,8 @@ function optimizer(θ,λ,ξ,φ,τ; verbosity)
 end
 
 # for debugging - only first order descent
-function optimizer1(θ,λ,ξ,φ,τ)
+function optimizer1(θ,λ,ξ,φ,τ; verbosity)
+    iinfo("optimizer"; verbosity)
     t0,tf = τ
     αf = φ.x(tf)
     μf = φ.u(tf)

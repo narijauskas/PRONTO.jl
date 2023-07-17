@@ -36,7 +36,7 @@ end
 
 resolve_model(InvPend)
 
-# PRONTO.runtime_info(θ::InvPend, ξ; verbosity) = nothing
+PRONTO.runtime_info(θ::InvPend, ξ; verbosity) = nothing
 # PRONTO.runtime_info(θ::InvPend, ξ; verbosity=1) = verbosity >= 1 && println(preview(ξ.u; color=PRONTO.manto_colors[1]))
 PRONTO.runtime_info(θ::InvPend, ξ; verbosity=1) = verbosity >= 1 && println(preview(ξ.x; color=PRONTO.manto_colors))
 # Rreg(x,u,t,θ) = diagm([1e-3])
@@ -72,11 +72,29 @@ u0 = @SVector [0.0]
 # α = t->smooth(t, x0, xf, tf)
 α = t->xf*t
 φ = PRONTO.Trajectory(θ,α,μ);
-ξ,data = pronto(θ,x0,φ,τ;maxiters=34);
+ξ,data = pronto(θ,x0,φ,τ;tol=1e-4,maxiters=50,verbosity=1);
 
 ##
-using MAT
+using GLMakie
+fig = Figure()
+ts = 0:0.001:10
 
-file = matopen("Descent.mat","w")
-write(file,"Dh",data.Dh)
-close(file)
+ax = Axis(fig[1,1]; title="optimal trajectory", xlabel="time [s]", ylabel="angle [rad]")
+x1 = [data.ξ[end].x(t)[1] for t∈ts]
+lines!(ax, ts, x1)
+
+ax = Axis(fig[2,1];xlabel="time [s]", ylabel="angular velocity [rad/s]")
+x2 = [data.ξ[end].x(t)[2] for t∈ts]
+lines!(ax, ts, x2)
+
+ax = Axis(fig[3,1]; xlabel="time [s]", ylabel="input [Nm]")
+u = [data.ξ[end].u(t)[1] for t∈ts]
+lines!(ax, ts, u)
+display(fig)
+
+save("optimal.png",fig)
+
+##
+fig2 = Figure()
+ax = Axis(fig2[1,1]; title="descent", xlabel="iteration", ylabel="-Dg", yscale=log10)
+lines!(ax, -data.Dh)

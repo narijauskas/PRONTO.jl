@@ -213,8 +213,7 @@ function pronto(θ::Model, x0::StaticVector, φ, τ;
         h = cost(ξ, τ)
         Dh,D2g = cost_derivs(θ,λ,φ,ξ,ζ,τ; verbosity)
         Dh > 0 && (info(i, "increased cost - quitting"); (return φ,data))
-        -Dh < tol && (info(i-1, as_bold("PRONTO converged")); (return φ,data))
-
+        
 
         # -------------- select γ via armijo step -------------- #
         # γ = γmax; 
@@ -240,6 +239,7 @@ function pronto(θ::Model, x0::StaticVector, φ, τ;
         push!(data.Dh, Dh)
         push!(data.D2g, D2g)
         φ = η
+        -Dh < tol && (info(i, as_bold("PRONTO converged")); (return φ,data))
 
         loop_end = time_ns()
         loop_time = (loop_end - loop_start)/1e6
