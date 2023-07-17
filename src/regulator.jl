@@ -27,18 +27,18 @@ show(io::IO, Kr::Regulator) = println(io, preview(Kr))
 
 
 
-# regulator(θ,φ,τ) = regulator(θ, φ.x, φ.u, τ)
+regulator(θ, α, μ, τ; kw...) = regulator(θ, Trajectory(θ, α, μ), τ; kw...)
 # design the regulator, solving dPr_dt
- function regulator(θ::Model{NX,NU}, φ, τ; verbosity) where {NX,NU}
+function regulator(θ::Model{NX,NU}, φ, τ; verbosity=0) where {NX,NU}
     iinfo("regulator"; verbosity)
     t0,tf = τ
     #FUTURE: Pf provided by user or auto-generated as P(α,μ,θ)
     # α 
     # Pf = SMatrix{NX,NX,Float64}(I(NX) - φ.x(tf)*(φ.x(tf))')
     # Pf = SMatrix{NX,NX,Float64}(I(NX))
-    α = φ.x(tf)
-    μ = φ.u(tf)
-    Pr = ODE(dPr_dt, Pf(θ,α,μ,tf), (tf,t0), (θ,φ))
+    αf = φ.x(tf)
+    μf = φ.u(tf)
+    Pr = ODE(dPr_dt, Pf(θ,αf,μf,tf), (tf,t0), (θ,φ))
     Regulator(θ,φ,Pr)
 end
 

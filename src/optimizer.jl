@@ -11,18 +11,16 @@ function dλ_dt(λ, (θ,ξ,Kr), t)
 end
 
 # for convenience:
-function lagrangian(θ,ξ,φ,Kr,τ; verbosity)
+function lagrangian(θ,ξ,Kr,τ; verbosity)
     iinfo("lagrangian"; verbosity)
     t0,tf = τ
-    αf = φ.x(tf)
-    μf = φ.u(tf)
+    αf = ξ.x(tf)
+    μf = ξ.u(tf)
 
     λf = px(θ, αf, μf, tf)
     λ = ODE(dλ_dt, λf, (tf,t0), (θ,ξ,Kr))
     return λ
 end
-
-
 
 
 
@@ -77,11 +75,12 @@ isstable(x::ODE) = retcode(x) == ReturnCode.Success
 struct InstabilityException <: Exception
 end
 
-function optimizer(θ,λ,ξ,φ,τ; verbosity)
+
+function optimizer(θ,λ,ξ,τ; verbosity)
     iinfo("optimizer"; verbosity)
     t0,tf = τ
-    αf = φ.x(tf)
-    μf = φ.u(tf)
+    αf = ξ.x(tf)
+    μf = ξ.u(tf)
     
     Pf = pxx(θ,αf,μf,tf)
 
@@ -103,10 +102,10 @@ function optimizer(θ,λ,ξ,φ,τ; verbosity)
 end
 
 # for debugging - only first order descent
-function optimizer1(θ,λ,ξ,φ,τ)
+function optimizer1(θ,λ,ξ,τ)
     t0,tf = τ
-    αf = φ.x(tf)
-    μf = φ.u(tf)
+    αf = ξ.x(tf)
+    μf = ξ.u(tf)
     
     Pf = pxx(θ,αf,μf,tf)
     N = FirstOrder()
@@ -176,11 +175,11 @@ function dr_dt(r, (θ,λ,ξ,Ko), t)
     -(A - B*Ko)'r - a + Ko'b
 end
 
-function costate(θ,λ,ξ,φ,Ko,τ; verbosity)
+function costate(θ,λ,ξ,Ko,τ; verbosity)
     iinfo("costate"; verbosity)
     t0,tf = τ
-    αf = φ.x(tf)
-    μf = φ.u(tf)
+    αf = ξ.x(tf)
+    μf = ξ.u(tf)
     N = order(Ko)
     rf = px(θ,αf,μf,tf)
     r = ODE(dr_dt, rf, (tf,t0), (θ,λ,ξ,Ko))

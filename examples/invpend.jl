@@ -63,21 +63,71 @@ PRONTO.runtime_info(θ::InvPend, ξ; verbosity=1) = verbosity >= 1 && println(pr
 
 
 ##
-θ = InvPend()
+# θ = InvPend(g=3.71) # on mars
+θ = InvPend() # on mars
+
 τ = t0,tf = 0,10
-x0 = @SVector [π;0]
+x0 = @SVector [2π/3;0]
 xf = @SVector [0;0]
 u0 = @SVector [0.0]
-smooth(t, x0, xf, tf) = @. (xf - x0)*(tanh((2π/tf)*t - π) + 1)/2 + x0
-μ = t->u0*sin(t)
-α = t->smooth(t, x0, xf, tf)
-φ = PRONTO.Trajectory(θ,α,μ);
-ξ,data = pronto(θ,x0,φ,τ);
+# smooth(t, x0, xf, tf) = @. (xf - x0)*(tanh((2π/tf)*t - π) + 1)/2 + x0
 
+α = t->xf
+μ = t->u0
+η3 = closed_loop(θ,x0,α,μ,τ)
+# closed_loop(θ, x0, α, μ, τ)
 
+η1 = smooth(θ, x0, xf, τ)
+η2 = smooth(θ, x0, xf, t->u0*sin(t), τ)
+ξ,data = pronto(θ,x0,η3,τ; maxiters=1000);
+ξ,data = pronto(θ,x0,η1,τ; maxiters=1000);
 
 ##
+using GLMakie
+n = Observable(1)
+fig = Figure()
+ax = Axis(fig[1,1])
+T = LinRange(τ...,10000)
+x1 = @lift [data.ξ[$n].x(t)[1] for t in T]
+x2 = @lift [data.ξ[$n].x(t)[2] for t in T]
+lines!(ax, T, x1)
+lines!(ax, T, x2)
+ylims!(ax,-7,7)
 
+u1 = @lift [data.ξ[$n].u(t)[1] for t in T]
+ax = Axis(fig[2,1])
+lines!(ax, T, u1)
+ylims!(ax,-7,7)
+display(fig)
+##
+
+record(x->n[]=x, fig, "test_mars.mp4", 1:length(data.ξ))
+
+planets = [
+    "Sun"=>274.1,
+    "Mercury"=>3.703,
+    "Venus"=>8.872,
+    "Earth"=>9.8067,
+    "Moon"=>1.625,
+    "Mars"=>3.728,
+    "Jupiter"=>25.93,
+    "Saturn"=>11.19,
+    "Uranus"=>9.01,
+    "Neptune"=>11.28,
+    "Pluto"=>0.610,
+]
+
+# θ = InvPend(g=274.1)
+θ = InvPend(g=61.0)
+η = smooth(θ, x0, xf, τ)
+ξ,data = pronto(θ,x0,η,τ; maxiters=1000, armijo_maxiters=100)
+
+for (planet,g) in planets[6]
+    @show θ = InvPend(g=g)
+    η = smooth(θ, x0, xf, τ)
+    ξ,data = pronto(θ,x0,η,τ; maxiters=1000, armijo_maxiters=100)
+    # println("$planet has a gravity of $g m/s^2")
+end
 
 
 Kr = regulator(θ,φ,τ)
