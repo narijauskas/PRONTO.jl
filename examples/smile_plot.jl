@@ -54,3 +54,4 @@ for i in 1:n, j in 1:n
     🙂(ax, data, (i-1)*n+j)
 end
 display(fig)
+

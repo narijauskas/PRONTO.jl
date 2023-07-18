@@ -1,4 +1,21 @@
 
+γmax(θ::Model,ζ,τ) = 1.0
+
+function armijo(θ, x0, ξ, ζ, Kr, h, Dh, τ; verbosity, armijo_maxiters)
+    # h = cost(ξ, τ)
+    α=0.4; β=0.7
+    γmin = β^armijo_maxiters
+    γ = min(γmax(θ,ζ,τ), 1.0)
+    # γ = 1.0
+    φ = ξ
+    while γ > γmin
+        iiinfo("armijo γ = $(round(γ; digits=6))"; verbosity)
+        φ = armijo_projection(θ,x0,ξ,ζ,γ,Kr,τ)
+        g = cost(φ, τ)
+        h-g >= -α*γ*Dh ? break : (γ *= β)
+    end
+    return φ,γ
+end
 
 armijo_projection(θ,x0,ξ,ζ,γ,Kr,τ; kw...) = armijo_projection(θ,x0,ξ.x,ξ.u,ζ.x,ζ.u,γ,Kr,τ; kw...)
 

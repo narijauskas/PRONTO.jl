@@ -1,5 +1,4 @@
 
-export zero_input, open_loop
 # export projection
 
 
@@ -20,25 +19,12 @@ function show(io::IO, ξ::Trajectory)
     println(io, preview(ξ.u))
 end
 
-
-
-
-
-function zero_input(θ::Model{NX,NU}, x0, τ) where {NX,NU}
-    μ = t -> zeros(SVector{NU})
-    open_loop(θ, x0, μ, τ)
+function projection(θ::Model, x0, η, τ; kw...)
+    Kr = regulator(θ, η, τ; verbosity)
+    projection(θ, x0, η, Kr, τ; kw...)
 end
 
-
-function open_loop(θ::Model{NX,NU}, x0, μ, τ) where {NX,NU}
-    α = t -> zeros(SVector{NX})
-    Kr = (α,μ,t) -> zeros(SMatrix{NU,NX})
-    projection(θ, x0, α, μ, Kr, τ)
-end
-
-
-projection(θ::Model, x0, φ, Kr, τ; kw...) = projection(θ, x0, φ.x, φ.u, Kr, τ; kw...)
-
+projection(θ::Model, x0, η, Kr, τ; kw...) = projection(θ, x0, η.x, η.u, Kr, τ; kw...)
 
 #TODO: a function that returns buf,cb
 

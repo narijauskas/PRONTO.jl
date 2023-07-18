@@ -41,12 +41,13 @@ import Base: extrema, length, eachindex, show, size, eltype, getproperty, getind
 
 
 export pronto
-export info #TODO: does this need to be exported?
+export zero_input, open_loop, closed_loop, smooth
 
 
 #TODO: reconsider export
 export ODE, Buffer
 export preview
+
 
 # ----------------------------------- model type ----------------------------------- #
 
@@ -122,12 +123,12 @@ runtime_info(θ::Model, ξ; verbosity) = nothing
 
 
 # by default, this is the solution to the algebraic riccati equation at tf
-# user can override this behavior for a model type by defining PRONTO.Pf(α,μ,tf,θ::MyModel)
-function Pf(θ::Model{NX},α,μ,tf) where {NX}
-    Ar = fx(θ, α, μ, tf)
-    Br = fu(θ, α, μ, tf)
-    Qr = Q(θ, α, μ, tf)
-    Rr = R(θ, α, μ, tf)
+# user can override this behavior for a model type by defining PRONTO.Pf(θ::MyModel,αf,μf,tf)
+function Pf(θ::Model{NX},αf,μf,tf) where {NX}
+    Ar = fx(θ, αf, μf, tf)
+    Br = fu(θ, αf, μf, tf)
+    Qr = Q(θ, αf, μf, tf)
+    Rr = R(θ, αf, μf, tf)
     Pf,_ = arec(Ar,Br*(Rr\Br'),Qr)
     return SMatrix{NX,NX,Float64}(Pf)
 end
@@ -147,9 +148,8 @@ include("armijo.jl") # armijo step and projection
 
 
 struct Data
-    φ::Vector{Trajectory}
-    Kr::Vector{Regulator}
     ξ::Vector{Trajectory}
+    Kr::Vector{Regulator}
     λ::Vector{ODE}
     Ko::Vector{Optimizer}
     vo::Vector{Costate}
@@ -157,12 +157,13 @@ struct Data
     h::Vector{Float64}
     Dh::Vector{Float64}
     D2g::Vector{Float64}
+    γ::Vector{Float64}
+    φ::Vector{Trajectory}
 end
 
 Data() = Data(
     Trajectory[],
     Regulator[],
-    Trajectory[],
     ODE[],
     Optimizer[],
     Costate[],
@@ -170,9 +171,40 @@ Data() = Data(
     Float64[],
     Float64[],
     Float64[],
+    Float64[],
+    Trajectory[],
 )
 
 Base.show(io::IO, data::Data) = print(io, "PRONTO data: $(length(data.φ)) iterations")
+# ----------------------------------- guess trajectories ----------------------------------- #
+# generate ξ0 from either η
+function zero_input(θ::Model{NX,NU}, x0, τ) where {NX,NU}
+    μ = t -> zeros(SVector{NU})
+    open_loop(θ, x0, μ, τ)
+end
+
+
+function open_loop(θ::Model{NX,NU}, x0, μ, τ) where {NX,NU}
+    α = t -> zeros(SVector{NX})
+    Kr = (α,μ,t) -> zeros(SMatrix{NU,NX})
+    projection(θ, x0, α, μ, Kr, τ)
+end
+
+#TODO: smooth guess
+# smooth(t, x0, xf, tf) = @. (xf - x0)*(tanh((2π/tf)*t - π) + 1)/2 + x0
+smooth(θ, x0, xf, τ) = smooth(θ, x0, xf, t->zeros(nu(θ)), τ)
+function smooth(θ, x0, xf, μ, τ)
+    t0,tf = τ
+    α = t-> @. (xf - x0)*(tanh((2π/tf)*t - π) + 1)/2 + x0
+    Kr = regulator(θ, α, μ, τ)
+    projection(θ, x0, α, μ, Kr, τ)
+end
+
+function closed_loop(θ, x0, α, μ, τ)
+    Kr = regulator(θ, α, μ, τ)
+    projection(θ, x0, α, μ, Kr, τ)
+end
+
 # ----------------------------------- pronto loop ----------------------------------- #
 
 fwd(τ) = extrema(τ)
@@ -181,82 +213,85 @@ bkwd(τ) = reverse(fwd(τ))
 # preview(θ::Model, ξ) = nothing
 
 # solves for x(t),u(t)'
-function pronto(θ::Model, x0::StaticVector, φ, τ; 
+function pronto(θ::Model, x0::StaticVector, ξ::Trajectory, τ; 
                 limitγ=false, 
                 tol = 1e-6, 
-                maxiters = 20,
+                maxiters = 100,
                 armijo_maxiters = 25,
                 verbosity = 1,
-                verbose = false,
                 )
     t0,tf = τ
-    # verbose && 
     info(0, "starting PRONTO")
     data = Data()
+    # Kr = regulator(θ, η, τ; verbosity)
+    # ξ = projection(θ, x0, η, Kr, τ; verbosity)
 
     for i in 1:maxiters
         loop_start = time_ns()
         # info(i, "iteration")
+        push!(data.ξ, ξ)
         # -------------- build regulator -------------- #
         # α,μ -> Kr,x,u
-        Kr = regulator(θ, φ, τ; verbosity)
-        ξ = projection(θ, x0, φ, Kr, τ; verbosity)
+        Kr = regulator(θ, ξ, τ; verbosity)
+        push!(data.Kr, Kr)
+        # ξ = projection(θ, x0, φ, Kr, τ; verbosity)
 
         # -------------- search direction -------------- #
         # Kr,x,u -> z,v
-        λ = lagrangian(θ,ξ,φ,Kr,τ; verbosity)
-        Ko = optimizer(θ,λ,ξ,φ,τ; verbosity)
-        vo = costate(θ,λ,ξ,φ,Ko,τ; verbosity)
-        ζ = search_direction(θ,ξ,Ko,vo,τ; verbosity)
+        λ = lagrangian(θ, ξ, Kr, τ; verbosity)
+        push!(data.λ, λ)
+        
+        Ko = optimizer(θ, λ, ξ, τ; verbosity)
+        push!(data.Ko, Ko)
 
+        vo = costate(θ, λ, ξ, Ko, τ; verbosity)
+        push!(data.vo, vo)
+
+        # λ,Ko,vo = optimizer(θ,ξ,Kr,τ; verbosity)
+        ζ = search_direction(θ,ξ,Ko,vo,τ; verbosity)
+        push!(data.ζ, ζ)
+
+        
         # -------------- cost/derivatives -------------- #
         h = cost(ξ, τ)
-        Dh,D2g = cost_derivs(θ,λ,φ,ξ,ζ,τ; verbosity)
-        Dh > 0 && (info(i, "increased cost - quitting"); (return φ,data))
-        
-
-        # -------------- select γ via armijo step -------------- #
-        # γ = γmax; 
-        α=0.4; β=0.7
-        γmin = β^armijo_maxiters
-        γ = limitγ ? min(1, 1/maximum(maximum(ζ.x(t) for t in t0:0.0001:tf))) : 1.0
-
-        local η # defined to exist outside of while loop
-        while γ > γmin
-            iiinfo("armijo γ = $(round(γ; digits=6))"; verbosity)
-            η = armijo_projection(θ,x0,ξ,ζ,γ,Kr,τ)
-            g = cost(η, τ)
-            h-g >= -α*γ*Dh ? break : (γ *= β)
-        end
-        push!(data.φ, φ)
-        push!(data.Kr, Kr)
-        push!(data.ξ, ξ)
-        push!(data.λ, λ)
-        push!(data.Ko, Ko)
-        push!(data.vo, vo)
-        push!(data.ζ, ζ)
         push!(data.h, h)
+
+        Dh,D2g = cost_derivs(θ, λ, ξ, ζ, τ; verbosity)
         push!(data.Dh, Dh)
         push!(data.D2g, D2g)
-        φ = η
-        -Dh < tol && (info(i, as_bold("PRONTO converged")); (return φ,data))
 
-        loop_end = time_ns()
-        loop_time = (loop_end - loop_start)/1e6
-        #TODO: store intermediates Kr,ξ,λ,Ko,vo,ζ,h,Dh,D2g,γ,        
+        Dh > 0 && (info(i, "increased cost - quitting"); (return ξ,data))
+
+        # -------------- select γ via armijo step -------------- #
+        φ,γ = armijo(θ, x0, ξ, ζ, Kr, h, Dh, τ; verbosity, armijo_maxiters)
+        push!(data.γ, γ)
+        push!(data.φ, φ) 
+        -Dh < tol && (info(i, as_bold("PRONTO converged")); (return φ,data))
+        ξ = φ # ξ_k+1 = φ_k
+
+        # -------------- runtime info -------------- #
+        loop_time = (time_ns() - loop_start)/1e6
         infostr = @sprintf("Dh = %.3e, h = %.3e, γ = %.3e, ", Dh, h, γ)
         infostr *= ", order = $(is2ndorder(Ko) ? "2nd" : "1st"), "
         infostr *= @sprintf("solved in %.4f ms", loop_time)
-        # info(i, "Dh = $Dh, h = $h, γ = $γ, order = $(is2ndorder(Ko) ? "2nd" : "1st")"; verbosity)
         info(i, infostr; verbosity)
         runtime_info(θ, ξ; verbosity)
-        # println(preview(φ.x, 1))
-        # println(preview(ξ.x, (1,3)))
-        # println(preview(ξ.x, (2,4)))
-        # println(preview(ξ.u, 1))
     end
-    return φ,data
+    info(maxiters, "maxiters reached - quitting")
+    return ξ,data
 end
 
+# γ = γmax; 
+# α=0.4; β=0.7
+# γmin = β^armijo_maxiters
+# γ = limitγ ? min(1, 1/maximum(maximum(ζ.x(t) for t in t0:0.0001:tf))) : 1.0
+
+# local η # defined to exist outside of while loop
+# while γ > γmin
+#     iiinfo("armijo γ = $(round(γ; digits=6))"; verbosity)
+#     φ = armijo_projection(θ,x0,ξ,ζ,γ,Kr,τ)
+#     g = cost(φ, τ)
+#     h-g >= -α*γ*Dh ? break : (γ *= β)
+# end
 
 end # module
