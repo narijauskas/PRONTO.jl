@@ -19,7 +19,7 @@ end
 
 armijo_projection(θ,x0,ξ,ζ,γ,Kr,τ; kw...) = armijo_projection(θ,x0,ξ.x,ξ.u,ζ.x,ζ.u,γ,Kr,τ; kw...)
 
-function armijo_projection(θ::Model{NX,NU},x0,x,u,z,v,γ,Kr,τ; dt=0.001, kw...) where {NX,NU}
+function armijo_projection(θ::Model{NX,NU},x0,x,u,z,v,γ,Kr,τ; dt=0.0001, kw...) where {NX,NU}
     ubuf = Vector{SVector{NU,Float64}}()
     t0,tf = τ; ts = t0:dt:tf
 

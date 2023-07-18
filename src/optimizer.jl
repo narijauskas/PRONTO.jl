@@ -202,7 +202,7 @@ is2ndorder(::Any) = false
 
 
 
-function search_direction(θ::Model{NX,NU},ξ,Ko,vo,τ; verbosity=1, dt=0.001) where {NX,NU}
+function search_direction(θ::Model{NX,NU},ξ,Ko,vo,τ; verbosity=1, dt=0.0001) where {NX,NU}
     iinfo("search_direction"; verbosity)
     t0,tf = τ
     ts = t0:dt:tf

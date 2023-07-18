@@ -38,7 +38,7 @@ end
 
 resolve_model(InvPend)
 
-PRONTO.runtime_info(θ::InvPend, ξ; verbosity) = nothing
+# PRONTO.runtime_info(θ::InvPend, ξ; verbosity) = nothing
 # PRONTO.runtime_info(θ::InvPend, ξ; verbosity=1) = verbosity >= 1 && println(preview(ξ.u; color=PRONTO.manto_colors[1]))
 PRONTO.runtime_info(θ::InvPend, ξ; verbosity=1) = verbosity >= 1 && println(preview(ξ.x; color=PRONTO.manto_colors))
 # Rreg(x,u,t,θ) = diagm([1e-3])
@@ -77,13 +77,9 @@ u0 = @SVector [0.0]
 
 α = t->xf
 μ = t->u0
-η3 = closed_loop(θ,x0,α,μ,τ)
-# closed_loop(θ, x0, α, μ, τ)
+η = closed_loop(θ,x0,α,μ,τ)
 
-η1 = smooth(θ, x0, xf, τ)
-η2 = smooth(θ, x0, xf, t->u0*sin(t), τ)
-ξ,data = pronto(θ,x0,η3,τ; maxiters=1000);
-ξ,data = pronto(θ,x0,η1,τ; maxiters=1000);
+ξ,data = pronto(θ,x0,η,τ; maxiters=28);
 
 ##
 using GLMakie
@@ -155,3 +151,4 @@ save("optimal.png",fig)
 fig2 = Figure()
 ax = Axis(fig2[1,1]; title="descent", xlabel="iteration", ylabel="-Dg", yscale=log10)
 lines!(ax, -data.Dh)
+display(fig2)
