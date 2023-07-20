@@ -1,4 +1,3 @@
-# export regulator
 
 struct Regulator{M,Φ,P}
     θ::M
@@ -7,12 +6,12 @@ struct Regulator{M,Φ,P}
 end
 
 (Kr::Regulator)(t) = Kr(Kr.φ.x(t), Kr.φ.u(t), t)
-(Kr::Regulator)(α, μ, t) = Kr(α, μ, t, Kr.θ)
+(Kr::Regulator)(α, μ, t) = Kr(Kr.θ, α, μ, t)
 
-function (Kr::Regulator)(α, μ, t, θ)
+function (Kr::Regulator)(θ, α, μ, t)
     Pr = Kr.Pr(t)
-    Rr = R(α,μ,t,θ)
-    Br = fu(α,μ,t,θ)
+    Rr = R(θ,α,μ,t)
+    Br = fu(θ,α,μ,t)
 
     Rr\Br'Pr
 end
@@ -22,35 +21,28 @@ nx(Kr::Regulator) = nx(Kr.θ)
 nu(Kr::Regulator) = nu(Kr.θ)
 extrema(Kr::Regulator) = extrema(Kr.Pr)
 eachindex(Kr::Regulator) = OneTo(nu(Kr)*nx(Kr))
-show(io::IO, Kr::Regulator) = println(io, preview(Kr))
+show(io::IO, Kr::Regulator) = println(io, make_plot(t->vec(Kr(t)), t_plot(Kr)))
 
 
-
-
-# regulator(θ,φ,τ) = regulator(θ, φ.x, φ.u, τ)
+regulator(θ, α, μ, τ; kw...) = regulator(θ, Trajectory(θ, α, μ), τ; kw...)
 # design the regulator, solving dPr_dt
- function regulator(θ::Model{NX,NU}, φ, τ) where {NX,NU}
+function regulator(θ::Model{NX,NU}, φ, τ) where {NX,NU}
     t0,tf = τ
-    #FUTURE: Pf provided by user or auto-generated as P(α,μ,θ)
-    # α 
-    # Pf = SMatrix{NX,NX,Float64}(I(NX) - φ.x(tf)*(φ.x(tf))')
-    # Pf = SMatrix{NX,NX,Float64}(I(NX))
-    α = φ.x(tf)
-    μ = φ.u(tf)
-    Pr = ODE(dPr_dt, Pf(α,μ,tf,θ), (tf,t0), (θ,φ))
+    αf = φ.x(tf)
+    μf = φ.u(tf)
+    Pr = ODE(dPr_dt, Pf(θ,αf,μf,tf), (tf,t0), (θ,φ))
     Regulator(θ,φ,Pr)
 end
-
 
 
 function dPr_dt(Pr,(θ,φ),t)#(M, out, θ, t, φ, Pr)
     α = φ.x(t)
     μ = φ.u(t)
 
-    Ar = fx(α,μ,t,θ)
-    Br = fu(α,μ,t,θ)
-    Qr = Q(α,μ,t,θ)
-    Rr = R(α,μ,t,θ)
+    Ar = fx(θ,α,μ,t)
+    Br = fu(θ,α,μ,t)
+    Qr = Q(θ,α,μ,t)
+    Rr = R(θ,α,μ,t)
     
     return - Ar'Pr - Pr*Ar + Pr'Br*(Rr\Br'Pr) - Qr
 end

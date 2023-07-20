@@ -1,5 +1,27 @@
 
 
+# ----------------------------------- armijo step line search ----------------------------------- #
+
+function armijo(θ, x0, ξ, ζ, Kr, h, Dh, τ;
+                armijo_maxiters = 25,
+                show_armijo = false,
+                α = 0.4,
+                β = 0.7)
+                
+    γmin = β^armijo_maxiters
+    γ = min(γmax(θ,ζ,τ), 1.0)
+    φ = ξ
+    while γ > γmin
+        show_armijo && iiinfo("γ = $(round(γ; digits=6))")
+        φ = armijo_projection(θ,x0,ξ,ζ,γ,Kr,τ)
+        g = cost(φ, τ)
+        h-g >= -α*γ*Dh ? break : (γ *= β)
+    end
+    return φ,γ
+end
+
+# ----------------------------------- armijo projection ----------------------------------- #
+
 armijo_projection(θ,x0,ξ,ζ,γ,Kr,τ; kw...) = armijo_projection(θ,x0,ξ.x,ξ.u,ζ.x,ζ.u,γ,Kr,τ; kw...)
 
 function armijo_projection(θ::Model{NX,NU},x0,x,u,z,v,γ,Kr,τ; dt=0.001, kw...) where {NX,NU}
@@ -28,5 +50,5 @@ function dxdt_armijo(x1, (θ,x,u,z,v,γ,Kr), t)
     μ = u(t) + γ*v(t)
     Kr = Kr(t)
     u = μ - Kr*(x1-α)
-    f(x1,u,t,θ)
+    f(θ,x1,u,t)
 end

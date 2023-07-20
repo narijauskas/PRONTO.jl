@@ -1,59 +1,66 @@
-# PRONTO.jl v0.4.0
+# PRONTO.jl v1.0.0_dev
 module PRONTO
 
-using FunctionWrappers: FunctionWrapper
+using Crayons
+using FunctionWrappers
+import FunctionWrappers: FunctionWrapper
 using StaticArrays
-using FastClosures
-export @closure #FUTURE: remove reexport
-
+using FastClosures #TODO: test speed
 using Base: @kwdef
-export @kwdef #FUTURE: remove reexport
+using Printf
 
-import LinearAlgebra
-using LinearAlgebra: mul!, I
-using UnicodePlots
+using Interpolations # data storage/resampling
+
+import LinearAlgebra # collision with lu!
+import LinearAlgebra: mul!, I, norm
+using MatrixEquations # provides arec
+
+using OrdinaryDiffEq
+using DiffEqCallbacks
+
+using Symbolics # code generation
+import Symbolics: derivative # code generation
+using SymbolicUtils.Code #MAYBE: code generation
+export Num # this reexport is needed for codegen macro scoping
+
+using ThreadTools # tmap for code generation
+using UnicodePlots # data representation
+
+
 using MacroTools
-using MatrixEquations
+import MacroTools: @capture
 
-#FUTURE: using OrdinaryDiffEq?
-using DifferentialEquations
-using Symbolics
-using Symbolics: derivative
-using SymbolicUtils.Code
-
-using ThreadTools
-
-using Dates: now
-
-using MacroTools
-using MacroTools: @capture
-
-using Interpolations
 
 using Base: OneTo
 using Base: fieldindex
 import Base: extrema, length, eachindex, show, size, eltype, getproperty, getindex
 
 
+export @define_f, @define_l, @define_m, @define_Q, @define_R
+export @dynamics, @incremental_cost, @terminal_cost, @regulator_Q, @regulator_R
+export resolve_model, symbolic
+export zero_input, open_loop, closed_loop, smooth
 export pronto
-export info
-export ODE, Buffer
-export preview
-
-# ----------------------------------- model type ----------------------------------- #
-
+export Trajectory
+export SymModel
 export Model
 export nx,nu,nθ
 
-abstract type Model{NX,NU,NΘ} <: FieldVector{NΘ,Float64} end
 
-nx(::Model{NX,NU,NΘ}) where {NX,NU,NΘ} = NX
-nu(::Model{NX,NU,NΘ}) where {NX,NU,NΘ} = NU
-nθ(::Model{NX,NU,NΘ}) where {NX,NU,NΘ} = NΘ
 
-nx(::Type{<:Model{NX,NU,NΘ}}) where {NX,NU,NΘ} = NX
-nu(::Type{<:Model{NX,NU,NΘ}}) where {NX,NU,NΘ} = NU
-nθ(::Type{<:Model{NX,NU,NΘ}}) where {NX,NU,NΘ} = NΘ
+# ----------------------------------- model type ----------------------------------- #
+
+
+abstract type Model{NX,NU} end
+# fields can be Scalars or SArrays
+
+nx(::Model{NX,NU}) where {NX,NU} = NX
+nu(::Model{NX,NU}) where {NX,NU} = NU
+nθ(::T) where {T<:Model} = nθ(T)
+
+nx(::Type{<:Model{NX,NU}}) where {NX,NU} = NX
+nu(::Type{<:Model{NX,NU}}) where {NX,NU} = NU
+nθ(T::Type{<:Model}) = fieldcount(T)
 
 # not used
 inv!(A) = LinearAlgebra.inv!(LinearAlgebra.cholesky!(Hermitian(A)))
@@ -74,29 +81,24 @@ function show(io::IO,::MIME"text/plain", θ::T) where {T<:Model}
 end
 
 
-# facilitate symbolic differentiation of model
-struct SymbolicModel{T}
-    vars
-end
-
-function SymbolicModel(T::DataType)
-    @variables θ[1:nθ(T)]
-    SymbolicModel{T}(collect(θ))
-end
-
-getindex(θ::SymbolicModel{T}, i::Integer) where {T} = getindex(getfield(θ, :vars), i)
-getproperty(θ::SymbolicModel{T}, name::Symbol) where {T} = getindex(θ, fieldindex(T, name))
-
 
 # ----------------------------------- #. helpers ----------------------------------- #
-include("helpers.jl")
+# include("helpers.jl") #TODO: remove file
+
+as_tag(str) = as_tag(crayon"default", str)
+as_tag(c::Crayon, str) = as_color(c, as_bold("[$str: "))
+as_color(c::Crayon, str) = "$c" * str * "$(crayon"default")"
+as_bold(ex) = as_bold(string(ex))
+as_bold(str::String) = "$(crayon"bold")" * str * "$(crayon"!bold")"
+clearln() = print("\e[2K","\e[1G")
+
+info(str) = println(as_tag(crayon"magenta","PRONTO"), str)
+info(i, str) = println(as_tag(crayon"magenta","PRONTO[$i]"), str)
+iinfo(str) = println("    > ", str) # secondary-level
+iiinfo(str) = println("        > ", str) # tertiary-level
 
 
-#can I finally deprecate this? :)
-views(::Model{NX,NU,NΘ},ξ) where {NX,NU,NΘ} = (@view ξ[1:NX]),(@view ξ[NX+1:end])
-
-
-# ----------------------------------- #. model functions ----------------------------------- #
+# ----------------------------------- # model functions ----------------------------------- #
 
 #MAYBE: just throw a method error?
 struct ModelDefError <: Exception
@@ -109,63 +111,95 @@ function Base.showerror(io::IO, e::ModelDefError)
 end
 
 
-
+# user can override this for some quantum-specific problems
+γmax(θ::Model, ζ, τ) = 1.0
+#TODO: sphere()
+sphere(r, ζ, τ) = sqrt(r)/maximum(norm(ζ.x(t)) for t in LinRange(τ..., 10000))
+# user can override this to change the preview displayed on each iteration
+preview(θ::Model, ξ) = ξ.x
 
 # by default, this is the solution to the algebraic riccati equation at tf
-# user can override this behavior for a model type by defining PRONTO.Pf(α,μ,tf,θ::MyModel)
-function Pf(α,μ,tf,θ::Model{NX}) where {NX}
-    Ar = fx(α, μ, tf, θ)
-    Br = fu(α, μ, tf, θ)
-    Qr = Q(α, μ, tf, θ)
-    Rr = R(α, μ, tf, θ)
+# user can override this behavior for a model type by defining PRONTO.Pf(θ::MyModel,αf,μf,tf)
+function Pf(θ::Model{NX},αf,μf,tf) where {NX}
+    Ar = fx(θ, αf, μf, tf)
+    Br = fu(θ, αf, μf, tf)
+    Qr = Q(θ, αf, μf, tf)
+    Rr = R(θ, αf, μf, tf)
     Pf,_ = arec(Ar,Br*(Rr\Br'),Qr)
     return SMatrix{NX,NX,Float64}(Pf)
 end
 
-# definitions for the following must be generated from a user-specified model by codegen
-f!(dx,x,u,t,θ) = throw(ModelDefError(θ))
-Q(α,μ,t,θ) = throw(ModelDefError(θ))
-R(α,μ,t,θ) = throw(ModelDefError(θ))
 
-f(x,u,t,θ) = throw(ModelDefError(θ))
-fx(x,u,t,θ) = throw(ModelDefError(θ))
-fu(x,u,t,θ) = throw(ModelDefError(θ))
-
-l(x,u,t,θ) = throw(ModelDefError(θ))
-lx(x,u,t,θ) = throw(ModelDefError(θ))
-lu(x,u,t,θ) = throw(ModelDefError(θ))
-lxx(x,u,t,θ) = throw(ModelDefError(θ))
-lxu(x,u,t,θ) = throw(ModelDefError(θ))
-luu(x,u,t,θ) = throw(ModelDefError(θ))
-
-p(x,u,t,θ) = throw(ModelDefError(θ))
-px(x,u,t,θ) = throw(ModelDefError(θ))
-pxx(x,u,t,θ) = throw(ModelDefError(θ))
-
-Lxx(λ,x,u,t,θ) = throw(ModelDefError(θ))
-Lxu(λ,x,u,t,θ) = throw(ModelDefError(θ))
-Luu(λ,x,u,t,θ) = throw(ModelDefError(θ))
-
-# currently unused:
-# fxx(x,u,t,θ) = throw(ModelDefError(θ))
-# fxu(x,u,t,θ) = throw(ModelDefError(θ))
-# fuu(x,u,t,θ) = throw(ModelDefError(θ))
-# L(λ,x,u,t,θ) = throw(ModelDefError(θ))
-# Lx(λ,x,u,t,θ) = throw(ModelDefError(θ))
-# Lu(λ,x,u,t,θ) = throw(ModelDefError(θ))
 
 # ----------------------------------- #. components ----------------------------------- #
 
-
+include("kernels.jl") # placeholder solver kernel function definitions
 include("codegen.jl") # takes derivatives, generates model functions
 include("odes.jl") # wrappers for ODE solution handling
 include("regulator.jl") # regulator for projection operator
 include("projection.jl") # projected (closed loop) and guess (open loop) trajectories
-include("optimizer.jl") # lagrangian, 1st/2nd order optimizer, search direction
+include("search_direction.jl") # lagrangian, 1st/2nd order optimizer, search direction
 include("cost.jl") # cost and cost derivatives
 include("armijo.jl") # armijo step and projection
 
 
+struct Data
+    ξ::Vector{Trajectory}
+    Kr::Vector{Regulator}
+    λ::Vector{ODE}
+    Ko::Vector{Optimizer}
+    vo::Vector{Costate}
+    ζ::Vector{Trajectory}
+    h::Vector{Float64}
+    Dh::Vector{Float64}
+    D2g::Vector{Float64}
+    γ::Vector{Float64}
+    φ::Vector{Trajectory}
+end
+
+Data() = Data(
+    Trajectory[],
+    Regulator[],
+    ODE[],
+    Optimizer[],
+    Costate[],
+    Trajectory[],
+    Float64[],
+    Float64[],
+    Float64[],
+    Float64[],
+    Trajectory[],
+)
+
+Base.show(io::IO, data::Data) = print(io, "PRONTO data: $(length(data.φ)) iterations")
+# ----------------------------------- guess trajectories ----------------------------------- #
+# generate ξ0 from either η
+function zero_input(θ::Model{NX,NU}, x0, τ) where {NX,NU}
+    μ = t -> zeros(SVector{NU})
+    open_loop(θ, x0, μ, τ)
+end
+
+
+function open_loop(θ::Model{NX,NU}, x0, μ, τ) where {NX,NU}
+    α = t -> zeros(SVector{NX})
+    Kr = (α,μ,t) -> zeros(SMatrix{NU,NX})
+    projection(θ, x0, α, μ, Kr, τ)
+end
+
+#TODO: smooth guess
+# smooth(t, x0, xf, tf) = @. (xf - x0)*(tanh((2π/tf)*t - π) + 1)/2 + x0
+smooth(θ, x0, xf, τ) = smooth(θ, x0, xf, t->zeros(nu(θ)), τ)
+function smooth(θ, x0, xf, μ, τ)
+    t0,tf = τ
+    α = t-> @. (xf - x0)*(tanh((2π/tf)*t - π) + 1)/2 + x0
+    Kr = regulator(θ, α, μ, τ)
+    projection(θ, x0, α, μ, Kr, τ)
+end
+
+function closed_loop(θ, x0, α, μ, τ)
+    Kr = regulator(θ, α, μ, τ)
+    projection(θ, x0, α, μ, Kr, τ)
+end
 
 # ----------------------------------- pronto loop ----------------------------------- #
 
@@ -174,61 +208,90 @@ bkwd(τ) = reverse(fwd(τ))
 
 
 # solves for x(t),u(t)'
-function pronto(θ::Model{NX,NU,NΘ}, x0::StaticVector, φ, τ; limitγ=false, tol = 1e-5, maxiters = 20,verbose=true) where {NX,NU,NΘ}
-    t0,tf = τ
+function pronto(θ::Model, x0::StaticVector, ξ::Trajectory, τ; 
+                tol = 1e-6, 
+                maxiters = 100,
+                show_info = true,
+                show_preview = true,
+                show_steps = false,
+                armijo_kw...)
+                
+    solve_start = time_ns()
+    show_steps && info(0, "starting PRONTO")
+    data = Data()
 
     for i in 1:maxiters
-        # info(i, "iteration")
+        loop_start = time_ns()
+        push!(data.ξ, ξ)
+
         # -------------- build regulator -------------- #
         # α,μ -> Kr,x,u
-        verbose && iinfo("regulator")
-        Kr = regulator(θ, φ, τ)
-        verbose && iinfo("projection")
-        ξ = projection(θ, x0, φ, Kr, τ)
+        show_steps && iinfo("regulator")
+        Kr = regulator(θ, ξ, τ)
+        push!(data.Kr, Kr)
+        # ξ = projection(θ, x0, φ, Kr, τ; verbosity)
 
         # -------------- search direction -------------- #
         # Kr,x,u -> z,v
-        verbose && iinfo("lagrangian")
-        λ = lagrangian(θ,ξ,φ,Kr,τ)
-        verbose && iinfo("optimizer")
-        Ko = optimizer(θ,λ,ξ,φ,τ)
-        verbose && iinfo("using $(is2ndorder(Ko) ? "2nd" : "1st") order search")
-        verbose && iinfo("costate")
-        vo = costate(θ,λ,ξ,φ,Ko,τ)
-        verbose && iinfo("search_direction")
-        ζ = search_direction(θ,ξ,Ko,vo,τ)
-
-        # -------------- cost/derivatives -------------- #
-        verbose && iinfo("cost/derivs")
-
-        Dh,D2g = cost_derivs(θ,λ,φ,ξ,ζ,τ)
+        show_steps && iinfo("lagrangian")
+        λ = lagrangian(θ, ξ, Kr, τ)
+        push!(data.λ, λ)
         
-        Dh > 0 && (info("increased cost - quitting"); (return φ))
-        -Dh < tol && (info(as_bold("PRONTO converged")); (return φ))
+        show_steps && iinfo("optimizer")
+        Ko = optimizer(θ, λ, ξ, τ)
+        push!(data.Ko, Ko)
+        show_steps && iinfo("using $(is2ndorder(Ko) ? "2nd" : "1st") order search")
 
-        # compute cost
+        show_steps && iinfo("costate")
+        vo = costate(θ, λ, ξ, Ko, τ)
+        push!(data.vo, vo)
+
+        show_steps && iinfo("search direction")
+        ζ = search_direction(θ,ξ,Ko,vo,τ)
+        push!(data.ζ, ζ)
+
+        
+        # -------------- cost/derivatives -------------- #
+        show_steps && iinfo("cost derivatives")
+
         h = cost(ξ, τ)
-        # verbose && iinfo(as_bold("h = $(h)\n"))
-        # print(ξ)
+        push!(data.h, h)
+
+        Dh,D2g = cost_derivs(θ, λ, ξ, ζ, τ)
+        push!(data.Dh, Dh)
+        push!(data.D2g, D2g)
+
+        if Dh > 0
+            show_info && info(i, "increased cost - quitting")
+            return ξ,data
+        end
 
         # -------------- select γ via armijo step -------------- #
-        # γ = γmax; 
-        aα=0.4; aβ=0.7
-        γ = limitγ ? min(1, 1/maximum(maximum(ζ.x(t) for t in t0:0.0001:tf))) : 1.0
+        show_steps && iinfo("armijo step")
+        φ,γ = armijo(θ, x0, ξ, ζ, Kr, h, Dh, τ; armijo_kw...)
+        push!(data.γ, γ)
+        push!(data.φ, φ) 
 
-        local η
-        while γ > aβ^25
-            verbose && iinfo("armijo γ = $(round(γ; digits=6))")
-            η = armijo_projection(θ,x0,ξ,ζ,γ,Kr,τ)
-            g = cost(η, τ)
-            h-g >= -aα*γ*Dh ? break : (γ *= aβ)
+        # -------------- runtime info -------------- #
+        loop_time = (time_ns() - loop_start)/1e6
+        infostr = @sprintf("Dh = %.3e, h = %.3e, γ = %.3e, ", Dh, h, γ)
+        infostr *= ", order = $(is2ndorder(Ko) ? "2nd" : "1st"), "
+        infostr *= @sprintf("solved in %.3f ms", loop_time)
+        show_info && info(i, infostr)
+        show_preview && plot_preview(θ, ξ)
+
+        # -------------- check convergence -------------- #
+        if -Dh < tol
+            solve_time = (time_ns() - solve_start)/1e9
+            show_info && info(i, @sprintf("PRONTO converged in %.2f seconds", solve_time))
+            return φ,data
         end
-        verbose && info(i, "Dh = $Dh, h = $h, γ = $γ") #TODO: 1st/2nd order
 
-        φ = η
+        # -------------- update trajectory -------------- #
+        ξ = φ # ξ_k+1 = φ_k
     end
-    return φ
+    show_info && info(maxiters, "maxiters reached - quitting")
+    return ξ,data
 end
-
 
 end # module

@@ -1,66 +1,48 @@
 using PRONTO
-using StaticArrays, LinearAlgebra
+using LinearAlgebra
+using StaticArrays
+using Base: @kwdef
 
-function mprod(x) 
-    Re = I(2) 
-    Im = [0 -1; 1 0] 
-    M = kron(Re,real(x)) + kron(Im,imag(x)); 
-    return M 
+
+## ----------------------------------- define the model ----------------------------------- ##
+
+@kwdef struct TwoSpin <: Model{4,1}
+    kr::Float64 = 1.0
+    kq::Float64 = 1.0
 end
 
-function inprod(x) 
-    i = Int(length(x)/2) 
-    a = x[1:i] 
-    b = x[i+1:end] 
-    P = [a*a'+b*b' -(a*b'+b*a'); a*b'+b*a' a*a'+b*b'] 
-    return P
+@define_f TwoSpin begin
+    H0 = [0 0 1 0;0 0 0 -1;-1 0 0 0;0 1 0 0]
+    H1 = [0 -1 0 0;1 0 0 0;0 0 0 -1;0 0 1 0]
+    (H0 + u[1]*H1)*x
 end
 
-function x_eig(i)
-    H0 = [0 1;1 0]
-    w = eigvecs(collect(H0)) 
-    x_eig = kron([1;0],w[:,i])
+@define_l TwoSpin begin
+    Rl = [0.01;;]
+    1/2*u'*Rl*u
 end
 
-@kwdef struct Spin2 <: PRONTO.Model{4,1,3}
-    kl::Float64 # stage cost gain
-    kr::Float64 # regulator r gain
-    kq::Float64 # regulator q gain
+@define_m TwoSpin begin
+    Pl = [0 0 0 0;0 1 0 0;0 0 0 0;0 0 0 1]
+    1/2*x'*Pl*x
 end
 
-function termcost(x,u,t,θ)
-    P = I(4) - inprod(x_eig(2))
-    1/2 * collect(x')*P*x
-end
+@define_Q TwoSpin kq*I(4)
+@define_R TwoSpin kr*I(1)
+resolve_model(TwoSpin)
 
-function dynamics(x,u,t,θ)
-    H0 = [0 1;1 0]
-    H1 = [0 -im;im 0]
-    return mprod(-im*(H0 + u[1]*H1) )*x
-end
 
-stagecost(x,u,t,θ) = 1/2 *θ[1]*collect(u')I*u
+# show the population function on each iteration
+PRONTO.preview(θ::TwoSpin, ξ) = [I(2) I(2)]*(ξ.x.^2)
+PRONTO.γmax(θ::TwoSpin, ζ, τ) = PRONTO.sphere(1, ζ, τ)
+PRONTO.Pf(θ::TwoSpin, αf, μf, tf) = SMatrix{4,4,Float64}(I(4))
 
-regR(x,u,t,θ) = θ.kr*I(1)
+## ----------------------------------- solve the problem ----------------------------------- ##
 
-function regQ(x,u,t,θ) 
-    x_re = x[1:2] 
-    x_im = x[3:4] 
-    ψ = x_re + im*x_im 
-    θ.kq*mprod(I(2) - ψ*ψ')
-end
-
-PRONTO.Pf(α,μ,tf,θ::Spin2) = SMatrix{4,4,Float64}(I(4) - α*α')
-
-PRONTO.generate_model(Spin2, dynamics, stagecost, termcost, regQ, regR)
-
-x0 = SVector{4}(x_eig(1))
-t0,tf = τ = (0,10)
-
-θ = Spin2(kl=0.01, kr=1, kq=1)
-
-μ = @closure t->SVector{1}(0.5*sin(t))
-φ = open_loop(θ,x0,μ,τ)
-
-@time ξ = pronto(θ,x0,φ,τ; tol = 1e-5, maxiters = 50, limitγ = true)
-
+θ = TwoSpin() # instantiate a new model
+τ = t0,tf = 0,10 # define time domain
+x0 = @SVector [0.0, 1.0, 0.0, 0.0] # initial state
+xf = @SVector [1.0, 0.0, 0.0, 0.0] # final state
+μ = t->[0.1] # open loop input μ(t)
+η = open_loop(θ, xf, μ, τ) # guess trajectory
+ξ,data = pronto(θ, x0, η, τ); # optimal trajectory
