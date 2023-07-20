@@ -106,9 +106,9 @@ function define_m(T::Type{<:Model{NX,NU}}, user_m) where {NX,NU}
     m = traceuser(T, user_m)
     Jx,Ju = jacobians(T)
     mx = reshape(Jx(m), NX)
-    define_methods(T, Size(1), m, :p, :x, :u, :t)
-    define_methods(T, Size(NX), mx, :px, :x, :u, :t)
-    define_methods(T, Size(NX,NX), Jx(mx), :pxx, :x, :u, :t)
+    define_methods(T, Size(1), m, :m, :x, :u, :t)
+    define_methods(T, Size(NX), mx, :mx, :x, :u, :t)
+    define_methods(T, Size(NX,NX), Jx(mx), :mxx, :x, :u, :t)
     return nothing
 end
 

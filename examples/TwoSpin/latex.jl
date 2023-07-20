@@ -13,7 +13,25 @@ u0 = 0.1
 @time ξ = pronto(θ, x0, φ, τ) # optimal trajectory
 # @code_warntype PRONTO.f(x0,u0,t0,θ)
 
+## ----------------------------------- symbolic ----------------------------------- ##
+using Symbolics
+using PRONTO: symbolic
+using Latexify
+copy_to_clipboard(true)
 
+θ = symbolic(InvPend)
+λ = Symbolics.variables(:λ, 1:nx(θ))
+x = Symbolics.variables(:x, 1:nx(θ))
+u = Symbolics.variables(:u, 1:nu(θ))
+t = symbolic(:t)
+
+##
+
+latexify(PRONTO.f(θ,x,u,t))
+latexify(PRONTO.fx(θ,x,u,t))
+latexify(PRONTO.fxx(θ,x,u,t))
+
+latexify(PRONTO.Lxx(θ,λ,x,u,t))
 
 
 ## ----------------------------------- symbolic ----------------------------------- ##
@@ -23,9 +41,10 @@ using PRONTO: symbolic
 # first, create symbolic versions of everything
 θ = symbolic(TwoSpin)
 θ = symbolic(LaneChange)
-λ = Symbolics.variables(:λ, 1:NX)
-x = Symbolics.variables(:x, 1:NX)
-u = Symbolics.variables(:u, 1:NU)
+θ = symbolic(InvPend)
+λ = Symbolics.variables(:λ, 1:nx(θ))
+x = Symbolics.variables(:x, 1:nx(θ))
+u = Symbolics.variables(:u, 1:nu(θ))
 t = symbolic(:t)
 
 # symbolic(TwoSpin, PRONTO.f)
@@ -40,7 +59,7 @@ PRONTO.Lxu(λ,x,u,t,θ) # or lagrangian hessian
 # this is useful, especially combined with other packages
 using Latexify
 copy_to_clipboard(true)
-latexify(PRONTO.f(x,u,t,θ))
+latexify(PRONTO.f(θ,x,u,t))
 
 ## ----------------------------------- more symbolic ----------------------------------- ##
 

@@ -4,7 +4,7 @@ cost(ξ,τ) = cost(ξ.θ,ξ.x,ξ.u,τ)
 
 function cost(θ,x,u,τ)
     t0,tf = τ; h0 = SVector{1,Float64}(0)
-    hf = p(θ,x(tf),u(tf),tf)
+    hf = m(θ, x(tf), u(tf), tf)
     h = hf + solve(ODEProblem(dh_dt, h0, (t0,tf), (θ,x,u)), Tsit5(); reltol=1e-7)(tf)
     return h[1]
 end
@@ -24,8 +24,8 @@ function cost_derivs(θ,λ,ξ,ζ,τ; verbosity)
     zf = ζ.x(tf)
     αf = ξ.x(tf)
     μf = ξ.u(tf)
-    rf = px(θ,αf,μf,tf)
-    Pf = pxx(θ,αf,μf,tf)
+    rf = mx(θ,αf,μf,tf)
+    Pf = mxx(θ,αf,μf,tf)
     Dh = 🐱_f + rf'zf
     D2g = 🐶_f + zf'Pf*zf
     return Dh,D2g

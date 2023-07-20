@@ -9,8 +9,6 @@ using MatrixEquations
 @kwdef struct InvPend <: Model{2,1}
     L::Float64 = 2 # length of pendulum (m)
     g::Float64 = 9.81 # gravity (m/s^2)
-    #TODO: kq::SVector{2} = [10, 1]
-    #TODO: kr::SVector{1} = [1e-3]
 end
 
 @dynamics InvPend [
@@ -18,11 +16,8 @@ end
     g/L*sin(x[1])-u[1]*cos(x[1])/L,
 ]
 
-@define_l InvPend begin
-    Q = I(2)
-    R = I(1)
-    1/2*x'*Q*x + 1/2*u'*R*u
-end
+@define_l InvPend 1/2*x'*I(2)*x + 1/2*u'*I(1)*u
+
 
 @define_m InvPend begin
     P = [
@@ -59,13 +54,13 @@ PRONTO.runtime_info(θ::InvPend, ξ; verbosity=1) = verbosity >= 1 && println(pr
 
 # PRONTO.generate_model(InvPend, dynamics, stagecost, termcost, Qreg, Rreg)
 # ##
-
+θ = InvPend()
+ξ,data = pronto(θ, x0, ξ0, τ);
 
 
 ##
 # θ = InvPend(g=3.71) # on mars
 θ = InvPend() # on mars
-
 τ = t0,tf = 0,10
 x0 = @SVector [2π/3;0]
 xf = @SVector [0;0]

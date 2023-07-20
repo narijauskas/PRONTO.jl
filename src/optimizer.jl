@@ -17,7 +17,7 @@ function lagrangian(θ,ξ,Kr,τ; verbosity)
     αf = ξ.x(tf)
     μf = ξ.u(tf)
 
-    λf = px(θ, αf, μf, tf)
+    λf = mx(θ, αf, μf, tf)
     λ = ODE(dλ_dt, λf, (tf,t0), (θ,ξ,Kr))
     return λ
 end
@@ -107,7 +107,7 @@ function optimizer1(θ,λ,ξ,τ)
     αf = ξ.x(tf)
     μf = ξ.u(tf)
     
-    Pf = pxx(θ,αf,μf,tf)
+    Pf = mxx(θ,αf,μf,tf)
     N = FirstOrder()
     P = ODE(dP_dt, Pf, (tf,t0), (θ,λ,ξ,N))
     
@@ -181,7 +181,7 @@ function costate(θ,λ,ξ,Ko,τ; verbosity)
     αf = ξ.x(tf)
     μf = ξ.u(tf)
     N = order(Ko)
-    rf = px(θ,αf,μf,tf)
+    rf = mx(θ,αf,μf,tf)
     r = ODE(dr_dt, rf, (tf,t0), (θ,λ,ξ,Ko))
     return Costate(N,θ,λ,ξ,r)
 end
