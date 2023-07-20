@@ -1,6 +1,8 @@
 
 γmax(θ::Model,ζ,τ) = 1.0
 
+# ----------------------------------- armijo step line search ----------------------------------- #
+
 function armijo(θ, x0, ξ, ζ, Kr, h, Dh, τ; verbosity, armijo_maxiters)
     # h = cost(ξ, τ)
     α=0.4; β=0.7
@@ -16,6 +18,8 @@ function armijo(θ, x0, ξ, ζ, Kr, h, Dh, τ; verbosity, armijo_maxiters)
     end
     return φ,γ
 end
+
+# ----------------------------------- armijo projection ----------------------------------- #
 
 armijo_projection(θ,x0,ξ,ζ,γ,Kr,τ; kw...) = armijo_projection(θ,x0,ξ.x,ξ.u,ζ.x,ζ.u,γ,Kr,τ; kw...)
 

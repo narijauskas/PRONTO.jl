@@ -23,9 +23,6 @@ function lagrangian(θ,ξ,Kr,τ; verbosity)
 end
 
 
-
-
-
 abstract type SearchOrder end
 struct FirstOrder <: SearchOrder end
 struct SecondOrder <: SearchOrder end
@@ -131,13 +128,6 @@ end
 
 
 
-
-
-
-
-
-
-
 struct Costate{Tθ,Tλ,Tξ,Tr}
     N::SearchOrder
     θ::Tθ
@@ -159,8 +149,6 @@ function (vo::Costate)(θ,x,u,t)
 
     return -R\(B'r + b)
 end
-
-
 
 
 function dr_dt(r, (θ,λ,ξ,Ko), t)
@@ -232,13 +220,3 @@ function dz_dt(z, (θ,ξ,Ko,vo), t)
     v = vo(x,u,t) - Ko(x,u,t)*z
     return A*z + B*v
 end
-
-
-# @build $T dy_dt(M,θ,t,ξ,ζ,λ) -> vcat(
-
-#     ($a)'*($z) + ($b)'*($v),
-#     ($z)'*($Qo_2)*($z) + 2*($z)'*($So_2)*($v) + ($v)'*($Ro_2)*($v)
-# )
-# @build $T _Dh(M,θ,t,φ,ζ,y) -> y[1] + (PRONTO.px($M,θ,t,φ))'*($z)
-# @build $T _D2g(M,θ,t,φ,ζ,y) -> y[2] + ($z)'*PRONTO.pxx($M,θ,t,φ)*($z)
-# @tock; println(@clock)

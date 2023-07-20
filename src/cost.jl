@@ -13,7 +13,7 @@ dh_dt(h, (θ,x,u), t) = l(θ, x(t), u(t), t)
 
 # ----------------------------------- cost derivatives ----------------------------------- #
 
-#TODO: decide on appropriate names for intermediate variables!
+#TODO: rename variables
 function cost_derivs(θ,λ,ξ,ζ,τ; verbosity)
     iinfo("cost/derivs"; verbosity)
     t0,tf = τ

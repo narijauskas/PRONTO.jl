@@ -10,20 +10,9 @@ struct InPlace end
 
 
 export @define_f, @define_l, @define_m, @define_Q, @define_R
-export @dynamics, @stage_cost, @terminal_cost, @regulatorQ, @regulatorR
-export resolve_model
+export @dynamics, @incremental_cost, @terminal_cost, @regulator_Q, @regulator_R
+export resolve_model, symbolic
 
-# for name in fieldnames(T)
-#     name in (:x,:u,:t) && error("model cannot have fields named x,u,t")
-#     ex = crispr(ex, name, :(θ.$name))
-# end
-
-
-# export generate_model, InPlace
-# export build
-# symbolic(name::Symbol, indices...) = Symbolics.variables(name::Symbol, indices...)
-# symbolic(T::Type{<:Model}) = SymbolicModel(T)
-# export symbolic
 
 macro define_f(T, ex)
     names = fieldnames(eval(:(Main.$T)))
@@ -55,22 +44,20 @@ macro define_R(T, ex)
     :(define_R($(esc(T)), $(esc(fn))))
 end
 
-
+# friendly names for the macros
 var"@dynamics" = var"@define_f"
-var"@stage_cost" = var"@define_l"
+var"@incremental_cost" = var"@define_l"
 var"@terminal_cost" = var"@define_m"
-var"@regulatorQ" = var"@define_Q"
-var"@regulatorR" = var"@define_R"
+var"@regulator_Q" = var"@define_Q"
+var"@regulator_R" = var"@define_R"
 
-
-
+# run before using model, ensures all methods are generated
 function resolve_model(T::Type{<:Model})
     define_L(T)
     #MAYBE: verify existence of all kernel methods
     info(PRONTO.as_bold(T)*" model ready")
     return nothing
 end
-
 
 
 function define_f(T::Type{<:Model{NX,NU}}, user_f) where {NX,NU}
@@ -130,26 +117,17 @@ function define_L(T::Type{<:Model{NX,NU}}) where {NX,NU}
     info("defining Lagrangian methods for $(as_bold(T))")
     Jx,Ju = jacobians(T)
 
-    # fxx = trace(T, PRONTO.fxx)
-    # fxu = trace(T, PRONTO.fxu)
-    # fuu = trace(T, PRONTO.fuu)
-
     f = trace(T, PRONTO.f)
     fxx = Jx(Jx(f))
     fxu = Ju(Jx(f))
     fuu = Ju(Ju(f))
 
     l = trace(T, PRONTO.l)
-    # Jx,Ju = jacobians(T)
     lx = reshape(Jx(l), NX)
     lu = reshape(Ju(l), NU)
     lxx = Jx(lx)
     lxu = Ju(lx)
     luu = Ju(lu)
-
-    # lxx = trace(T, PRONTO.lxx)
-    # lxu = trace(T, PRONTO.lxu)
-    # luu = trace(T, PRONTO.luu)
 
     λ = collect(first(@variables λ[1:NX]))
     Lxx = lxx .+ sum(λ[k]*fxx[k,:,:] for k in 1:NX)
@@ -162,9 +140,6 @@ function define_L(T::Type{<:Model{NX,NU}}) where {NX,NU}
     return nothing
 end
 
-
-
-
 # object to facilitate symbolic differentiation of model
 struct SymModel{T} end
 
@@ -172,8 +147,6 @@ struct SymModel{T} end
 getproperty(::SymModel{T}, name::Symbol) where {T<:Model} = symbolic(name, fieldtype(T, name))
 propertynames(::SymModel{T}) where T = fieldnames(T)
 Base.all(M::SymModel{T}) where T = [getproperty(M, name) for name in propertynames(M)]
-
-export symbolic
 
 # for models
 symbolic(T::Type{<:Model}) = SymModel{T}()
@@ -192,9 +165,6 @@ symbolic(name::Symbol, T::Type{<:AbstractArray}) = error("Cannot create symbolic
 
 # for pretty versions of symbols
 symbolic(name::Symbol, ix::UnitRange) = Symbolics.variables(name, ix)
-
-# for PRONTO functions
-# symbolic(T::Type{<:Model}, f::Function) = trace(T, f)
 
 function traceuser(T::Type{<:Model{NX,NU}}, fn) where {NX,NU}
     x = symbolic(:x, NX)
@@ -219,8 +189,8 @@ function jacobians(T::Type{<:Model{NX,NU}}) where {NX,NU}
     return Jx,Ju
 end
 
+# functor which maps symbolic -> symbolic jacobian
 # eg. Jx = Jacobian(x); fx_sym = Jx(f_sym)
-# maps symbolic -> symbolic
 struct Jacobian dv end
 
 function (J::Jacobian)(f_sym)
@@ -231,8 +201,6 @@ function (J::Jacobian)(f_sym)
     end
     return cat(fv_sym...; dims=ndims(f_sym)+1) #ndims = 0 for scalar-valued l,p
 end
-# isnothing(force_dims) || (fx_sym = reshape(fx_sym, force_dims...))
-
 
 function define_methods(T, sz::Size{S}, sym, name, args...) where S
     body = def_kernel(sym)
@@ -247,7 +215,6 @@ function define_methods(T, sz::Size{S}, sym, name, args...) where S
     hdr = "PRONTO.$name(θ::$(T)$([", $a" for a in args]...))" |> x->x*repeat(" ", max(36-length(x),0))
     iinfo("$hdr "*as_color(crayon"dark_gray", "[$file]"))
 end
-
 
 function def_kernel(sym)
     kernel = tmap(enumerate(sym)) do (i,x)
