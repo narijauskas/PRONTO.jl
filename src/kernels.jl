@@ -49,8 +49,3 @@ Luu(θ,λ,x,u,t) = throw(ModelDefError(θ))
 Lxx!(out,θ,λ,x,u,t) = throw(ModelDefError(θ))
 Lxu!(out,θ,λ,x,u,t) = throw(ModelDefError(θ))
 Luu!(out,θ,λ,x,u,t) = throw(ModelDefError(θ))
-
-
-
-
-# kernels = return [Q, R, f, fx, fu, fxx, fxu, fuu, l, lx, lu, lxx, lxu, luu, p, px, pxx, Lxx, Lxu, Luu]

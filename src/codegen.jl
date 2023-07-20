@@ -3,16 +3,11 @@
 using Base: invokelatest
 using MacroTools: striplines, prettify, postwalk, @capture
 
+# change this to MacroTools.prettify if you want pretty code and are willing to wait for it
 global format::Function = identity
 
-# builds buffered versions by default, for an in-place version, use:
-struct InPlace end
 
-
-export @define_f, @define_l, @define_m, @define_Q, @define_R
-export @dynamics, @incremental_cost, @terminal_cost, @regulator_Q, @regulator_R
-export resolve_model, symbolic
-
+# ----------------------------------- code generation macros ----------------------------------- #
 
 macro define_f(T, ex)
     names = fieldnames(eval(:(Main.$T)))
@@ -59,6 +54,10 @@ function resolve_model(T::Type{<:Model})
     return nothing
 end
 
+# ----------------------------------- code generation pipeline ----------------------------------- #
+
+# builds buffered versions by default, for an in-place version, use:
+struct InPlace end # TODO: deprecate?
 
 function define_f(T::Type{<:Model{NX,NU}}, user_f) where {NX,NU}
     info("defining dynamics and derivatives for $(as_bold(T))")
@@ -139,6 +138,9 @@ function define_L(T::Type{<:Model{NX,NU}}) where {NX,NU}
     define_methods(T, Size(NU,NU), Luu, :Luu, :λ, :x, :u, :t)
     return nothing
 end
+
+
+# ----------------------------------- code generation helpers ----------------------------------- #
 
 # object to facilitate symbolic differentiation of model
 struct SymModel{T} end
@@ -270,9 +272,6 @@ end
 # append ! to a symbol, eg. :name -> :name!
 _!(ex) = Symbol(String(ex)*"!")
 
-
-# AType(sz::Size{S}) where {S} = :(Array{T}(undef, $(S...)))
-
 # generate efficient constructors for numeric SArrays and MArrays
 MType(sz::Size{S}) where {S} = MType(Val(length(S)), sz)
 MType(::Val{1}, sz::Size{S}) where {S} = :(MVector{$(S...), Float64})
@@ -285,17 +284,12 @@ SType(::Val{2}, sz::Size{S}) where {S} = :(SMatrix{$(S...), Float64})
 SType(::Val, sz::Size{S}) where {S} = :(SArray{Tuple{$(S...)}, Float64, $(length(S)), $(prod(S))})
 
 
-
-
-
-
 # make a version of v with the sparsity pattern of fn
 function sparse_mask(v, fn)
     v .* map(fn) do ex
         iszero(ex) ? 0 : 1
     end |> collect
 end
-
 
 # remove excess begin blocks & comments
 function clean(ex)
@@ -304,140 +298,9 @@ function clean(ex)
     end
 end
 
-
 # insert the `new` expression at each matching `tgt` in the `src`
 function crispr(src,tgt,new)
     postwalk(src) do ex
         return @capture(ex, $tgt) ? new : ex
     end
 end
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#=
-#MAYBE: do we actually want to save the whole model to a file?
-#TODO: deprecate
-function build(sz, hdr, sym, M; file=nothing)
-    body = tmaparr(enumerate(sym)) do (i,x)
-        :(out[$i] = $(format(toexpr(x))))
-    end
-    @capture(hdr, name_(args__))
-    file = tempname()*".jl"
-    ex = _build(sz, name, args[1:end-1], body, M)
-    write(file, (@. ex |> clean |> x->string(x)*"\n\n")...)
-    Base.include(Main, file)
-    iinfo("$hdr\t"*as_color(crayon"dark_gray", "[$file]"))
-    # eval(ex)
-end
-
-# separate(str) = str*"\n\n"
-# :(θ::$M{T})
-#TODO: deprecate
-function _build(sz::Size{S}, name, args, body, M) where {S}
-    name! = _!(name)
-    f1 = quote
-        function PRONTO.$name($(args...), θ::$M{T}) where {T<:Number}
-            out = $(MType(sz))(undef)
-            PRONTO.$name!(out, $(args...), θ)
-            # @inbounds begin
-            #     $(body...)
-            # end
-            return $(SType(sz))(out)
-        end
-    end
-
-    f2 = quote
-        function PRONTO.$name($(args...), θ::$M{Num})
-            out = Array{Num}(undef, $(S...))
-            PRONTO.$name!(out, $(args...), θ)
-            return SArray{Tuple{$(S...)}}(out)
-        end
-    end
-
-    # f3 = quote
-    #     function PRONTO.$name($(args...), θ::$M{T}) where {T}
-    #         out = Array{T}(undef, $(S...))
-    #         PRONTO.$name!(out, $(args...), θ)
-    #         return SArray{Tuple{$(S...)}}(out)
-    #     end
-    # end
-
-    f4 = quote
-        function PRONTO.$name!(out, $(args...), θ::$M)
-            @inbounds begin
-                $(body...)
-            end
-            return out
-        end
-    end
-
-    return (f1,f2,f4)
-end
-
-# function _build(::InPlace, name, args, body, M)
-#     quote
-#         function PRONTO.$name($(args...)) where {T}
-#             @inbounds begin
-#                 $(body...)
-#             end
-#             return nothing
-#         end
-#     end
-# end
-
-#TODO: deprecate
-function init_syms(T)
-    NX = nx(T)
-    NU = nu(T)
-    @variables x[1:NX] u[1:NU] t λ[1:NX]
-    x = collect(x)
-    u = collect(u)
-    λ = collect(λ)
-    t = t
-    θ = SymbolicModel(T)
-    Jx,Ju = Jacobian.([x,u])
-    # M = :($(nameof(T)){T})
-    M = nameof(T)
-    return (NX,NU,x,u,t,θ,λ,Jx,Ju,M)
-end
-
-
-
-
-
-
-
-# fix discrepancy between map and tmap for zero-dim arrays
-# TODO: deprecate
-function tmaparr(f, args...) 
-    x = tmap(f, args...)
-    return x isa AbstractArray ? x : [x]
-end
-
-# build_inplace(:f, body, :(model::TwoSpin), :x, :u, :t)
-=#

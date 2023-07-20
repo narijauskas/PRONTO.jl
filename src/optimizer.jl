@@ -1,4 +1,6 @@
 
+# ----------------------------------- lagrange multipliers ----------------------------------- #
+
 function dλ_dt(λ, (θ,ξ,Kr), t)
     x = ξ.x(t); u = ξ.u(t); Kr = Kr(t)
 
@@ -22,6 +24,8 @@ function lagrangian(θ,ξ,Kr,τ; verbosity)
     return λ
 end
 
+
+# ----------------------------------- optimizer ----------------------------------- #
 
 abstract type SearchOrder end
 struct FirstOrder <: SearchOrder end
@@ -128,6 +132,9 @@ end
 
 
 
+
+# ----------------------------------- costate ----------------------------------- #
+
 struct Costate{Tθ,Tλ,Tξ,Tr}
     N::SearchOrder
     θ::Tθ
@@ -188,6 +195,9 @@ is2ndorder(vo::Costate) = is2ndorder(vo.N)
 is2ndorder(::SecondOrder) = true
 is2ndorder(::Any) = false
 
+
+
+# ----------------------------------- search direction ----------------------------------- #
 
 
 function search_direction(θ::Model{NX,NU},ξ,Ko,vo,τ; verbosity=1, dt=0.001) where {NX,NU}

@@ -1,7 +1,5 @@
 
-# export projection
-
-
+#MAYBE: move to trajectories.jl?
 struct Trajectory{M,X,U}
     θ::M
     x::X
@@ -26,7 +24,6 @@ end
 
 projection(θ::Model, x0, η, Kr, τ; kw...) = projection(θ, x0, η.x, η.u, Kr, τ; kw...)
 
-#TODO: a function that returns buf,cb
 
 function projection(θ::Model{NX,NU}, x0, α, μ, Kr, (t0,tf); verbosity=1, dt=0.001) where {NX,NU}
     iinfo("projection"; verbosity)
@@ -53,7 +50,6 @@ function projection(θ::Model{NX,NU}, x0, α, μ, Kr, (t0,tf); verbosity=1, dt=0
 end
 
 
-
 function dxdt(x, (θ,α,μ,Kr), t)
     α = α(t)
     μ = μ(t)
@@ -61,7 +57,3 @@ function dxdt(x, (θ,α,μ,Kr), t)
     u = μ - Kr*(x-α)
     f(θ,x,u,t)
 end
-
-
-
-

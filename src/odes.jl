@@ -32,15 +32,16 @@ ODE(fn::Function, ic, ts, p; kw...) = ODE(fn::Function, ic, ts, p, Size(ic); kw.
 # constructor basically wraps ODEProblem, should make algorithm available for tuning
 function ODE(fn::Function, ic, ts, p, ::Size{S}; alg=Tsit5(), kw...) where {S}
 
-    soln = solve(ODEProblem(fn, ic, ts, p),
+    soln! = solve(ODEProblem(fn, ic, ts, p),
             alg;
-            reltol=1e-7, kw...)
+            reltol=1e-7,
+            kw...)
 
     T = SArray{Tuple{S...}, Float64, length(S), prod(S)}
 
     wrap = FunctionWrapper{T, Tuple{Float64}}() do t
             out = MArray{Tuple{S...}, Float64, length(S), prod(S)}(undef)
-            soln(out,t)
+            soln!(out,t)
             return SArray{Tuple{S...}, Float64, length(S), prod(S)}(out)
     end
 
@@ -59,32 +60,10 @@ extrema(ode::ODE) = extrema(ode.soln.t)
 eachindex(::ODE{T}) where {T} = OneTo(length(T))
 show(io::IO, ode::ODE) = println(io, preview(ode))
 
+# domain(ode) = extrema(ode.t)
 # stats(ode)
 # retcode(ode)
 # algorithm(ode)
-
-
-# T = LinRange(extrema(ode.soln.t)..., 240)
-# Base.show(io::IO, ode::ODE) = print(io, typeof(ode))
-
-#TODO: more info
-# function Base.show(io::IO, ode::ODE)
-#     compact = get(io, :compact, false)
-#     if compact
-#         print(io, typeof(ode))
-#     else
-#         println(io)
-#         print(io, preview(ode))
-#         println(io)
-#     end
-#     return nothing
-#     # print(io, typeof(ode))
-#     # if !compact
-#     #     println(io)
-#     #     print(io, preview(ode))
-#     # end
-#     # return nothing
-# end
 
 
 # preview(ode; kw...) = preview(ode, domain(ode)...; kw...)
@@ -102,6 +81,9 @@ function show(io::IO, fn::FunctionWrapper{T,A}) where {T,A}
     print(io, "FunctionWrapper: $A -> $T $(fn.ptr)")
 end
 
+
+
+
 # ----------------------------------- ODE display ----------------------------------- #
 # I find it much more intuitive to show a trace of an ODE solution
 
@@ -115,6 +97,7 @@ t_plot(x) = t_plot(extrema(x)...)
 function Base.getindex(ode::ODE, i)
     [ode(t)[ix] for t in t_plot(ode), ix in i]
 end
+
 
 function set_plot_scale(height, width)
     global PLOT_HEIGHT = convert(Int, height)
@@ -142,34 +125,3 @@ manto_colors = [
     crayon"#2AD599",
     crayon"#007DC6",
 ]
-
-
-#FUTURE: Makie support
-# using MakieCore
-# function MakieCore.convert_arguments(P::MakieCore.PointBased, x::ODE, i)
-#     ts = LinRange(extrema(x)...,1001)
-#     # is = eachindex(x)
-#     xs = [x(t)[i] for t∈ts]
-#     (MakieCore.convert_arguments(P, collect(ts), xs),
-#     MakieCore.convert_arguments(P, collect(ts), xs))
-# end
-
-
-
-
-
-
-
-#=
-
-
-
-
-
-# this is type piracy... but it prevents some obscenely long error messages
-function Base.show(io::IO, fn::FunctionWrapper{T,A}) where {T,A}
-    print(io, "FunctionWrapper: $A -> $T $(fn.ptr)")
-end
-
-
-=#
