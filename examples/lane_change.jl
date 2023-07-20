@@ -18,15 +18,8 @@ using LinearAlgebra, StaticArrays
     xeq::SVector{6,Float64} = zeros(6)      # equilibrium
 end
 
-# sideslip angles
-# αf(x,Lf,s) = x[5] - atan((x[2] + Lf*x[4])/s)
-# αr(x,Lf,s) = x[6] - atan((x[2] - Lr*x[4])/s)
-
-# # tire force
-# F(α,θ) = μ*g*M*sin(c*atan(b*α))
-
 # define model dynamics
-@dynamics LaneChange begin
+@define_f LaneChange begin
     # sideslip angles
     αf = x[5] - atan((x[2] + Lf*x[4])/s)
     αr = x[6] - atan((x[2] - Lr*x[4])/s)
@@ -59,13 +52,10 @@ x0 = SVector{6}(-5.0,zeros(5)...)
 xf = @SVector zeros(6)
 t0,tf = τ = (0,4)
 μ = t->zeros(2)
-# μ = @closure t->SVector{2}(zeros(2))
 η = open_loop(θ,x0,μ,τ)
 ξ,data = pronto(θ,x0,η,τ; tol = 1e-6, maxiters = 50);
 
-# plot_lane_change(ξ,τ)
 ## -------------------------------  ------------------------------- ##
-
 
 function plot_lane_change(ξ,τ)
     fig = Figure()
@@ -84,113 +74,3 @@ function plot_lane_change(ξ,τ)
     return fig
 end
 display(fig)
-
-
-
-
-
-
-
-## -------------------------------  ------------------------------- ##
-using Base.Threads: @spawn
-using ThreadTools
-
-x0 = SVector{6}(-5.0,zeros(5)...)
-xf = @SVector zeros(6)
-t0,tf = τ = (0,4)
-
-μ = @closure t->SVector{2}(zeros(2))
-φ = open_loop(θ,x0,μ,τ)
-
-
-tk = map([1,2,10]) do s
-    θ = LaneChange(s=s)
-    @spawn pronto(θ,x0,φ,τ; tol = 1e-6, maxiters = 50, verbose = false)
-end
-
-fetch.(tk)
-
-# just the inputs
-[ξ.x for ξ in fetch.(tk)]
-
-
-# plot_lane_change(ξ,τ)
-PRONTO.set_plot_scale(15,80)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-## ----------------------------------- tests ----------------------------------- ##
-
-M = LaneChange()
-θ = Float64[]
-t0 = 0.0
-tf = 10.0
-x0 = [-5.0;zeros(nx(M)-1)]
-xf = zeros(nx(M))
-u0 = zeros(nu(M))
-uf = zeros(nu(M))
-
-ξ0 = vcat(x0,u0)
-
-##
-φg = @closure t->[smooth(t,x0,xf,tf); 0.1*ones(nu(M))]
-φ = guess_φ(M,θ,ξ0,t0,tf,φg)
-@time ξ = pronto(M,θ,t0,tf,x0,u0,φ; tol = 1e-4)
-
-##
-
-model = (
-    ts = 0:0.001:10,
-
-    x0 = [-5.0;zeros(NX-1)],
-    tol = 1e-4,
-    x_eq = zeros(NX),
-    u_eq = zeros(NU),
-    maxiters = 20,
-    α = 0.4,
-    β = 0.7,
-)
-
-#TEST: move inside f(x,u)
-
-
-η = pronto(model)
-ts = model.ts
-
-
-#= plot result
-    using GLMakie
-    fig = Figure()
-    ax = Axis(fig[1,1])
-    for i in 1:NX
-        lines!(ax, ts, map(t->η[1](t)[i], ts))
-    end
-    ax = Axis(fig[2,1])
-    for i in 1:NU
-        lines!(ax, ts, map(t->η[2](t)[i], ts))
-    end
-    display(fig)
-=#
-
