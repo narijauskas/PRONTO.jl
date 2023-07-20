@@ -1,5 +1,5 @@
-using PRONTO, Test, SafeTestsets
+using PRONTO, Test
 
 begin
-    @safetestset "code generation: TwoSpin" begin include("test_codegen.jl") end
+    @testset "code generation: TwoSpin" begin include("test_codegen.jl") end
 end
