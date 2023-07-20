@@ -61,7 +61,7 @@ nx(Ko::Optimizer) = nx(Ko.θ)
 nu(Ko::Optimizer) = nu(Ko.θ)
 extrema(Ko::Optimizer) = extrema(Ko.P)
 eachindex(Ko::Optimizer) = OneTo(nu(Ko)*nx(Ko))
-show(io::IO, Ko::Optimizer) = println(io, preview(Ko))
+show(io::IO, Ko::Optimizer) = println(io, println(io, make_plot(t->vec(Ko(t)), t_plot(Ko))))
 
 
 function asymmetry(A)
@@ -187,7 +187,7 @@ nx(vo::Costate) = nx(vo.θ)
 nu(vo::Costate) = nu(vo.θ)
 extrema(vo::Costate) = extrema(vo.r)
 eachindex(vo::Costate) = OneTo(nu(vo)^2)
-show(io::IO, vo::Costate) = println(io, preview(vo))
+show(io::IO, vo::Costate) = println(io, make_plot(t->vec(vo(t)), t_plot(vo)))
 
 
 is2ndorder(Ko::Optimizer) = is2ndorder(Ko.N)

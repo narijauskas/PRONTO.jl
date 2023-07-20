@@ -1,39 +1,28 @@
 using PRONTO
-using PRONTO: SymModel
-using StaticArrays
 using LinearAlgebra
+using StaticArrays
+using Base: @kwdef
+
+
+## ----------------------------------- define the model ----------------------------------- ##
 
 @kwdef struct InvPend <: Model{2,1}
     L::Float64 = 2 # length of pendulum (m)
     g::Float64 = 9.81 # gravity (m/s^2)
 end
 
-@define_f InvPend begin
-[
+@define_f InvPend [
     x[2],
     g/L*sin(x[1])-u[1]*cos(x[1])/L,
 ]
-end
-
 @define_l InvPend 1/2*x'*I(2)*x + 1/2*u'*I(1)*u
-
-
-@define_m InvPend begin
-    P = [
-            1 0;
-            0 1;
-        ]
-    1/2*x'*P*x
-end
-
+@define_m InvPend 1/2*x'*I(2)*x
 @define_Q InvPend diagm([10, 1])
 @define_R InvPend diagm([1e-3])
-
 resolve_model(InvPend)
+PRONTO.preview(θ::InvPend, ξ) = ξ.x
 
-PRONTO.runtime_info(θ::InvPend, ξ; verbosity=1) = verbosity >= 1 && println(preview(ξ.x; color=PRONTO.manto_colors))
-
-##
+## ----------------------------------- solve the problem ----------------------------------- ##
 
 θ = InvPend() 
 τ = t0,tf = 0,10
@@ -45,4 +34,4 @@ u0 = @SVector [0.0]
 μ = t->u0
 η = closed_loop(θ,x0,α,μ,τ)
 
-ξ,data = pronto(θ,x0,η,τ; maxiters=100, tol=1e-4);
+ξ,data = pronto(θ,x0,η,τ; tol=1e-4);

@@ -1,7 +1,9 @@
 using PRONTO
-using PRONTO: SymModel
-using StaticArrays, LinearAlgebra
+using LinearAlgebra
+using StaticArrays
+using Base: @kwdef
 
+## ----------------------------------- define helper functions ----------------------------------- ##
 
 function mprod(x)
     Re = I(2)  
@@ -31,14 +33,13 @@ function x_eig(i)
 end
 
 
-## ------------------------------- beam splitter to eigenstate 2 ------------------------------- ##
+## ----------------------------------- define the model ----------------------------------- ##
 
 @kwdef struct Split2 <: PRONTO.Model{22,1}
     kl::Float64 # stage cost gain
     kr::Float64 # regulator r gain
     kq::Float64 # regulator q gain
 end
-
 
 @define_f Split2 begin
     α = 10 
@@ -71,21 +72,16 @@ end
 # must be run after any changes to model definition
 resolve_model(Split2)
 
-# overwrite default behavior of Pf
 PRONTO.Pf(θ::Split2,α,μ,tf) = SMatrix{22,22,Float64}(I(22)-α*α')
+PRONTO.γmax(θ::Split2, ζ, τ) = PRONTO.sphere(1, ζ, τ)
+PRONTO.preview(θ::Split2, ξ) = [I(11) I(11)]*(ξ.x.^2)
 
-# runtime plots
-PRONTO.runtime_info(θ::Split2, ξ; verbosity=1) = verbosity >= 1 && println(preview(ξ.u, 1))
-
-
-## ------------------------------- demo: eigenstate 1->2 in 10s ------------------------------- ##
-
-
-x0 = SVector{22}(x_eig(1))
-t0,tf = τ = (0,10)
-
+## ----------------------------------- solve the problem ----------------------------------- ##
+# eigenstate 1->2
 
 θ = Split2(kl=0.01, kr=1, kq=1)
+t0,tf = τ = (0,10)
+x0 = SVector{22}(x_eig(1))
 μ = t->SVector{1}(0.4*sin(t))
 η = open_loop(θ,x0,μ,τ)
-ξ,data = pronto(θ,x0,η,τ; tol = 1e-6, maxiters = 50, verbosity=2)
+ξ,data = pronto(θ,x0,η,τ; verbosity=2);

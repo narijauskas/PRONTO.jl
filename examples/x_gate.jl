@@ -1,8 +1,9 @@
 using PRONTO
-using PRONTO: SymModel
-using StaticArrays
 using LinearAlgebra
+using StaticArrays
 using Base: @kwdef
+
+## ----------------------------------- define helper functions ----------------------------------- ##
 
 function mprod(x)
     Re = I(2)
@@ -12,10 +13,9 @@ function mprod(x)
     return M
 end
 
-NX = 12
-NU = 1
+## ----------------------------------- define the model ----------------------------------- ##
 
-@kwdef struct XGate3 <: PRONTO.Model{NX,NU}
+@kwdef struct XGate3 <: PRONTO.Model{12,1}
     kl::Float64 = 0.01
     kr::Float64 = 1.0
     kq::Float64 = 1.0
@@ -49,17 +49,16 @@ end
     return 1/2*(x-xf)'*I(12)*(x-xf)
 end
 
-@define_Q XGate3 kq*I(NX)
-@define_R XGate3 kr*I(NU)
+@define_Q XGate3 kq*I(12)
+@define_R XGate3 kr*I(1)
 
 # must be run after any changes to model definition
 resolve_model(XGate3)
 
 # overwrite default behavior of Pf
 PRONTO.Pf(θ::XGate3,α,μ,tf) = SMatrix{12,12,Float64}(I(12))
-
-# runtime plots
-PRONTO.runtime_info(θ::XGate3, ξ; verbosity=1) = verbosity >= 1 && println(preview(ξ.u, 1))
+PRONTO.γmax(θ::XGate3, ζ, τ) = PRONTO.sphere(2, ζ, τ)
+PRONTO.preview(θ::XGate3, ξ) = ξ.u
 
 ## ----------------------------------- run optimization ----------------------------------- ##
 

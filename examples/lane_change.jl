@@ -1,8 +1,11 @@
-# using Test
 using PRONTO
-using LinearAlgebra, StaticArrays
+using LinearAlgebra
+using StaticArrays
+using Base: @kwdef
 
-# NX = 6; NU = 2
+
+## ----------------------------------- define the model ----------------------------------- ##
+
 @kwdef struct LaneChange <: Model{6,2}
     M::Float64 = 2041    # [kg]     Vehicle mass
     J::Float64 = 4964    # [kg m^2] Vehicle inertia (yaw)
@@ -38,19 +41,18 @@ end
 end
 
 @define_l LaneChange 1/2*(x-xeq)'*I*(x-xeq) + 1/2*u'*I*u
-# m should be solution to DARE at desired equilibrium
 @define_m LaneChange 1/2*(x-xeq)'*I*(x-xeq)
 @define_R LaneChange diagm(kr)
 @define_Q LaneChange diagm(kq)
 resolve_model(LaneChange)
-PRONTO.runtime_info(θ::LaneChange, ξ; verbosity=1) = verbosity >= 1 && println(preview(ξ.x, 1; color=PRONTO.manto_colors[1]))
+PRONTO.preview(θ::LaneChange, ξ) = ξ.x
 
+## ----------------------------------- solve the problem ----------------------------------- ##
 
-## -------------------------------  ------------------------------- ##
 θ = LaneChange(xeq = [1,0,0,0,0,0], kq=[0.1,0,1,0,0,0])
-x0 = SVector{6}(-5.0,zeros(5)...)
-xf = @SVector zeros(6)
 t0,tf = τ = (0,4)
+x0 = SVector{6}(-5.0, zeros(5)...)
+xf = @SVector zeros(6)
 μ = t->zeros(2)
 η = open_loop(θ,x0,μ,τ)
-ξ,data = pronto(θ,x0,η,τ; tol = 1e-6, maxiters = 50);
+ξ,data = pronto(θ,x0,η,τ)

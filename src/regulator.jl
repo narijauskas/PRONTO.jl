@@ -21,7 +21,7 @@ nx(Kr::Regulator) = nx(Kr.θ)
 nu(Kr::Regulator) = nu(Kr.θ)
 extrema(Kr::Regulator) = extrema(Kr.Pr)
 eachindex(Kr::Regulator) = OneTo(nu(Kr)*nx(Kr))
-show(io::IO, Kr::Regulator) = println(io, preview(Kr))
+show(io::IO, Kr::Regulator) = println(io, make_plot(t->vec(Kr(t)), t_plot(Kr)))
 
 
 regulator(θ, α, μ, τ; kw...) = regulator(θ, Trajectory(θ, α, μ), τ; kw...)

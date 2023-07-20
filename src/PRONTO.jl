@@ -12,7 +12,7 @@ using Printf
 using Interpolations # data storage/resampling
 
 import LinearAlgebra # collision with lu!
-import LinearAlgebra: mul!, I
+import LinearAlgebra: mul!, I, norm
 using MatrixEquations # provides arec
 
 using OrdinaryDiffEq
@@ -26,7 +26,7 @@ export Num # this reexport is needed for codegen macro scoping
 using ThreadTools # tmap for code generation
 using UnicodePlots # data representation
 
-using Dates: now
+using Dates: now #why?
 
 using MacroTools
 import MacroTools: @capture
@@ -104,7 +104,7 @@ iinfo(str; verbosity=2) = verbosity >= 2 && println("    > ", str) # secondary-l
 iiinfo(str; verbosity=3) = verbosity >= 3 && println("        > ", str) # tertiary-level
 
 
-# ----------------------------------- #. model functions ----------------------------------- #
+# ----------------------------------- # model functions ----------------------------------- #
 
 #MAYBE: just throw a method error?
 struct ModelDefError <: Exception
@@ -117,12 +117,12 @@ function Base.showerror(io::IO, e::ModelDefError)
 end
 
 
-# TODO: γlimit
-# must result in γ∈[β^maxiters,1]
-
-runtime_info(θ::Model, ξ; verbosity) = nothing
-
-
+# user can override this for some quantum-specific problems
+γmax(θ::Model, ζ, τ) = 1.0
+#TODO: sphere()
+sphere(r, ζ, τ) = sqrt(r)/maximum(norm(ζ.x(t)) for t in LinRange(τ..., 10000))
+# user can override this to change the preview displayed on each iteration
+preview(θ::Model, ξ) = ξ.x
 
 # by default, this is the solution to the algebraic riccati equation at tf
 # user can override this behavior for a model type by defining PRONTO.Pf(θ::MyModel,αf,μf,tf)
@@ -144,7 +144,7 @@ include("codegen.jl") # takes derivatives, generates model functions
 include("odes.jl") # wrappers for ODE solution handling
 include("regulator.jl") # regulator for projection operator
 include("projection.jl") # projected (closed loop) and guess (open loop) trajectories
-include("optimizer.jl") # lagrangian, 1st/2nd order optimizer, search direction
+include("search_direction.jl") # lagrangian, 1st/2nd order optimizer, search direction
 include("cost.jl") # cost and cost derivatives
 include("armijo.jl") # armijo step and projection
 
@@ -215,7 +215,6 @@ bkwd(τ) = reverse(fwd(τ))
 
 # solves for x(t),u(t)'
 function pronto(θ::Model, x0::StaticVector, ξ::Trajectory, τ; 
-                limitγ=false, 
                 tol = 1e-6, 
                 maxiters = 100,
                 armijo_maxiters = 25,
@@ -223,6 +222,7 @@ function pronto(θ::Model, x0::StaticVector, ξ::Trajectory, τ;
                 show_preview = true,
                 )
     t0,tf = τ
+    solve_start = time_ns()
     info(0, "starting PRONTO")
     data = Data()
 
@@ -266,33 +266,21 @@ function pronto(θ::Model, x0::StaticVector, ξ::Trajectory, τ;
         φ,γ = armijo(θ, x0, ξ, ζ, Kr, h, Dh, τ; verbosity, armijo_maxiters)
         push!(data.γ, γ)
         push!(data.φ, φ) 
-        -Dh < tol && (info(i, as_bold("PRONTO converged")); (return φ,data))
-        ξ = φ # ξ_k+1 = φ_k
 
         # -------------- runtime info -------------- #
         loop_time = (time_ns() - loop_start)/1e6
         infostr = @sprintf("Dh = %.3e, h = %.3e, γ = %.3e, ", Dh, h, γ)
         infostr *= ", order = $(is2ndorder(Ko) ? "2nd" : "1st"), "
-        infostr *= @sprintf("solved in %.4f ms", loop_time)
+        infostr *= @sprintf("solved in %.3f ms", loop_time)
         info(i, infostr; verbosity)
         show_preview && plot_preview(θ, ξ)
+        solve_time = (time_ns() - solve_start)/1e9
+        -Dh < tol && (info(i, @sprintf("PRONTO converged in %.2f seconds", solve_time)); (return φ,data))
+        ξ = φ # ξ_k+1 = φ_k
         
     end
     info(maxiters, "maxiters reached - quitting")
     return ξ,data
 end
-
-# γ = γmax; 
-# α=0.4; β=0.7
-# γmin = β^armijo_maxiters
-# γ = limitγ ? min(1, 1/maximum(maximum(ζ.x(t) for t in t0:0.0001:tf))) : 1.0
-
-# local η # defined to exist outside of while loop
-# while γ > γmin
-#     iiinfo("armijo γ = $(round(γ; digits=6))"; verbosity)
-#     φ = armijo_projection(θ,x0,ξ,ζ,γ,Kr,τ)
-#     g = cost(φ, τ)
-#     h-g >= -α*γ*Dh ? break : (γ *= β)
-# end
 
 end # module

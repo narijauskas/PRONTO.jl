@@ -93,17 +93,15 @@ function set_plot_scale(height, width)
 end
 
 
-# add methods for model-specific preview functions
-preview(θ::Model, ξ) = ξ.x
-
 plot_preview(θ, ξ) = println(make_plot(t->preview(θ, ξ(t)), t_plot(ξ)))
 
+# make_plot(t->vec(Kr(t)), t_plot(ξ))
 function make_plot(f, ts)
     lineplot(ts, reduce(hcat, collect.(f(t) for t∈ts))';
                 height = PLOT_HEIGHT,
                 width = PLOT_WIDTH,
                 labels = false,
-                color = manto_colors)
+                color = repeat(manto_colors,3))
 end
 
 # before julia 1.9:
