@@ -1,7 +1,7 @@
 name = "PRONTO"
 uuid = "97df7862-8962-462b-83f4-d1fea1a8c26c"
 authors = ["Mantas Naris <mantas@case.edu>", "Jay Shao"]
-version = "1.0.0-dev"
+version = "1.0.0"
 
 [deps]
 Crayons = "a8cc5b0e-0ffa-5ad4-8c14-923d3ee1735f"
