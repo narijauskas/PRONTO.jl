@@ -212,7 +212,6 @@ end
 fwd(τ) = extrema(τ)
 bkwd(τ) = reverse(fwd(τ))
 
-# preview(θ::Model, ξ) = nothing
 
 # solves for x(t),u(t)'
 function pronto(θ::Model, x0::StaticVector, ξ::Trajectory, τ; 
@@ -221,17 +220,16 @@ function pronto(θ::Model, x0::StaticVector, ξ::Trajectory, τ;
                 maxiters = 100,
                 armijo_maxiters = 25,
                 verbosity = 1,
+                show_preview = true,
                 )
     t0,tf = τ
     info(0, "starting PRONTO")
     data = Data()
-    # Kr = regulator(θ, η, τ; verbosity)
-    # ξ = projection(θ, x0, η, Kr, τ; verbosity)
 
     for i in 1:maxiters
         loop_start = time_ns()
-        # info(i, "iteration")
         push!(data.ξ, ξ)
+
         # -------------- build regulator -------------- #
         # α,μ -> Kr,x,u
         Kr = regulator(θ, ξ, τ; verbosity)
@@ -277,7 +275,8 @@ function pronto(θ::Model, x0::StaticVector, ξ::Trajectory, τ;
         infostr *= ", order = $(is2ndorder(Ko) ? "2nd" : "1st"), "
         infostr *= @sprintf("solved in %.4f ms", loop_time)
         info(i, infostr; verbosity)
-        runtime_info(θ, ξ; verbosity)
+        show_preview && plot_preview(θ, ξ)
+        
     end
     info(maxiters, "maxiters reached - quitting")
     return ξ,data

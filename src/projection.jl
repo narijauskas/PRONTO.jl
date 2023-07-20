@@ -6,15 +6,15 @@ struct Trajectory{M,X,U}
     u::U
 end
 
-(ξ::Trajectory)(t) = ξ.x(t),ξ.u(t)
+(ξ::Trajectory)(t) = (x=ξ.x(t),u=ξ.u(t))
 # Base.show(io::IO, ξ::Trajectory) = print(io, "Trajectory")
 nx(ξ::Trajectory) = nx(ξ.θ)
 nu(ξ::Trajectory) = nu(ξ.θ)
 extrema(ξ::Trajectory) = extrema(ξ.x)
 
 function show(io::IO, ξ::Trajectory)
-    println(io, preview(ξ.x))
-    println(io, preview(ξ.u))
+    show(io, ξ.x)
+    show(io, ξ.u)
 end
 
 function projection(θ::Model, x0, η, τ; kw...)

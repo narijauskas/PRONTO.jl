@@ -2,7 +2,6 @@
 
 # ----------------------------------- interpolation functor ----------------------------------- #
 
-# used to 
 struct Interpolant{T}
     itp::T
 end
@@ -10,7 +9,7 @@ end
 export Interpolant
 
 show(io::IO, ::Type{Interpolant{T}}) where {T} = print(io, "Interpolant{$(eltype(T)),...}")
-show(io::IO, u::Interpolant) = print(io, preview(u))
+show(io::IO, u::Interpolant) = println(io, make_plot(u, t_plot(u)))
 # Base.length(::Interpolant{T}) where {T} = length(eltype(T))
 eltype(::Interpolant{T}) where {T} = eltype(T)
 extrema(u::Interpolant) = extrema(first(u.itp.ranges))
@@ -45,7 +44,7 @@ function ODE(fn::Function, ic, ts, p, ::Size{S}; alg=Tsit5(), kw...) where {S}
             return SArray{Tuple{S...}, Float64, length(S), prod(S)}(out)
     end
 
-    ODE{T}(wrap,soln)
+    ODE{T}(wrap,soln!)
 end
 
 
@@ -56,25 +55,15 @@ Base.size(::ODE{T}) where {T} = size(T)
 Base.length(::ODE{T}) where {T} = length(T)
 
 eltype(::Type{ODE{T}}) where {T} = T
-extrema(ode::ODE) = extrema(ode.soln.t)
+extrema(x::ODE) = extrema(x.soln.t)
 eachindex(::ODE{T}) where {T} = OneTo(length(T))
-show(io::IO, ode::ODE) = println(io, preview(ode))
+show(io::IO, x::ODE) = println(io, make_plot(x, t_plot(x)))
 
 # domain(ode) = extrema(ode.t)
 # stats(ode)
 # retcode(ode)
 # algorithm(ode)
 
-
-# preview(ode; kw...) = preview(ode, domain(ode)...; kw...)
-# preview(fn, t0, tf; kw...) = preview(fn, LinRange(t0, tf, 240); kw...)
-
-# function preview(ode, T; height = 30, width = 120, labels = false, kw...)
-#     x = [ode(t)[i] for t in T, i in 1:length(ode)]
-#     lineplot(T, x; height, width, labels, kw...)
-# end
-
-export domain, preview
 
 # this is type piracy... but it prevents some obscenely long error messages
 function show(io::IO, fn::FunctionWrapper{T,A}) where {T,A}
@@ -84,8 +73,7 @@ end
 
 
 
-# ----------------------------------- ODE display ----------------------------------- #
-# I find it much more intuitive to show a trace of an ODE solution
+# ----------------------------------- curve display ----------------------------------- #
 
 PLOT_HEIGHT::Int = 10
 PLOT_WIDTH::Int = 120
@@ -105,16 +93,24 @@ function set_plot_scale(height, width)
 end
 
 
-preview(x; kw...) = preview(x, eachindex(x), t_plot(x); kw...)
-preview(x, is; kw...) = preview(x, is, t_plot(x); kw...)
+# add methods for model-specific preview functions
+preview(θ::Model, ξ) = ξ.x
 
-function preview(x, is, ts; kw...)
-    lineplot(ts, [x(t)[i] for t∈ts, i∈is];
+plot_preview(θ, ξ) = println(make_plot(t->preview(θ, ξ(t)), t_plot(ξ)))
+
+function make_plot(f, ts)
+    lineplot(ts, reduce(hcat, collect.(f(t) for t∈ts))';
                 height = PLOT_HEIGHT,
                 width = PLOT_WIDTH,
                 labels = false,
-                kw...)
+                color = manto_colors)
 end
+
+# before julia 1.9:
+# reduce(hcat, collect.(ξ.x(t) for t∈ts))'
+# after julia 1.9:
+# stack(ξ.x(t) for t∈ts)'
+
 
 
 manto_colors = [
