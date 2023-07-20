@@ -13,8 +13,7 @@ function dλ_dt(λ, (θ,ξ,Kr), t)
 end
 
 # for convenience:
-function lagrangian(θ,ξ,Kr,τ; verbosity)
-    iinfo("lagrangian"; verbosity)
+function lagrangian(θ,ξ,Kr,τ)
     t0,tf = τ
     αf = ξ.x(tf)
     μf = ξ.u(tf)
@@ -77,8 +76,7 @@ struct InstabilityException <: Exception
 end
 
 
-function optimizer(θ,λ,ξ,τ; verbosity)
-    iinfo("optimizer"; verbosity)
+function optimizer(θ,λ,ξ,τ)
     t0,tf = τ
     αf = ξ.x(tf)
     μf = ξ.u(tf)
@@ -98,7 +96,6 @@ function optimizer(θ,λ,ξ,τ; verbosity)
     end
 
     Ko = Optimizer(N,θ,λ,ξ,P)
-    iinfo("using $(is2ndorder(Ko) ? "2nd" : "1st") order search"; verbosity)
     return Ko
 end
 
@@ -170,8 +167,7 @@ function dr_dt(r, (θ,λ,ξ,Ko), t)
     -(A - B*Ko)'r - a + Ko'b
 end
 
-function costate(θ,λ,ξ,Ko,τ; verbosity)
-    iinfo("costate"; verbosity)
+function costate(θ,λ,ξ,Ko,τ)
     t0,tf = τ
     αf = ξ.x(tf)
     μf = ξ.u(tf)
@@ -200,8 +196,7 @@ is2ndorder(::Any) = false
 # ----------------------------------- search direction ----------------------------------- #
 
 
-function search_direction(θ::Model{NX,NU},ξ,Ko,vo,τ; verbosity=1, dt=0.001) where {NX,NU}
-    iinfo("search_direction"; verbosity)
+function search_direction(θ::Model{NX,NU},ξ,Ko,vo,τ; dt=0.001) where {NX,NU}
     t0,tf = τ
     ts = t0:dt:tf
     vbuf = Vector{SVector{NU,Float64}}()

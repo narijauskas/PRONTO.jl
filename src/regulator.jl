@@ -26,8 +26,7 @@ show(io::IO, Kr::Regulator) = println(io, make_plot(t->vec(Kr(t)), t_plot(Kr)))
 
 regulator(θ, α, μ, τ; kw...) = regulator(θ, Trajectory(θ, α, μ), τ; kw...)
 # design the regulator, solving dPr_dt
-function regulator(θ::Model{NX,NU}, φ, τ; verbosity=0) where {NX,NU}
-    iinfo("regulator"; verbosity)
+function regulator(θ::Model{NX,NU}, φ, τ) where {NX,NU}
     t0,tf = τ
     αf = φ.x(tf)
     μf = φ.u(tf)

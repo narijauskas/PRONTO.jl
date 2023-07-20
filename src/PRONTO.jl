@@ -26,7 +26,6 @@ export Num # this reexport is needed for codegen macro scoping
 using ThreadTools # tmap for code generation
 using UnicodePlots # data representation
 
-using Dates: now #why?
 
 using MacroTools
 import MacroTools: @capture
@@ -47,11 +46,6 @@ export SymModel
 export Model
 export nx,nu,nθ
 
-
-
-#TODO: reconsider export
-export ODE, Buffer
-export preview
 
 
 # ----------------------------------- model type ----------------------------------- #
@@ -98,10 +92,10 @@ as_bold(ex) = as_bold(string(ex))
 as_bold(str::String) = "$(crayon"bold")" * str * "$(crayon"!bold")"
 clearln() = print("\e[2K","\e[1G")
 
-info(str; verbosity=1) = verbosity >= 1 && println(as_tag(crayon"magenta","PRONTO"), str)
-info(i, str; verbosity=1) = verbosity >= 1 && println(as_tag(crayon"magenta","PRONTO[$i]"), str)
-iinfo(str; verbosity=2) = verbosity >= 2 && println("    > ", str) # secondary-level
-iiinfo(str; verbosity=3) = verbosity >= 3 && println("        > ", str) # tertiary-level
+info(str) = println(as_tag(crayon"magenta","PRONTO"), str)
+info(i, str) = println(as_tag(crayon"magenta","PRONTO[$i]"), str)
+iinfo(str) = println("    > ", str) # secondary-level
+iiinfo(str) = println("        > ", str) # tertiary-level
 
 
 # ----------------------------------- # model functions ----------------------------------- #
@@ -217,13 +211,13 @@ bkwd(τ) = reverse(fwd(τ))
 function pronto(θ::Model, x0::StaticVector, ξ::Trajectory, τ; 
                 tol = 1e-6, 
                 maxiters = 100,
-                armijo_maxiters = 25,
-                verbosity = 1,
+                show_info = true,
                 show_preview = true,
-                )
-    t0,tf = τ
+                show_steps = false,
+                armijo_kw...)
+                
     solve_start = time_ns()
-    info(0, "starting PRONTO")
+    show_steps && info(0, "starting PRONTO")
     data = Data()
 
     for i in 1:maxiters
@@ -232,38 +226,49 @@ function pronto(θ::Model, x0::StaticVector, ξ::Trajectory, τ;
 
         # -------------- build regulator -------------- #
         # α,μ -> Kr,x,u
-        Kr = regulator(θ, ξ, τ; verbosity)
+        show_steps && iinfo("regulator")
+        Kr = regulator(θ, ξ, τ)
         push!(data.Kr, Kr)
         # ξ = projection(θ, x0, φ, Kr, τ; verbosity)
 
         # -------------- search direction -------------- #
         # Kr,x,u -> z,v
-        λ = lagrangian(θ, ξ, Kr, τ; verbosity)
+        show_steps && iinfo("lagrangian")
+        λ = lagrangian(θ, ξ, Kr, τ)
         push!(data.λ, λ)
         
-        Ko = optimizer(θ, λ, ξ, τ; verbosity)
+        show_steps && iinfo("optimizer")
+        Ko = optimizer(θ, λ, ξ, τ)
         push!(data.Ko, Ko)
+        show_steps && iinfo("using $(is2ndorder(Ko) ? "2nd" : "1st") order search")
 
-        vo = costate(θ, λ, ξ, Ko, τ; verbosity)
+        show_steps && iinfo("costate")
+        vo = costate(θ, λ, ξ, Ko, τ)
         push!(data.vo, vo)
 
-        # λ,Ko,vo = optimizer(θ,ξ,Kr,τ; verbosity)
-        ζ = search_direction(θ,ξ,Ko,vo,τ; verbosity)
+        show_steps && iinfo("search direction")
+        ζ = search_direction(θ,ξ,Ko,vo,τ)
         push!(data.ζ, ζ)
 
         
         # -------------- cost/derivatives -------------- #
+        show_steps && iinfo("cost derivatives")
+
         h = cost(ξ, τ)
         push!(data.h, h)
 
-        Dh,D2g = cost_derivs(θ, λ, ξ, ζ, τ; verbosity)
+        Dh,D2g = cost_derivs(θ, λ, ξ, ζ, τ)
         push!(data.Dh, Dh)
         push!(data.D2g, D2g)
 
-        Dh > 0 && (info(i, "increased cost - quitting"); (return ξ,data))
+        if Dh > 0
+            show_info && info(i, "increased cost - quitting")
+            return ξ,data
+        end
 
         # -------------- select γ via armijo step -------------- #
-        φ,γ = armijo(θ, x0, ξ, ζ, Kr, h, Dh, τ; verbosity, armijo_maxiters)
+        show_steps && iinfo("armijo step")
+        φ,γ = armijo(θ, x0, ξ, ζ, Kr, h, Dh, τ; armijo_kw...)
         push!(data.γ, γ)
         push!(data.φ, φ) 
 
@@ -272,14 +277,20 @@ function pronto(θ::Model, x0::StaticVector, ξ::Trajectory, τ;
         infostr = @sprintf("Dh = %.3e, h = %.3e, γ = %.3e, ", Dh, h, γ)
         infostr *= ", order = $(is2ndorder(Ko) ? "2nd" : "1st"), "
         infostr *= @sprintf("solved in %.3f ms", loop_time)
-        info(i, infostr; verbosity)
+        show_info && info(i, infostr)
         show_preview && plot_preview(θ, ξ)
-        solve_time = (time_ns() - solve_start)/1e9
-        -Dh < tol && (info(i, @sprintf("PRONTO converged in %.2f seconds", solve_time)); (return φ,data))
+
+        # -------------- check convergence -------------- #
+        if -Dh < tol
+            solve_time = (time_ns() - solve_start)/1e9
+            show_info && info(i, @sprintf("PRONTO converged in %.2f seconds", solve_time))
+            return φ,data
+        end
+
+        # -------------- update trajectory -------------- #
         ξ = φ # ξ_k+1 = φ_k
-        
     end
-    info(maxiters, "maxiters reached - quitting")
+    show_info && info(maxiters, "maxiters reached - quitting")
     return ξ,data
 end
 

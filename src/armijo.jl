@@ -2,15 +2,17 @@
 
 # ----------------------------------- armijo step line search ----------------------------------- #
 
-function armijo(θ, x0, ξ, ζ, Kr, h, Dh, τ; verbosity, armijo_maxiters)
-    # h = cost(ξ, τ)
-    α=0.4; β=0.7
+function armijo(θ, x0, ξ, ζ, Kr, h, Dh, τ;
+                armijo_maxiters = 25,
+                show_armijo = false,
+                α = 0.4,
+                β = 0.7)
+                
     γmin = β^armijo_maxiters
     γ = min(γmax(θ,ζ,τ), 1.0)
-    # γ = 1.0
     φ = ξ
     while γ > γmin
-        iiinfo("armijo γ = $(round(γ; digits=6))"; verbosity)
+        show_armijo && iiinfo("γ = $(round(γ; digits=6))")
         φ = armijo_projection(θ,x0,ξ,ζ,γ,Kr,τ)
         g = cost(φ, τ)
         h-g >= -α*γ*Dh ? break : (γ *= β)
