@@ -1,4 +1,5 @@
 using PRONTO
+using PRONTO: SymModel
 using StaticArrays
 using LinearAlgebra
 using Base: @kwdef
@@ -20,7 +21,7 @@ NU = 1
     kq::Float64 = 1.0
 end
 
-@dynamics XGate3 begin
+@define_f XGate3 begin
     E0 = 0.0
     E1 = 1.0
     E2 = 5.0
@@ -37,19 +38,19 @@ end
     return 2 * π * mprod(-im * (H00 + H11)) * x
 end
 
-@stage_cost XGate3 begin
-    θ.kl/2*u'*I*u + 0.3*x'*mprod(diagm([0,0,1,0,0,1]))*x
+@define_l XGate3 begin
+    kl/2*u'*I*u + 0.3*x'*mprod(diagm([0,0,1,0,0,1]))*x
 end
 
-@terminal_cost XGate3 begin
+@define_m XGate3 begin
     ψ1 = [1;0;0]
     ψ2 = [0;1;0]
     xf = vec([ψ2;ψ1;0*ψ2;0*ψ1])
     return 1/2*(x-xf)'*I(12)*(x-xf)
 end
 
-@regulatorQ XGate3 θ.kq*I(NX)
-@regulatorR XGate3 θ.kr*I(NU)
+@define_Q XGate3 kq*I(NX)
+@define_R XGate3 kr*I(NU)
 
 # must be run after any changes to model definition
 resolve_model(XGate3)
@@ -69,22 +70,6 @@ PRONTO.runtime_info(θ::XGate3, ξ; verbosity=1) = verbosity >= 1 && println(pre
 ψ2 = [0;1;0]
 x0 = SVector{12}(vec([ψ1;ψ2;0*ψ1;0*ψ2]))
 μ = t->SVector{1}((π/tf)*exp(-(t-tf/2)^2/(tf^2))*cos(2*π*1*t))
-φ = open_loop(θ, x0, μ, τ) # guess trajectory
-@time ξ = pronto(θ, x0, φ, τ;verbose=1) # optimal trajectory
+η = open_loop(θ, x0, μ, τ) # guess trajectory
+ξ,data = pronto(θ, x0, η, τ); # optimal trajectory
 
-# μ = ξ.u
-# φ = open_loop(θ, x0, μ, τ)
-# ξ = pronto(θ, x0, φ, τ;verbose=1, tol=1e-4)
-
-##
-import Pkg: activate
-activate()
-using MAT
-activate(".")
-
-ts = t0:0.01:tf
-is = eachindex(ξ.u)
-us = [ξ.u(t)[i] for t∈ts, i∈is]
-file = matopen("Uopt_xgate_10_1.0.mat","w")
-write(file,"Uopt",us)
-close(file)
