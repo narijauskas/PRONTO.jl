@@ -82,7 +82,7 @@ function optimizer(θ,λ,ξ,τ; verbosity)
     αf = ξ.x(tf)
     μf = ξ.u(tf)
     
-    Pf = pxx(θ,αf,μf,tf)
+    Pf = mxx(θ,αf,μf,tf)
 
     #FIX: this implementation is not the most robust
     P,N = try

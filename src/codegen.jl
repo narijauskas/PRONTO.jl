@@ -165,11 +165,7 @@ end
 
 
 
-# # facilitate symbolic differentiation of model
-# struct SymbolicModel{T}
-#     vars
-# end
-export SymModel
+# object to facilitate symbolic differentiation of model
 struct SymModel{T} end
 
 # symmodel.kq -> variables fitting 
@@ -206,17 +202,14 @@ function traceuser(T::Type{<:Model{NX,NU}}, fn) where {NX,NU}
     t = symbolic(:t)
     return collect(fn(x, u, t, all(symbolic(T))...))
 end
-# θ = symbolic(T)
+
 function trace(T::Type{<:Model{NX,NU}}, f) where {NX,NU}
     x = symbolic(:x, NX)
     u = symbolic(:u, NU)
     t = symbolic(:t)
     θ = symbolic(T)
+    # NOTE: invokelatest might not be necessary
     return collect(invokelatest(f, θ, x, u, t))
-    # return collect(f(θ, x, u, t))
-
-    # return Symbolics.scalarize(invokelatest(f, x, u, t, θ))
-    # return collect(invokelatest(f, x, u, t, θ))
 end
 
 function jacobians(T::Type{<:Model{NX,NU}}) where {NX,NU}
@@ -239,10 +232,6 @@ function (J::Jacobian)(f_sym)
     return cat(fv_sym...; dims=ndims(f_sym)+1) #ndims = 0 for scalar-valued l,p
 end
 # isnothing(force_dims) || (fx_sym = reshape(fx_sym, force_dims...))
-
-
-
-
 
 
 function define_methods(T, sz::Size{S}, sym, name, args...) where S
