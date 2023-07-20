@@ -10,7 +10,7 @@ where $h$ is $\mathcal{C}^2$ convex function, and $ξ(t) = (x(t),u(t))$ is a tra
 
 $$\mathcal{T} = \{ ξ ∈(\mathcal{X}\times\mathcal{U})\ |\ \dot{x} = f(x,u),\ x(0)=x_0 \}$$
 
-To explore beyond this trajectory manifold, we consider an arbitrary curve $η ∈(\mathcal{X}\times\mathcal{U})$ where $η(t) = (α(t),μ(t))$. The projection operator $ \mathcal{P}:(\mathcal{X}\times\mathcal{U})\rightarrow \mathcal{T}$, which maps curves onto the trajectory manifold of the system, is used to convert the above constrained optimization problem to the unconstrained problem:
+To explore beyond this trajectory manifold, we consider an arbitrary curve $η ∈(\mathcal{X}\times\mathcal{U})$ where $η(t) = (α(t),μ(t))$. The projection operator $\mathcal{P}:(\mathcal{X}\times\mathcal{U})\rightarrow \mathcal{T}$, which maps curves onto the trajectory manifold of the system, is used to convert the above constrained optimization problem to the unconstrained problem:
 
 $$g(η) = h(\mathcal{P}(η))$$
 

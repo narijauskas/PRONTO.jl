@@ -216,7 +216,7 @@ vo = PRONTO.costate(θ,λ,ξ,φ,Ko,τ)
 ## ------------------------------- other ------------------------------- ##
 
 
-# shorter error messages:
+# shorter error messages (this is generally bad practice):
 using SciMLBase, DifferentialEquations
 Base.show(io::IO, ::Type{<:SciMLBase.ODEProblem}) = print(io, "ODEProblem{...}")
 Base.show(io::IO, ::Type{<:OrdinaryDiffEq.ODEIntegrator}) = print(io, "ODEIntegrator{...}")
