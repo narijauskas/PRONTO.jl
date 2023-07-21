@@ -41,9 +41,9 @@ function projection(θ::Model{NX,NU}, x0, α, μ, Kr, (t0,tf); dt=0.001) where {
         push!(ubuf, SVector{NU,Float64}(u))
     end  
 
-    x = ODE(dxdt, x0, (t0,tf), (θ,α,μ,Kr); callback = cb, saveat = ts)
-    # x = Interpolant(scale(interpolate(xbuf, BSpline(Linear())), ts))
-    u = Interpolant(scale(interpolate(ubuf, BSpline(Linear())), ts))
+    ODE(dxdt, x0, (t0,tf), (θ,α,μ,Kr); callback = cb, saveat = ts)
+    x = Interpolant(scale(interpolate(xbuf, BSpline(Cubic())), ts))
+    u = Interpolant(scale(interpolate(ubuf, BSpline(Cubic())), ts))
 
     return Trajectory(θ,x,u)
 end
