@@ -33,20 +33,51 @@ end
 
 PRONTO.Pf(θ::TwoSpin, αf, μf, tf) = SMatrix{4,4,Float64}(I(4))
 
-# must be run after any changes to model definition
-resolve_model(TwoSpin)
+
+## plots
+import Pkg
+Pkg.activate()
+using GLMakie, Statistics
+Pkg.activate(".")
+
+function plot_spin(ξ,τ)
+    fig = Figure()
+    ts = LinRange(τ...,10001)
+
+    ax = Axis(fig[1:2,1]; title="state")
+    is = eachindex(ξ.x)
+    xs = [ξ.x(t)[i] for t∈ts, i∈is]
+    foreach(i->lines!(ax, ts, xs[:,i]), is)
+    
+    # ax = Axis(fig[1:2,2]; title="population")
+    # ps = ([I(11) I(11)] * (xs.^2)')'
+    # foreach(i->lines!(ax, ts, ps[:,i]), 1:11)
 
 
-PRONTO.runtime_info(θ::TwoSpin, ξ; verbosity=1) = verbosity >= 1 && println(preview(ξ.u, 1))
+    ax = Axis(fig[1:2,2]; title="inputs")
+    is = eachindex(ξ.u)
+    us = [ξ.u(t)[i] for t∈ts, i∈is]
+    foreach(i->lines!(ax, ts, us[:,i]), is)
 
-## --------------------- run optimization --------------------- ##
+    return fig
+end
+##
 
-θ = TwoSpin() # instantiate a new model
-τ = t0,tf = 0,10 # define time domain
-x0 = @SVector [0.0, 1.0, 0.0, 0.0] # initial state
-xf = @SVector [1.0, 0.0, 0.0, 0.0] # final state
-μ = t->[0.1] # open loop input μ(t)
-η = open_loop(θ, xf, μ, τ); # guess trajectory
-η0 = open_loop(θ, x0, μ, τ); # guess trajectory
-ξ,data = pronto(θ, x0, η0, τ); # optimal trajectory
-@time ξ,data = pronto(θ, x0, η0, τ); # optimal trajectory
+
+# ----------------------------------- tests ----------------------------------- ##
+
+
+x0 = @SVector [0.0, 1.0, 0.0, 0.0]
+xf = @SVector [1.0, 0.0, 0.0, 0.0]
+u0 = [0.0]
+
+smooth(t, x0, xf, tf) = @. (xf - x0)*(tanh((2π/tf)*t - π) + 1)/2 + x0
+μ = @closure t->u0*sin(t)
+α = @closure t->smooth(t, x0, xf, tf)
+φ = PRONTO.Trajectory(θ,α,μ);
+
+# μ = @closure t->SizedVector{1}(u0)
+# φ = open_loop(θ,xf,μ,τ) # guess trajectory
+ξ = pronto(θ,x0,φ,τ) # optimal trajectory
+
+plot_spin(ξ,τ)
