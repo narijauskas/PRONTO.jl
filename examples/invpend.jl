@@ -79,7 +79,36 @@ u0 = @SVector [0.0]
 μ = t->u0
 η = closed_loop(θ,x0,α,μ,τ)
 
-ξ,data = pronto(θ,x0,η,τ; maxiters=28);
+ξ,data = pronto(θ,x0,η,τ; maxiters=29);
+
+##
+
+fig = Figure()
+ts = 0:0.01:tf
+ax = Axis(fig[1,1]; xlabel="time [s]", ylabel="angle [rad]",title = "optimal trajectory")
+x1 = [ξ.x(t)[1] for t∈ts]
+lines!(ax, ts, x1)
+
+ax = Axis(fig[2,1];xlabel="time [s]", ylabel="angular velocity [rad/s]")
+x2 = [ξ.x(t)[2] for t∈ts]
+lines!(ax, ts, x2)
+
+ax = Axis(fig[3,1]; xlabel="time [s]", ylabel="input [Nm]")
+u = [ξ.u(t)[1] for t∈ts]
+lines!(ax, ts, u)
+display(fig)
+
+save("optimal_traj.png",fig, px_per_unit=2)
+
+##
+fig = Figure()
+ts = 1:29
+ax = Axis(fig[1,1]; xlabel="iterations", ylabel="-Dg",title = "descent", yscale=log10)
+x1 = -data.Dh
+lines!(ax, ts, x1)
+
+display(fig)
+save("descent.png",fig, px_per_unit=2)
 
 ##
 using GLMakie
@@ -88,19 +117,22 @@ fig = Figure()
 ax = Axis(fig[1,1])
 T = LinRange(τ...,10000)
 x1 = @lift [data.ξ[$n].x(t)[1] for t in T]
-x2 = @lift [data.ξ[$n].x(t)[2] for t in T]
 lines!(ax, T, x1)
+ylims!(ax,-7,7)
+
+x2 = @lift [data.ξ[$n].x(t)[2] for t in T]
+ax = Axis(fig[2,1])
 lines!(ax, T, x2)
 ylims!(ax,-7,7)
 
 u1 = @lift [data.ξ[$n].u(t)[1] for t in T]
-ax = Axis(fig[2,1])
+ax = Axis(fig[3,1])
 lines!(ax, T, u1)
 ylims!(ax,-7,7)
 display(fig)
 ##
 
-record(x->n[]=x, fig, "test_mars.mp4", 1:length(data.ξ))
+record(x->n[]=x, fig, "test.mp4", 1:length(data.ξ))
 
 planets = [
     "Sun"=>274.1,
