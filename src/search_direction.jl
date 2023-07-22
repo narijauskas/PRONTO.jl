@@ -13,7 +13,7 @@ function dλ_dt(λ, (θ,ξ,Kr), t)
 end
 
 # for convenience:
-function lagrangian(θ,ξ,Kr,τ)
+function lagrange(θ,ξ,Kr,τ)
     t0,tf = τ
     αf = ξ.x(tf)
     μf = ξ.u(tf)
@@ -31,7 +31,7 @@ struct FirstOrder <: SearchOrder end
 struct SecondOrder <: SearchOrder end
 
 
-struct Optimizer{Tθ,Tλ,Tξ,TP}
+struct OptFBGain{Tθ,Tλ,Tξ,TP}
     N::SearchOrder
     θ::Tθ
     λ::Tλ
@@ -39,10 +39,10 @@ struct Optimizer{Tθ,Tλ,Tξ,TP}
     P::TP
 end
 
-(Ko::Optimizer)(t) = Ko(Ko.ξ.x(t), Ko.ξ.u(t), t)
-(Ko::Optimizer)(x,u,t) = Ko(Ko.θ,x,u,t)
+(Ko::OptFBGain)(t) = Ko(Ko.ξ.x(t), Ko.ξ.u(t), t)
+(Ko::OptFBGain)(x,u,t) = Ko(Ko.θ,x,u,t)
 
-function (Ko::Optimizer)(θ,x,u,t)
+function (Ko::OptFBGain)(θ,x,u,t)
 
     λ = is2ndorder(Ko) ? Ko.λ(t) : nothing
     Q = is2ndorder(Ko) ? Lxx(θ,λ,x,u,t) : lxx(θ,x,u,t)
@@ -55,12 +55,12 @@ function (Ko::Optimizer)(θ,x,u,t)
     return R\(S' + B'P)
 end
 
-order(Ko::Optimizer) = Ko.N
-nx(Ko::Optimizer) = nx(Ko.θ)
-nu(Ko::Optimizer) = nu(Ko.θ)
-extrema(Ko::Optimizer) = extrema(Ko.P)
-eachindex(Ko::Optimizer) = OneTo(nu(Ko)*nx(Ko))
-show(io::IO, Ko::Optimizer) = println(io, println(io, make_plot(t->vec(Ko(t)), t_plot(Ko))))
+order(Ko::OptFBGain) = Ko.N
+nx(Ko::OptFBGain) = nx(Ko.θ)
+nu(Ko::OptFBGain) = nu(Ko.θ)
+extrema(Ko::OptFBGain) = extrema(Ko.P)
+eachindex(Ko::OptFBGain) = OneTo(nu(Ko)*nx(Ko))
+show(io::IO, Ko::OptFBGain) = println(io, println(io, make_plot(t->vec(Ko(t)), t_plot(Ko))))
 
 
 function asymmetry(A)
@@ -76,7 +76,7 @@ struct InstabilityException <: Exception
 end
 
 
-function optimizer(θ,λ,ξ,τ)
+function opt_fb_gain(θ,λ,ξ,τ)
     t0,tf = τ
     αf = ξ.x(tf)
     μf = ξ.u(tf)
@@ -95,12 +95,12 @@ function optimizer(θ,λ,ξ,τ)
         (P,N)
     end
 
-    Ko = Optimizer(N,θ,λ,ξ,P)
+    Ko = OptFBGain(N,θ,λ,ξ,P)
     return Ko
 end
 
 # for debugging - only first order descent
-function optimizer1(θ,λ,ξ,τ)
+function opt_fb_gain_1(θ,λ,ξ,τ)
     t0,tf = τ
     αf = ξ.x(tf)
     μf = ξ.u(tf)
@@ -109,7 +109,7 @@ function optimizer1(θ,λ,ξ,τ)
     N = FirstOrder()
     P = ODE(dP_dt, Pf, (tf,t0), (θ,λ,ξ,N))
     
-    return Optimizer(N,θ,λ,ξ,P)
+    return OptFBGain(N,θ,λ,ξ,P)
 end
 
 function dP_dt(P, (θ,λ,ξ,N), t)
@@ -132,7 +132,7 @@ end
 
 # ----------------------------------- costate ----------------------------------- #
 
-struct Costate{Tθ,Tλ,Tξ,Tr}
+struct OptFFWInput{Tθ,Tλ,Tξ,Tr}
     N::SearchOrder
     θ::Tθ
     λ::Tλ # ODE{SVector{NX,Float64}}
@@ -141,10 +141,10 @@ struct Costate{Tθ,Tλ,Tξ,Tr}
 end
 
 
-(vo::Costate)(t) = vo(vo.ξ.x(t), vo.ξ.u(t), t)
-(vo::Costate)(x,u,t) = vo(vo.θ,x,u,t)
+(vo::OptFFWInput)(t) = vo(vo.ξ.x(t), vo.ξ.u(t), t)
+(vo::OptFFWInput)(x,u,t) = vo(vo.θ,x,u,t)
 
-function (vo::Costate)(θ,x,u,t)
+function (vo::OptFFWInput)(θ,x,u,t)
 
     R = is2ndorder(vo) ? Luu(θ,vo.λ(t),x,u,t) : luu(θ,x,u,t)
     B = fu(θ,x,u,t)
@@ -167,27 +167,27 @@ function dr_dt(r, (θ,λ,ξ,Ko), t)
     -(A - B*Ko)'r - a + Ko'b
 end
 
-function costate(θ,λ,ξ,Ko,τ)
+function opt_ffw_input(θ,λ,ξ,Ko,τ)
     t0,tf = τ
     αf = ξ.x(tf)
     μf = ξ.u(tf)
     N = order(Ko)
     rf = mx(θ,αf,μf,tf)
     r = ODE(dr_dt, rf, (tf,t0), (θ,λ,ξ,Ko))
-    return Costate(N,θ,λ,ξ,r)
+    return OptFFWInput(N,θ,λ,ξ,r)
 end
 
 
-order(vo::Costate) = vo.N
-nx(vo::Costate) = nx(vo.θ)
-nu(vo::Costate) = nu(vo.θ)
-extrema(vo::Costate) = extrema(vo.r)
-eachindex(vo::Costate) = OneTo(nu(vo)^2)
-show(io::IO, vo::Costate) = println(io, make_plot(t->vec(vo(t)), t_plot(vo)))
+order(vo::OptFFWInput) = vo.N
+nx(vo::OptFFWInput) = nx(vo.θ)
+nu(vo::OptFFWInput) = nu(vo.θ)
+extrema(vo::OptFFWInput) = extrema(vo.r)
+eachindex(vo::OptFFWInput) = OneTo(nu(vo)^2)
+show(io::IO, vo::OptFFWInput) = println(io, make_plot(t->vec(vo(t)), t_plot(vo)))
 
 
-is2ndorder(Ko::Optimizer) = is2ndorder(Ko.N)
-is2ndorder(vo::Costate) = is2ndorder(vo.N)
+is2ndorder(Ko::OptFBGain) = is2ndorder(Ko.N)
+is2ndorder(vo::OptFFWInput) = is2ndorder(vo.N)
 is2ndorder(::SecondOrder) = true
 is2ndorder(::Any) = false
 
