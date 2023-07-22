@@ -292,7 +292,7 @@ function pronto(θ::Model, x0::StaticVector, ξ::Trajectory, τ;
         ξ = φ # ξ_k+1 = φ_k
     end
     solve_time = (time_ns() - solve_start)/1e9
-    show_info && info(i, @sprintf("maxiters reached in %.2f seconds - quitting", solve_time))
+    show_info && info(maxiters, @sprintf("maxiters reached in %.2f seconds - quitting", solve_time))
     return ξ,data
 end
 
