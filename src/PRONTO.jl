@@ -147,8 +147,8 @@ struct Data
     ξ::Vector{Trajectory}
     Kr::Vector{Regulator}
     λ::Vector{ODE}
-    Ko::Vector{Optimizer}
-    vo::Vector{Costate}
+    Ko::Vector{OptFBGain}
+    vo::Vector{OptFFWInput}
     ζ::Vector{Trajectory}
     h::Vector{Float64}
     Dh::Vector{Float64}
@@ -161,8 +161,8 @@ Data() = Data(
     Trajectory[],
     Regulator[],
     ODE[],
-    Optimizer[],
-    Costate[],
+    OptFBGain[],
+    OptFFWInput[],
     Trajectory[],
     Float64[],
     Float64[],
@@ -217,7 +217,7 @@ function pronto(θ::Model, x0::StaticVector, ξ::Trajectory, τ;
                 armijo_kw...)
                 
     solve_start = time_ns()
-    show_steps && info(0, "starting PRONTO")
+    show_info && info(0, "starting PRONTO")
     data = Data()
 
     for i in 1:maxiters
@@ -233,17 +233,17 @@ function pronto(θ::Model, x0::StaticVector, ξ::Trajectory, τ;
 
         # -------------- search direction -------------- #
         # Kr,x,u -> z,v
-        show_steps && iinfo("lagrangian")
-        λ = lagrangian(θ, ξ, Kr, τ)
+        show_steps && iinfo("lagrange multipliers")
+        λ = lagrange(θ, ξ, Kr, τ)
         push!(data.λ, λ)
         
-        show_steps && iinfo("optimizer")
-        Ko = optimizer(θ, λ, ξ, τ)
+        show_steps && iinfo("optimal feedback gain")
+        Ko = opt_fb_gain(θ, λ, ξ, τ)
         push!(data.Ko, Ko)
         show_steps && iinfo("using $(is2ndorder(Ko) ? "2nd" : "1st") order search")
 
-        show_steps && iinfo("costate")
-        vo = costate(θ, λ, ξ, Ko, τ)
+        show_steps && iinfo("optimal feedforward input")
+        vo = opt_ffw_input(θ, λ, ξ, Ko, τ)
         push!(data.vo, vo)
 
         show_steps && iinfo("search direction")
@@ -262,12 +262,13 @@ function pronto(θ::Model, x0::StaticVector, ξ::Trajectory, τ;
         push!(data.D2g, D2g)
 
         if Dh > 0
-            show_info && info(i, "increased cost - quitting")
+            solve_time = (time_ns() - solve_start)/1e9
+            show_info && info(i, @sprintf("increased cost in %.2f seconds - quitting", solve_time))
             return ξ,data
         end
 
         # -------------- select γ via armijo step -------------- #
-        show_steps && iinfo("armijo step")
+        show_steps && iinfo("armijo backstep")
         φ,γ = armijo(θ, x0, ξ, ζ, Kr, h, Dh, τ; armijo_kw...)
         push!(data.γ, γ)
         push!(data.φ, φ) 
@@ -290,7 +291,8 @@ function pronto(θ::Model, x0::StaticVector, ξ::Trajectory, τ;
         # -------------- update trajectory -------------- #
         ξ = φ # ξ_k+1 = φ_k
     end
-    show_info && info(maxiters, "maxiters reached - quitting")
+    solve_time = (time_ns() - solve_start)/1e9
+    show_info && info(i, @sprintf("maxiters reached in %.2f seconds - quitting", solve_time))
     return ξ,data
 end
 

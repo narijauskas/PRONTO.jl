@@ -76,7 +76,7 @@ end
 # ----------------------------------- curve display ----------------------------------- #
 
 PLOT_HEIGHT::Int = 10
-PLOT_WIDTH::Int = 120
+PLOT_WIDTH::Int = 100
 t_plot(t0,tf) = LinRange(t0,tf,4*PLOT_WIDTH)
 t_plot(x) = t_plot(extrema(x)...)
 
