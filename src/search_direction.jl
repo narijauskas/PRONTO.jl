@@ -196,9 +196,9 @@ is2ndorder(::Any) = false
 # ----------------------------------- search direction ----------------------------------- #
 
 
-function search_direction(θ::Model{NX,NU},ξ,Ko,vo,τ; dt=0.001) where {NX,NU}
+function search_direction(θ::Model{NX,NU},ξ,Ko,vo,τ; resample_dt=0.001) where {NX,NU}
     t0,tf = τ
-    ts = t0:dt:tf
+    ts = t0:resample_dt:tf
     vbuf = Vector{SVector{NU,Float64}}()
     zbuf = Vector{SVector{NX,Float64}}()
 
