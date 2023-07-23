@@ -3,6 +3,7 @@
 # ----------------------------------- armijo step line search ----------------------------------- #
 
 function armijo(θ, x0, ξ, ζ, Kr, h, Dh, τ;
+                resample_dt = 0.001,
                 armijo_maxiters = 25,
                 show_armijo = false,
                 α = 0.4,
@@ -13,7 +14,7 @@ function armijo(θ, x0, ξ, ζ, Kr, h, Dh, τ;
     φ = ξ
     while γ > γmin
         show_armijo && iiinfo("γ = $(round(γ; digits=6))")
-        φ = armijo_projection(θ,x0,ξ,ζ,γ,Kr,τ)
+        φ = armijo_projection(θ, x0, ξ, ζ, γ, Kr, τ; resample_dt)
         g = cost(φ, τ)
         h-g >= -α*γ*Dh ? break : (γ *= β)
     end
@@ -24,9 +25,10 @@ end
 
 armijo_projection(θ,x0,ξ,ζ,γ,Kr,τ; kw...) = armijo_projection(θ,x0,ξ.x,ξ.u,ζ.x,ζ.u,γ,Kr,τ; kw...)
 
-function armijo_projection(θ::Model{NX,NU},x0,x,u,z,v,γ,Kr,τ; dt=0.001, kw...) where {NX,NU}
+function armijo_projection(θ::Model{NX,NU},x0,x,u,z,v,γ,Kr,τ; resample_dt=0.001, kw...) where {NX,NU}
     ubuf = Vector{SVector{NU,Float64}}()
-    t0,tf = τ; ts = t0:dt:tf
+    xbuf = Vector{SVector{NX,Float64}}()
+    t0,tf = τ; ts = t0:resample_dt:tf
 
     cb = FunctionCallingCallback(funcat = ts, func_start = false) do x1,t,integrator
         (θ,x,u,z,v,γ,Kr) = integrator.p
@@ -37,10 +39,12 @@ function armijo_projection(θ::Model{NX,NU},x0,x,u,z,v,γ,Kr,τ; dt=0.001, kw...
         u = μ - Kr*(x1-α)
 
         push!(ubuf, SVector{NU,Float64}(u))
+        push!(xbuf, SVector{NX,Float64}(x1))
     end
 
-    x = ODE(dxdt_armijo, x0, (t0,tf), (θ,x,u,z,v,γ,Kr); callback = cb, saveat = ts, kw...)
-    u = Interpolant(scale(interpolate(ubuf, BSpline(Linear())), ts))
+    ODE(dxdt_armijo, x0, (t0,tf), (θ,x,u,z,v,γ,Kr); callback = cb, dense=false, kw...)
+    x = Interpolant(scale(interpolate(xbuf, BSpline(Cubic())), ts))
+    u = Interpolant(scale(interpolate(ubuf, BSpline(Cubic())), ts))
 
     return Trajectory(θ,x,u)
 end

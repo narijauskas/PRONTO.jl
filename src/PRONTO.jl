@@ -214,6 +214,7 @@ function pronto(θ::Model, x0::StaticVector, ξ::Trajectory, τ;
                 show_info = true,
                 show_preview = true,
                 show_steps = false,
+                resample_dt = 0.001,
                 armijo_kw...)
                 
     solve_start = time_ns()
@@ -247,7 +248,7 @@ function pronto(θ::Model, x0::StaticVector, ξ::Trajectory, τ;
         push!(data.vo, vo)
 
         show_steps && iinfo("search direction")
-        ζ = search_direction(θ,ξ,Ko,vo,τ)
+        ζ = search_direction(θ, ξ, Ko, vo, τ; resample_dt)
         push!(data.ζ, ζ)
 
         
@@ -269,7 +270,7 @@ function pronto(θ::Model, x0::StaticVector, ξ::Trajectory, τ;
 
         # -------------- select γ via armijo step -------------- #
         show_steps && iinfo("armijo backstep")
-        φ,γ = armijo(θ, x0, ξ, ζ, Kr, h, Dh, τ; armijo_kw...)
+        φ,γ = armijo(θ, x0, ξ, ζ, Kr, h, Dh, τ; resample_dt, armijo_kw...)
         push!(data.γ, γ)
         push!(data.φ, φ) 
 

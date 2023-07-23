@@ -33,7 +33,7 @@ function ODE(fn::Function, ic, ts, p, ::Size{S}; alg=Tsit5(), kw...) where {S}
 
     soln! = solve(ODEProblem(fn, ic, ts, p),
             alg;
-            reltol=1e-7,
+            reltol=1e-8,
             kw...)
 
     T = SArray{Tuple{S...}, Float64, length(S), prod(S)}

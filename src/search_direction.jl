@@ -196,10 +196,12 @@ is2ndorder(::Any) = false
 # ----------------------------------- search direction ----------------------------------- #
 
 
-function search_direction(θ::Model{NX,NU},ξ,Ko,vo,τ; dt=0.001) where {NX,NU}
+function search_direction(θ::Model{NX,NU},ξ,Ko,vo,τ; resample_dt=0.001) where {NX,NU}
     t0,tf = τ
-    ts = t0:dt:tf
+    ts = t0:resample_dt:tf
     vbuf = Vector{SVector{NU,Float64}}()
+    zbuf = Vector{SVector{NX,Float64}}()
+
 
     cb = FunctionCallingCallback(funcat = ts) do z,t,integrator
         (_,ξ,Ko,vo) = integrator.p
@@ -209,10 +211,12 @@ function search_direction(θ::Model{NX,NU},ξ,Ko,vo,τ; dt=0.001) where {NX,NU}
         v = vo(x,u,t) - Ko(x,u,t)*z
 
         push!(vbuf, SVector{NU,Float64}(v))
+        push!(zbuf, SVector{NX,Float64}(z))
     end
     z0 = zeros(SVector{NX,Float64})
-    z = ODE(dz_dt, z0, (t0,tf), (θ,ξ,Ko,vo); callback = cb, saveat = ts)
-    v = Interpolant(scale(interpolate(vbuf, BSpline(Linear())), ts))
+    ODE(dz_dt, z0, (t0,tf), (θ,ξ,Ko,vo); callback = cb, dense = false)
+    z = Interpolant(scale(interpolate(zbuf, BSpline(Cubic())), ts))
+    v = Interpolant(scale(interpolate(vbuf, BSpline(Cubic())), ts))
 
     return Trajectory(θ,z,v)
 end
