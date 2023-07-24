@@ -57,18 +57,18 @@ resolve_model(XGate3)
 
 # overwrite default behavior of Pf
 PRONTO.Pf(θ::XGate3,α,μ,tf) = SMatrix{12,12,Float64}(I(12))
-PRONTO.γmax(θ::XGate3, ζ, τ) = PRONTO.sphere(2, ζ, τ)
-PRONTO.preview(θ::XGate3, ξ) = ξ.u
+PRONTO.γmax(θ::XGate3, ζ, τ) = 1
+
 
 ## ----------------------------------- run optimization ----------------------------------- ##
 
 θ = XGate3()
-τ = t0,tf = 0,10
+τ = t0,tf = 0,15
 
 ψ1 = [1;0;0]
 ψ2 = [0;1;0]
 x0 = SVector{12}(vec([ψ1;ψ2;0*ψ1;0*ψ2]))
 μ = t->SVector{1}((π/tf)*exp(-(t-tf/2)^2/(tf^2))*cos(2*π*1*t))
 η = open_loop(θ, x0, μ, τ) # guess trajectory
-ξ,data = pronto(θ, x0, η, τ); # optimal trajectory
+ξ,data = pronto(θ, x0, η, τ; tol=1e-4); # optimal trajectory
 
