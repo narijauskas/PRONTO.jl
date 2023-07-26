@@ -46,3 +46,15 @@ u0 = @SVector [0.0]
 η = closed_loop(θ,x0,α,μ,τ)
 
 ξ,data = pronto(θ,x0,η,τ; maxiters=100, tol=1e-4);
+
+##
+using GLMakie
+
+fig = Figure()
+ax = Axis(fig[1,1],xlabel="iterations",ylabel="-Dg",title="descent",yscale=log10)
+y = -data.Dh
+lines!(ax,1:length(y),y)
+hlines!(ax,1e-4,length(y),color=:red,linestyle=:dash)
+display(fig)
+
+save("inv_pend_descent.png",fig)
