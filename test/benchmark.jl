@@ -42,6 +42,9 @@ benchmarks["LaneChange"] = @benchmark pronto(θ, x0, η, τ; show_preview=false)
 
 ## ----------------------------------- ----------------------------------- ##
 
+
+
+
 include("../examples/x_gate.jl")
 θ = XGate3()
 τ = t0,tf = 0,10
@@ -52,6 +55,12 @@ x0 = SVector{12}(vec([ψ1;ψ2;0*ψ1;0*ψ2]))
 η = open_loop(θ, x0, μ, τ) # guess trajectory
 benchmarks["XGate3"] = @benchmark pronto(θ, x0, η, τ; show_preview=false); # optimal trajectory
 
+
+
+
+
+
+
 ## ----------------------------------- ----------------------------------- ##
 
 include("../examples/split.jl")
@@ -61,3 +70,5 @@ x0 = SVector{22}(x_eig(1))
 μ = t->SVector{1}(0.4*sin(t))
 η = open_loop(θ,x0,μ,τ)
 benchmarks["Split2"] = @benchmark pronto(θ, x0, η, τ; show_preview=false); # optimal trajectory
+
+
