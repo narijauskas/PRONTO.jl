@@ -270,9 +270,11 @@ function pronto(θ::Model, x0::StaticVector, ξ::Trajectory, τ;
 
         # -------------- select γ via armijo step -------------- #
         show_steps && iinfo("armijo backstep")
+        # return armijo_projection(θ, x0, ξ, ζ, 1, Kr, τ; resample_dt)
+        # return armijo(θ, x0, ξ, ζ, Kr, h, Dh, τ; resample_dt, armijo_kw...)
         φ,γ = armijo(θ, x0, ξ, ζ, Kr, h, Dh, τ; resample_dt, armijo_kw...)
         push!(data.γ, γ)
-        push!(data.φ, φ) 
+        push!(data.φ, φ)
 
         # -------------- runtime info -------------- #
         loop_time = (time_ns() - loop_start)/1e6
@@ -291,6 +293,7 @@ function pronto(θ::Model, x0::StaticVector, ξ::Trajectory, τ;
 
         # -------------- update trajectory -------------- #
         ξ = φ # ξ_k+1 = φ_k
+        # return φ
     end
     solve_time = (time_ns() - solve_start)/1e9
     show_info && info(maxiters, @sprintf("maxiters reached in %.2f seconds - quitting", solve_time))

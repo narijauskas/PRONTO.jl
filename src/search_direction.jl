@@ -199,29 +199,46 @@ is2ndorder(::Any) = false
 function search_direction(θ::Model{NX,NU},ξ,Ko,vo,τ; resample_dt=0.001) where {NX,NU}
     t0,tf = τ
     ts = t0:resample_dt:tf
-    vbuf = Vector{SVector{NU,Float64}}(undef, length(ts))
-    zbuf = Vector{SVector{NX,Float64}}(undef, length(ts))
-    i = Ref(1)
+    # vbuf = Vector{SVector{NU,Float64}}(undef, length(ts))
+    # zbuf = Vector{SVector{NX,Float64}}(undef, length(ts))
+    # i = Ref(1)
 
-
-    cb = FunctionCallingCallback(funcat = ts) do z,t,integrator
+    
+    sv = SavedValues(Float64, SVector{NU,Float64})
+    cb = SavingCallback(sv) do z,t,integrator
         (_,_ξ,_Ko,_vo) = integrator.p
-        # local v
         x = _ξ.x(t)
         u = _ξ.u(t)
-        v = _vo(x,u,t) - _Ko(x,u,t)*z
-        vbuf[i[]] = SVector{NU,Float64}(v)
-        zbuf[i[]] = SVector{NX,Float64}(z)
-        i[] += 1
+        return SVector{NU,Float64}(_vo(x,u,t) - _Ko(x,u,t)*z)
+        # vbuf[i[]] = SVector{NU,Float64}(v)
+        # zbuf[i[]] = SVector{NX,Float64}(z)
+        # i[] += 1
         # push!(vbuf, SVector{NU,Float64}(v))
         # push!(zbuf, SVector{NX,Float64}(z))
     end
-    z0 = zeros(SVector{NX,Float64})
-    ODE(dz_dt, z0, (t0,tf), (θ,ξ,Ko,vo); callback = cb, dense = false)
-    z = Interpolant(scale(interpolate(zbuf, BSpline(Cubic())), ts))
-    v_ = Interpolant(scale(interpolate(vbuf, BSpline(Cubic())), ts))
 
-    return Trajectory(θ,z,v_)
+
+    # cb = FunctionCallingCallback(funcat = ts) do z,t,integrator
+    #     (_,_ξ,_Ko,_vo) = integrator.p
+    #     # local v
+    #     x = _ξ.x(t)
+    #     u = _ξ.u(t)
+    #     v = _vo(x,u,t) - _Ko(x,u,t)*z
+    #     vbuf[i[]] = SVector{NU,Float64}(v)
+    #     zbuf[i[]] = SVector{NX,Float64}(z)
+    #     i[] += 1
+    #     # push!(vbuf, SVector{NU,Float64}(v))
+    #     # push!(zbuf, SVector{NX,Float64}(z))
+    # end
+    z0 = zeros(SVector{NX,Float64})
+    z = ODE(dz_dt, z0, (t0,tf), (θ,ξ,Ko,vo); callback = cb, tstops=ts)
+    # z = Interpolant(scale(interpolate(zbuf, BSpline(Cubic())), ts))
+    # v_ = Interpolant(scale(interpolate(vbuf, BSpline(Cubic())), ts))
+    v = VecInterpolant(
+        MVector{NU, Float64}(undef),
+        [interpolate(sv.t, [x[i] for x in sv.saveval], FritschButlandMonotonicInterpolation()) for i in 1:NU]
+    )
+    return Trajectory(θ,z,v)
 end
 
 function dz_dt(z, (θ,ξ,Ko,vo), t)
