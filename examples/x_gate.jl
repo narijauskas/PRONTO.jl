@@ -70,5 +70,6 @@ PRONTO.preview(θ::XGate3, ξ) = ξ.u
 x0 = SVector{12}(vec([ψ1;ψ2;0*ψ1;0*ψ2]))
 μ = t->SVector{1}((π/tf)*exp(-(t-tf/2)^2/(tf^2))*cos(2*π*1*t))
 η = open_loop(θ, x0, μ, τ) # guess trajectory
-ξ,data = pronto(θ, x0, η, τ); # optimal trajectory
+ξ, data = pronto(θ, x0, η, τ); # optimal trajectory
+ξ, data = pronto(θ, x0, η, τ; show_preview=false); # optimal trajectory
 

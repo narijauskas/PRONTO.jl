@@ -59,8 +59,9 @@ eachindex(::Interpolant{T}) where {T} = OneTo(length(eltype(T)))
 #     sol.interp(v, t, idxs, deriv, sol.prob.p, continuity)
 # end
 
-struct ODE{S,T,N,L,IType}
+struct ODE{S,T,N,L,RC,IType}
     buf::MArray{S,T,N,L}
+    retcode::RC
     interp::IType
 end
 
@@ -91,11 +92,11 @@ function ODE(fn::Function, ic, ts, p, ::Size{S}; alg=Tsit5(), kw...) where {S}
     soln = solve(ODEProblem(fn, ic, ts, p),
             alg;
             # tstops=0:0.001:10,
-            # abstol=1e-8,
             reltol=1e-8,
+            abstol=1e-8,
             kw...)
     
-    ODE(buf, soln.interp)
+    ODE(buf, soln.retcode, soln.interp)
 
     # ODE{T}(wrap,soln!)
 end
