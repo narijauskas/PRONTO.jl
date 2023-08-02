@@ -10,7 +10,7 @@ end
 # Base.show(io::IO, ξ::Trajectory) = print(io, "Trajectory")
 nx(ξ::Trajectory) = nx(ξ.θ)
 nu(ξ::Trajectory) = nu(ξ.θ)
-extrema(ξ::Trajectory) = extrema(ξ.x)
+domain(ξ::Trajectory) = domain(ξ.x)
 
 function show(io::IO, ξ::Trajectory)
     show(io, ξ.x)

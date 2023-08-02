@@ -58,9 +58,9 @@ end
 order(Ko::OptFBGain) = Ko.N
 nx(Ko::OptFBGain) = nx(Ko.θ)
 nu(Ko::OptFBGain) = nu(Ko.θ)
-extrema(Ko::OptFBGain) = extrema(Ko.P)
+domain(Ko::OptFBGain) = domain(Ko.P)
 eachindex(Ko::OptFBGain) = OneTo(nu(Ko)*nx(Ko))
-show(io::IO, Ko::OptFBGain) = println(io, println(io, make_plot(t->vec(Ko(t)), t_plot(Ko))))
+show(io::IO, Ko::OptFBGain) = println(io, make_plot(t->vec(Ko(t)), t_plot(Ko)))
 
 
 function asymmetry(A)
@@ -69,8 +69,10 @@ function asymmetry(A)
     sum([0.5*abs(A[i,j]-A[j,i]) for i in 1:n, j in 1:n])
 end
 
-retcode(x::ODE) = x.soln.retcode
-isstable(x::ODE) = retcode(x) == ReturnCode.Success
+retcode(x::SlimODE) = x.retcode
+retcode(x::WrappedODE) = x.soln.retcode
+retcode(x::BufferedODE) = x.soln.retcode
+isstable(x) = retcode(x) == ReturnCode.Success
 
 struct InstabilityException <: Exception
 end
@@ -90,6 +92,7 @@ function opt_fb_gain(θ,λ,ξ,τ)
         !isstable(P) && throw(InstabilityException())
         (P,N)
     catch e
+        show(e)
         N = FirstOrder()
         P = ODE(dP_dt, Pf, (tf,t0), (θ,λ,ξ,N))
         (P,N)
@@ -181,7 +184,7 @@ end
 order(vo::OptFFWInput) = vo.N
 nx(vo::OptFFWInput) = nx(vo.θ)
 nu(vo::OptFFWInput) = nu(vo.θ)
-extrema(vo::OptFFWInput) = extrema(vo.r)
+domain(vo::OptFFWInput) = domain(vo.r)
 eachindex(vo::OptFFWInput) = OneTo(nu(vo)^2)
 show(io::IO, vo::OptFFWInput) = println(io, make_plot(t->vec(vo(t)), t_plot(vo)))
 

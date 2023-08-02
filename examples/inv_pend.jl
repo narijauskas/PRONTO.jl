@@ -32,6 +32,7 @@ u0 = @SVector [0.0]
 
 α = t->xf
 μ = t->u0
-η = closed_loop(θ,x0,α,μ,τ)
-
-ξ,data = pronto(θ,x0,η,τ; tol=1e-4);
+η = closed_loop(θ,x0,α,μ,τ); show(η)
+ξ, data = pronto(θ,x0,η,τ; tol=1e-4); show(data)
+ξ, data = pronto(θ,x0,η,τ; tol=1e-4, show_preview=false);
+descent(data)

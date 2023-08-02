@@ -12,24 +12,53 @@ show(io::IO, ::Type{Interpolant{T}}) where {T} = print(io, "Interpolant{$(eltype
 show(io::IO, u::Interpolant) = println(io, make_plot(u, t_plot(u)))
 # Base.length(::Interpolant{T}) where {T} = length(eltype(T))
 eltype(::Interpolant{T}) where {T} = eltype(T)
-extrema(u::Interpolant) = extrema(first(u.itp.ranges))
+domain(u::Interpolant) = extrema(first(u.itp.ranges))
 eachindex(::Interpolant{T}) where {T} = OneTo(length(eltype(T)))
 
 
-# ----------------------------------- ODE solution wrapper ----------------------------------- #
+# ----------------------------------- ODE solution wrappers ----------------------------------- #
+abstract type AbstractODE end
 
-struct ODE{T}
+struct BufferedODE{S,T,N,L,SType} <: AbstractODE
+    buf::MArray{S,T,N,L}
+    soln::SType
+end
+
+function (ode::BufferedODE{S,T,N,L})(t) where {S,T,N,L}
+    fill!(ode.buf, 0)
+    ode.soln(ode.buf, t)
+    return SArray{S,T,N,L}(ode.buf)
+end
+
+
+# ODE(fn::Function, ic, ts, p; kw...) = ODE(fn::Function, ic, ts, p, Size(ic); kw...)
+
+# function ODE(fn::Function, ic, ts, p, ::Size{S}; alg=Tsit5(), kw...) where {S}
+#     buf = MArray{Tuple{S...}, Float64, length(S), prod(S)}(undef)
+#     # fill!(buf, 0)
+#     soln = solve(ODEProblem(fn, ic, ts, p),
+#             alg;
+#             abstol=1e-8,
+#             kw...)
+#     return BufferedODE(buf, soln)
+# end
+
+show(io::IO, x::BufferedODE) = println(io, make_plot(x, t_plot(x)))
+domain(x::BufferedODE) = extrema(x.soln.interp.ts)
+
+
+struct WrappedODE{T} <: AbstractODE
     wrap::FunctionWrapper{T, Tuple{Float64}}
     soln::SciMLBase.AbstractODESolution
 end
 
-(ode::ODE)(t) = ode.wrap(t)
-
+(ode::WrappedODE)(t) = ode.wrap(t)
+# (ode::ODE{T})(t) where {T} = T(ode.soln(t))
 
 # try to infer size from the *type* of the initial condition - must use StaticArray
-ODE(fn::Function, ic, ts, p; kw...) = ODE(fn::Function, ic, ts, p, Size(ic); kw...)
+WrappedODE(fn::Function, ic, ts, p; kw...) = WrappedODE(fn::Function, ic, ts, p, Size(ic); kw...)
 # constructor basically wraps ODEProblem, should make algorithm available for tuning
-function ODE(fn::Function, ic, ts, p, ::Size{S}; alg=Tsit5(), kw...) where {S}
+function WrappedODE(fn::Function, ic, ts, p, ::Size{S}; alg=Tsit5(), kw...) where {S}
 
     soln! = solve(ODEProblem(fn, ic, ts, p),
             alg;
@@ -45,20 +74,20 @@ function ODE(fn::Function, ic, ts, p, ::Size{S}; alg=Tsit5(), kw...) where {S}
             return SArray{Tuple{S...}, Float64, length(S), prod(S)}(out)
     end
 
-    ODE{T}(wrap,soln!)
+    WrappedODE{T}(wrap,soln!)
 end
 
 
 # might not be needed
-StaticArrays.Size(::ODE{T}) where {T} = Size(T)
-StaticArrays.Size(::Type{ODE{T}}) where {T} = Size(T)
-Base.size(::ODE{T}) where {T} = size(T)
-Base.length(::ODE{T}) where {T} = length(T)
+# StaticArrays.Size(::ODE{T}) where {T} = Size(T)
+# StaticArrays.Size(::Type{ODE{T}}) where {T} = Size(T)
+# Base.size(::ODE{T}) where {T} = size(T)
+# Base.length(::ODE{T}) where {T} = length(T)
 
-eltype(::Type{ODE{T}}) where {T} = T
-extrema(x::ODE) = extrema(x.soln.t)
-eachindex(::ODE{T}) where {T} = OneTo(length(T))
-show(io::IO, x::ODE) = println(io, make_plot(x, t_plot(x)))
+# eltype(::Type{ODE{T}}) where {T} = T
+# eachindex(::ODE{T}) where {T} = OneTo(length(T))
+domain(x::WrappedODE) = extrema(x.soln.t)
+show(io::IO, x::WrappedODE) = println(io, make_plot(x, t_plot(x)))
 
 # domain(ode) = extrema(ode.t)
 # stats(ode)
@@ -72,7 +101,32 @@ function show(io::IO, fn::FunctionWrapper{T,A}) where {T,A}
 end
 
 
+export SlimODE
+struct SlimODE{S,T,N,L,RC,IType} <: AbstractODE
+    buf::MArray{S,T,N,L}
+    retcode::RC
+    interp::IType
+end
 
+function (ode::SlimODE{S,T,N,L})(t) where {S,T,N,L}
+    ode.interp(ode.buf, t, nothing, Val{0}, nothing, :left)
+    return SArray{S,T,N,L}(ode.buf)
+end
+
+ODE(fn::Function, ic, ts, p; kw...) = ODE(fn::Function, ic, ts, p, Size(ic); kw...)
+
+function ODE(fn::Function, ic, ts, p, ::Size{S}; alg=Tsit5(), kw...) where {S}
+    buf = MArray{Tuple{S...}, Float64, length(S), prod(S)}(undef)
+    fill!(buf, 0)
+    soln = solve(ODEProblem(fn, ic, ts, p),
+            alg;
+            abstol=1e-8,
+            kw...)
+    return SlimODE(buf, soln.retcode, soln.interp)
+end
+
+show(io::IO, x::SlimODE) = println(io, make_plot(x, t_plot(x)))
+domain(x::SlimODE) = extrema(x.interp.ts)
 
 # ----------------------------------- curve display ----------------------------------- #
 
@@ -92,13 +146,13 @@ PLOT_KW = (
     color = repeat(PLOT_COLORS, 3),
 )
 t_plot(t0,tf) = LinRange(t0,tf,4*PLOT_WIDTH)
-t_plot(x) = t_plot(extrema(x)...)
+t_plot(x) = t_plot(domain(x)...)
 
 
 # for convenience more than anything
-function Base.getindex(ode::ODE, i)
-    [ode(t)[ix] for t in t_plot(ode), ix in i]
-end
+# function Base.getindex(ode::ODE, i)
+#     [ode(t)[ix] for t in t_plot(ode), ix in i]
+# end
 
 
 function set_plot_scale(height, width)

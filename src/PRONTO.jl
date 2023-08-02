@@ -152,7 +152,7 @@ struct Data
     iterations::Ref{Int}
     ξ::Vector{Trajectory}
     Kr::Vector{Regulator}
-    λ::Vector{ODE}
+    λ::Vector{AbstractODE}
     Ko::Vector{OptFBGain}
     vo::Vector{OptFFWInput}
     ζ::Vector{Trajectory}
@@ -169,7 +169,7 @@ end
 Data(θ) = Data(θ, Ref(0),
     Trajectory[],
     Regulator[],
-    ODE[],
+    AbstractODE[],
     OptFBGain[],
     OptFFWInput[],
     Trajectory[],
