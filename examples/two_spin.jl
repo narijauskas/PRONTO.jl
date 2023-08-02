@@ -39,14 +39,12 @@ PRONTO.Pf(θ::TwoSpin, αf, μf, tf) = SMatrix{4,4,Float64}(I(4))
 
 ## ----------------------------------- solve the problem ----------------------------------- ##
 
-θ = TwoSpin() # instantiate a new model
+θ = TwoSpin(); show(θ)
 τ = t0,tf = 0,10 # define time domain
 x0 = @SVector [0.0, 1.0, 0.0, 0.0] # initial state
 xf = @SVector [1.0, 0.0, 0.0, 0.0] # final state
 μ = t->[0.1] # open loop input μ(t)
-η = open_loop(θ, xf, μ, τ) # guess trajectory
-show(η)
-ξ, data = pronto(θ, x0, η, τ); # optimal trajectory
-show(ξ)
+η = open_loop(θ, xf, μ, τ); show(η)
+ξ, data = pronto(θ, x0, η, τ); show(data)
 ξ, data = pronto(θ, x0, η, τ; show_preview=false); # optimal trajectory
 descent(data)

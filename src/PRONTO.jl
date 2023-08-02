@@ -194,7 +194,7 @@ function Base.show(io::IO, data::Data)
     println(io, "    cost: $(data.h[end])")
     println(io, "    Dh: $(data.Dh[end])")
     println(io, "    iterations: $(data.iterations[])")
-    print(io, "    time: $(data.solve_time[]) seconds")
+    println(io, "    time: $(data.solve_time[]) seconds")
 end
 
 export descent
@@ -313,22 +313,20 @@ function pronto(θ::Model, x0::StaticVector, ξ::Trajectory, τ;
         h = cost(ξ, τ)
         push!(data.h, h)
 
-        Dh,D2g = cost_derivs(θ, λ, ξ, ζ, τ)
-        push!(data.Dh, Dh)
-        push!(data.D2g, D2g)
+        Dh, D2g = cost_derivs(θ, λ, ξ, ζ, τ)
+        push!(data.Dh, Dh); push!(data.D2g, D2g)
 
         if Dh > 0
-            data.solve_time[] = solve_time = (time_ns() - solve_start)/1e9
+            data.solve_time[] = (time_ns() - solve_start)/1e9
             data.retcode[] = IncreasedCost()
             show_info && info(i, @sprintf("increased cost in %.2f seconds - quitting", data.solve_time[]))
-            return ξ,data
+            return ξ, data
         end
 
         # -------------- select γ via armijo step -------------- #
         show_steps && iinfo("armijo backstep")
-        φ,γ = armijo(θ, x0, ξ, ζ, Kr, h, Dh, τ; resample_dt, armijo_kw...)
-        push!(data.γ, γ)
-        push!(data.φ, φ) 
+        φ, γ = armijo(θ, x0, ξ, ζ, Kr, h, Dh, τ; resample_dt, armijo_kw...)
+        push!(data.γ, γ); push!(data.φ, φ) 
 
         # -------------- runtime info -------------- #
         loop_time = (time_ns() - loop_start)/1e6
@@ -344,7 +342,7 @@ function pronto(θ::Model, x0::StaticVector, ξ::Trajectory, τ;
             data.solve_time[] = (time_ns() - solve_start)/1e9
             data.retcode[] = Converged()
             show_info && info(i, @sprintf("PRONTO converged in %.2f seconds", data.solve_time[]))
-            return φ,data
+            return φ, data
         end
 
         # -------------- update trajectory -------------- #
@@ -353,7 +351,7 @@ function pronto(θ::Model, x0::StaticVector, ξ::Trajectory, τ;
     data.solve_time[] = (time_ns() - solve_start)/1e9
     data.retcode[] = MaxIters()
     show_info && info(maxiters, @sprintf("maxiters reached in %.2f seconds - quitting", data.solve_time[]))
-    return ξ,data
+    return ξ, data
 end
 
 end # module

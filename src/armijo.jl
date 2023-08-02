@@ -4,7 +4,7 @@
 
 function armijo(θ, x0, ξ, ζ, Kr, h, Dh, τ;
                 resample_dt = 0.001,
-                armijo_maxiters = 25,
+                armijo_maxiters = 30,
                 show_armijo = false,
                 α = 0.4,
                 β = 0.7)
