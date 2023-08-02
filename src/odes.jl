@@ -92,7 +92,7 @@ function ODE(fn::Function, ic, ts, p, ::Size{S}; alg=Tsit5(), kw...) where {S}
             alg;
             # tstops=0:0.001:10,
             # abstol=1e-8,
-            reltol=1e-6,
+            reltol=1e-8,
             kw...)
     
     ODE(buf, soln.interp)

@@ -46,3 +46,4 @@ xf = @SVector [1.0, 0.0, 0.0, 0.0] # final state
 μ = t->[0.1] # open loop input μ(t)
 η = open_loop(θ, xf, μ, τ) # guess trajectory
 ξ,data = pronto(θ, x0, η, τ); # optimal trajectory
+ξ,data = pronto(θ, x0, η, τ; show_preview=false); # optimal trajectory
