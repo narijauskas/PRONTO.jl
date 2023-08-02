@@ -31,17 +31,17 @@ function armijo_projection(θ::Model{NX,NU},x0,x,u,z,v,γ,Kr,τ; resample_dt=0.0
     ts = t0:resample_dt:tf
     # ts = Float64[]
     # ubuf = SVector{NU,Float64}[]
-    # ubuf = Vector{SVector{NU,Float64}}(undef, length(ts))
-    # xbuf = Vector{SVector{NX,Float64}}(undef, length(ts))
-    # i = Ref(1)
+    ubuf = Vector{SVector{NU,Float64}}(undef, length(ts))
+    xbuf = Vector{SVector{NX,Float64}}(undef, length(ts))
+    i = Ref(1)
 
-    sv = SavedValues(Float64, SVector{NU,Float64})
-    cb = SavingCallback(sv) do x1,t,integrator
-        (_,x_,u_,z_,v_,γ_,Kr_) = integrator.p
-        α = x_(t) + γ_*z_(t)
-        μ = u_(t) + γ_*v_(t)
-        return SVector{NU,Float64}(μ - Kr_(t)*(x1-α))
-    end
+    # sv = SavedValues(Float64, SVector{NU,Float64})
+    # cb = SavingCallback(sv) do x1,t,integrator
+    #     (_,x_,u_,z_,v_,γ_,Kr_) = integrator.p
+    #     α = x_(t) + γ_*z_(t)
+    #     μ = u_(t) + γ_*v_(t)
+    #     return SVector{NU,Float64}(μ - Kr_(t)*(x1-α))
+    # end
 
     # cb = DiscreteCallback((_,_,_)->true, integrator->begin
     #     (_,x_,u_,z_,v_,γ_,Kr_) = integrator.p
@@ -53,26 +53,49 @@ function armijo_projection(θ::Model{NX,NU},x0,x,u,z,v,γ,Kr,τ; resample_dt=0.0
     #     push!(ubuf, SVector{NU,Float64}(u1))
     # end)
 
-    # cb = FunctionCallingCallback(funcat = ts, func_start = false) do x1,t,integrator
-    #     (_,x_,u_,z_,v_,γ_,Kr_) = integrator.p
-    #     α = x_(t) + γ_*z_(t)
-    #     μ = u_(t) + γ_*v_(t)
-    #     u1 = μ - Kr_(t)*(x1-α)
-    #     ubuf[i[]] = SVector{NU,Float64}(u1)
-    #     xbuf[i[]] = SVector{NX,Float64}(x1)
-    #     i[] += 1
-    #     # push!(ubuf, SVector{NU,Float64}(u))
-    #     # push!(xbuf, SVector{NX,Float64}(x1))
-    # end
-    
-    x = ODE(dxdt_armijo, x0, (t0,tf), (θ,x,u,z,v,γ,Kr); callback = cb, tstops=ts, kw...)
+    cb = FunctionCallingCallback(funcat = ts, func_start = false) do x1,t,integrator
+        (_,x_,u_,z_,v_,γ_,Kr_) = integrator.p
+        α = x_(t) + γ_*z_(t)
+        μ = u_(t) + γ_*v_(t)
+        u1 = μ - Kr_(t)*(x1-α)
+        ubuf[i[]] = SVector{NU,Float64}(u1)
+        xbuf[i[]] = SVector{NX,Float64}(x1)
+        i[] += 1
+        # push!(ubuf, SVector{NU,Float64}(u1))
+        # push!(xbuf, SVector{NX,Float64}(x1))
+    end
+    ODE(dxdt_armijo, x0, (t0,tf), (θ,x,u,z,v,γ,Kr); callback = cb, dense=false, kw...)
+    x = Interpolant(scale(interpolate(xbuf, BSpline(Cubic())), ts))
+    u = Interpolant(scale(interpolate(ubuf, BSpline(Cubic())), ts))
+
+
     # x = Interpolant(scale(interpolate(xbuf, BSpline(Cubic())), ts))
     # return saved_values
     # interpolate([x[1] for x in sv.saveval], sv.t, FritschCarlsonMonotonicInterpolation())
-    u = VecInterpolant(
-        MVector{NU, Float64}(undef),
-        [interpolate(sv.t, [x[i] for x in sv.saveval], FritschButlandMonotonicInterpolation()) for i in 1:NU]
-    )
+    
+    # x = ODE(dxdt_armijo, x0, (t0,tf), (θ,x,u,z,v,γ,Kr); callback = cb, kw...)
+    # u = DataInterpolations.CubicSpline(sv.saveval, sv.t)
+    # u = DataInterpolations.AkimaInterpolation(first.(sv.saveval), sv.t)
+
+    # u = VecInterpolant(
+    #     MVector{NU, Float64}(undef),
+    #     [CubicSpline([x[i] for x in sv.saveval], sv.t) for i in 1:NU],
+    # )
+
+
+    # u = VecInterpolant(
+    #     MVector{NU, Float64}(undef),
+    #     [interpolate(sv.t, [x[i] for x in sv.saveval], SteffenMonotonicInterpolation()) for i in 1:NU]
+    # )
+
+    # xx = ODE(dxdt_armijo, x0, (t0,tf), (θ,x,u,z,v,γ,Kr); kw...)
+    # uu = t->begin
+    #     local α = x(t) + γ*z(t)
+    #     local μ = u(t) + γ*v(t)
+    #     return SVector{NU,Float64}(μ - Kr(t)*(xx(t)-α))
+    # end
+    # return Trajectory(θ,xx,uu)
+
     # interpolate(u_i, sv.t, FritschCarlsonMonotonicInterpolation()) for 
     # x[i] for x in saved_values.saveval
     # u = Interpolant(interpolate(saved_values.saveval, saved_values.t, FritschCarlsonMonotonicInterpolation()))
@@ -99,7 +122,8 @@ function (x::VecInterpolant)(t)
 end
 
 show(io::IO, x::VecInterpolant) = println(io, make_plot(x, t_plot(x)))
-domain(x::VecInterpolant) = extrema(first(x.itps).knots)
+# domain(x::VecInterpolant) = extrema(first(x.itps).knots)
+domain(x::VecInterpolant) = domain(first(x.itps))
 
 function armijo_cb!(integrator)
     (_,x_,u_,z_,v_,γ_,Kr_) = integrator.p

@@ -10,7 +10,8 @@ using Base: @kwdef
 using Printf
 
 using Interpolations # data storage/resampling
-
+using DataInterpolations
+LinearInterpolation = DataInterpolations.LinearInterpolation
 import LinearAlgebra # collision with lu!
 import LinearAlgebra: mul!, I, norm
 using MatrixEquations # provides arec

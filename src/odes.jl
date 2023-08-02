@@ -69,7 +69,6 @@ domain(x::ODE) = domain(x.interp)
 domain(x::OrdinaryDiffEq.InterpolationData) = extrema(x.ts)
 domain(x::AbstractInterpolation) = (minimum(minimum.(x.ranges)), maximum(maximum.(x.ranges)))
 domain(x::Interpolant) = domain(x.itp)
-domain(ξ::Trajectory) = domain(ξ.x)
 # (minimum(minimum.(x.itp.ranges)), maximum(maximum.(x.itp.ranges)))
 
 function (ode::ODE{S,T,N,L})(t) where {S,T,N,L}
@@ -84,14 +83,16 @@ end
 # end
 
 # (ode::ODE)(t) = ode.wrap(t)
-
+# OwrenZen3()
 function ODE(fn::Function, ic, ts, p, ::Size{S}; alg=Tsit5(), kw...) where {S}
 
     buf = MArray{Tuple{S...}, Float64, length(S), prod(S)}(undef)
     fill!(buf, 0)
     soln = solve(ODEProblem(fn, ic, ts, p),
             alg;
-            reltol=1e-8,
+            # tstops=0:0.001:10,
+            # abstol=1e-8,
+            reltol=1e-6,
             kw...)
     
     ODE(buf, soln.interp)

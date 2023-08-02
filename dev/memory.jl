@@ -39,3 +39,10 @@ lineplot(gc_bytes; width=120)
 lineplot(rss_bytes-gc_bytes; width=120)
 
 # heap snapshot is missing close to 8GB of stuff
+
+
+
+# problem is worse on linux:
+# 16GB memory
+# Intel Core i7-8700K CPU # 3.70GHz × 12
+# Pop!_OS 22.04 LTS
