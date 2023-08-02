@@ -49,11 +49,11 @@ PRONTO.preview(θ::LaneChange, ξ) = ξ.x
 
 ## ----------------------------------- solve the problem ----------------------------------- ##
 
-θ = LaneChange(xeq = [1,0,0,0,0,0], kq=[0.1,0,1,0,0,0])
+θ = LaneChange(xeq = [1,0,0,0,0,0], kq=[1,0,1,0,0,0])
 t0,tf = τ = (0,4)
 x0 = SVector{6}(-5.0, zeros(5)...)
 xf = @SVector zeros(6)
 μ = t->zeros(2)
 η = open_loop(θ,x0,μ,τ)
-ξ,data = pronto(θ,x0,η,τ)
-
+ξ, data = pronto(θ,x0,η,τ; tol=1e-4)
+@time ξ, data = pronto(θ,x0,η,τ; tol=1e-4, show_preview=false, show_info=false);
