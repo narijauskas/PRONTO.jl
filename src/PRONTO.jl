@@ -142,8 +142,14 @@ include("search_direction.jl") # lagrangian, 1st/2nd order optimizer, search dir
 include("cost.jl") # cost and cost derivatives
 include("armijo.jl") # armijo step and projection
 
+abstract type RetCode end
+struct Converged <: RetCode end
+struct MaxIters <: RetCode end
+struct IncreasedCost <: RetCode end
 
 struct Data
+    θ::Model
+    iterations::Ref{Int}
     ξ::Vector{Trajectory}
     Kr::Vector{Regulator}
     λ::Vector{ODE}
@@ -155,9 +161,12 @@ struct Data
     D2g::Vector{Float64}
     γ::Vector{Float64}
     φ::Vector{Trajectory}
+    loop_time::Vector{Float64}
+    retcode::Ref{RetCode}
+    solve_time::Ref{Float64}
 end
 
-Data() = Data(
+Data(θ) = Data(θ, Ref(0),
     Trajectory[],
     Regulator[],
     ODE[],
@@ -169,9 +178,54 @@ Data() = Data(
     Float64[],
     Float64[],
     Trajectory[],
+    Float64[],
+    Ref{RetCode}(),
+    Ref{Float64}(),
 )
 
-Base.show(io::IO, data::Data) = print(io, "PRONTO data: $(length(data.φ)) iterations")
+# Base.show(io::IO, data::Data) = print(io, "PRONTO data: $(length(data.φ)) iterations")
+
+function Base.show(io::IO, data::Data)
+    println(io, "PRONTO result: ")
+    # println(io, "    result:")
+    show(io, last(data.φ))
+    println(io, "    model: $(typeof(data.θ))")
+    println(io, "    status: $(data.retcode[])")
+    println(io, "    cost: $(data.h[end])")
+    println(io, "    Dh: $(data.Dh[end])")
+    println(io, "    iterations: $(data.iterations[])")
+    print(io, "    time: $(data.solve_time[]) seconds")
+end
+
+export descent
+function descent(data)
+    n = length(data.φ)
+    idx = 1:n
+    # n = data.iterations[]
+    # idx = MaxIters() == data.return_code[] ? (1:n) : (1:n-1)
+    
+    
+    plt = scatterplot(log10.(-data.Dh[1:n]);
+    # scatterplot(data.h[2:n-1] - data.h[3:n];
+    # scatterplot(data.h[2:n];
+            # ylim = (1e0, 1e-6),
+            xlim = (1,n),
+            xlabel = "iteration",
+            compact = true,
+            title = "log10(-Dh)",
+            width = PLOT_WIDTH,
+            height = 2*PLOT_HEIGHT,
+            marker = [is2ndorder(Ko) ? '⦿' : '⊝' for Ko in data.Ko[1:n]],
+            color = PLOT_COLORS[1],)
+            # color = [is2ndorder(Ko) ? PLOT_COLORS[1] : PLOT_COLORS[6] for Ko in data.Ko[1:n]],)
+end
+
+# ⊝
+# ⊚
+# ⊛
+# ⦿
+# ⊝
+
 # ----------------------------------- guess trajectories ----------------------------------- #
 # generate ξ0 from either η
 function zero_input(θ::Model{NX,NU}, x0, τ) where {NX,NU}
@@ -219,10 +273,11 @@ function pronto(θ::Model, x0::StaticVector, ξ::Trajectory, τ;
                 
     solve_start = time_ns()
     show_info && info(0, "starting PRONTO")
-    data = Data()
+    data = Data(θ)
 
     for i in 1:maxiters
         loop_start = time_ns()
+        data.iterations[] += 1
         push!(data.ξ, ξ)
 
         # -------------- build regulator -------------- #
@@ -263,8 +318,9 @@ function pronto(θ::Model, x0::StaticVector, ξ::Trajectory, τ;
         push!(data.D2g, D2g)
 
         if Dh > 0
-            solve_time = (time_ns() - solve_start)/1e9
-            show_info && info(i, @sprintf("increased cost in %.2f seconds - quitting", solve_time))
+            data.solve_time[] = solve_time = (time_ns() - solve_start)/1e9
+            data.retcode[] = IncreasedCost()
+            show_info && info(i, @sprintf("increased cost in %.2f seconds - quitting", data.solve_time[]))
             return ξ,data
         end
 
@@ -276,6 +332,7 @@ function pronto(θ::Model, x0::StaticVector, ξ::Trajectory, τ;
 
         # -------------- runtime info -------------- #
         loop_time = (time_ns() - loop_start)/1e6
+        push!(data.loop_time, loop_time/1e3)
         infostr = @sprintf("Dh = %.3e, h = %.3e, γ = %.3e, ", Dh, h, γ)
         infostr *= ", order = $(is2ndorder(Ko) ? "2nd" : "1st"), "
         infostr *= @sprintf("solved in %.3f ms", loop_time)
@@ -284,16 +341,18 @@ function pronto(θ::Model, x0::StaticVector, ξ::Trajectory, τ;
 
         # -------------- check convergence -------------- #
         if -Dh < tol
-            solve_time = (time_ns() - solve_start)/1e9
-            show_info && info(i, @sprintf("PRONTO converged in %.2f seconds", solve_time))
+            data.solve_time[] = (time_ns() - solve_start)/1e9
+            data.retcode[] = Converged()
+            show_info && info(i, @sprintf("PRONTO converged in %.2f seconds", data.solve_time[]))
             return φ,data
         end
 
         # -------------- update trajectory -------------- #
         ξ = φ # ξ_k+1 = φ_k
     end
-    solve_time = (time_ns() - solve_start)/1e9
-    show_info && info(maxiters, @sprintf("maxiters reached in %.2f seconds - quitting", solve_time))
+    data.solve_time[] = (time_ns() - solve_start)/1e9
+    data.retcode[] = MaxIters()
+    show_info && info(maxiters, @sprintf("maxiters reached in %.2f seconds - quitting", data.solve_time[]))
     return ξ,data
 end
 
