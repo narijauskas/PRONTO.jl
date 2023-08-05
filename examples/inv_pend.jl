@@ -34,4 +34,4 @@ u0 = @SVector [0.0]
 μ = t->u0
 η = closed_loop(θ,x0,α,μ,τ)
 
-ξ,data = pronto(θ,x0,η,τ; tol=1e-4);
+ξ,data = pronto(θ,x0,η,τ; tol=1e-3);
