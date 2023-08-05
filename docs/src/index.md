@@ -2,6 +2,72 @@
 
 Hello and welcome to the julia implementation of the **PR**ojection-**O**perator-Based **N**ewton’s Method for **T**rajectory **O**ptimization (PRONTO).
 
+## Inverted Pendulum
+We consider a simple inverted pendulum system
+```math
+\dot{x} = \begin{bmatrix}
+\dot{x_1} \\
+\dot{x_2}
+\end{bmatrix} = \begin{bmatrix}
+x_2 \\
+\frac{g}{L}\sin{x_1} - \frac{u}{L}\cos{x_1}
+\end{bmatrix},
+```
+where $x_1$ [rad] is the angular position, $x_2$ [rad/s] is the angular velocity and $u$ [m/s^2] is the control input (the acceleration of the pivot point). Assume the pendulum starts at the initial condition $x_0 = [\frac{2\pi}{3},0]^T$ at time $t=0$ and we wish the pendulum goes to the equilibrium point $x_e = [0,0]^T$ at time $t=10$. To compute such a control law $u(t)$, we solve the OCP:
+```math
+\min h(\xi) = m(x(T)) + \int^T_0 l(x(t),u(t),t) dt \\
+s.t.    \quad \dot{x} = f(x,u,t), x(0) = x_0.
+```
+First, we load some dependencies:
+```julia
+using PRONTO
+using LinearAlgebra
+using StaticArrays
+using Base: @kwdef
+```
+Now we can define our model for this inverted pendulum. We decide to name our model `InvPend`, where `{2,1}` represents the 2 state vector $x$, the single control input $u$; `L` is the length of the pendulum and `g` is the gravity acceleration on earth.  
+```julia
+@kwdef struct InvPend <: Model{2,1}
+    L::Float64 = 2 
+    g::Float64 = 9.81 
+end
+```
+Then we can define our OCP, where the dynamics $f = \dot{x}$, the incremental cost $l = \frac{1}{2}x^TIx+\frac{1}{2}u^TIu$, and the terminal cost $m = \frac{1}{2}x^TIx$.
+```julia
+@define_f InvPend [
+    x[2],
+    g/L*sin(x[1])-u[1]*cos(x[1])/L,
+]
+@define_l InvPend 1/2*x'*I(2)*x + 1/2*u'*I(1)*u
+@define_m InvPend 1/2*x'*I(2)*x
+```
+Next we define a LQR for the projection operator. In this case, we only need to define `Q` and `R`; `P` is computed by ARE around the equilibrium point.
+```julia
+@define_Q InvPend diagm([10, 1])
+@define_R InvPend diagm([1e-3])
+```
+Last we compute the Lagrange dynamics $L = l + \lambda^Tf$.
+```julia
+resolve_model(InvPend)
+```
+Now we can solve this OCP! We load the parameter `θ`, the time horizon `τ` and the inital condition `x0`. For this OCP, our intial guess does NOT have to be a trajectory! We assume a pair of state-and-input curve `α` and `μ`, which is NOT a trajectory, but we can obtain `η`, which is the output from the projection operator.
+```julia
+θ = InvPend() 
+τ = t0,tf = 0,10
+x0 = @SVector [2π/3;0]
+
+xe = @SVector [0;0]
+u0 = @SVector [0.0]
+α = t->xe
+μ = t->u0
+η = closed_loop(θ,x0,α,μ,τ)
+```
+The desired OCP is solved!
+```julia
+ξ,data = pronto(θ,x0,η,τ; tol=1e-3);
+```
+
+
 
 ## An Example: Two Spin System
 We consider the Schrödinger equation

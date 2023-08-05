@@ -20,16 +20,16 @@ end
 @define_Q InvPend diagm([10, 1])
 @define_R InvPend diagm([1e-3])
 resolve_model(InvPend)
-PRONTO.preview(θ::InvPend, ξ) = ξ.x
+# PRONTO.preview(θ::InvPend, ξ) = ξ.x
 
 ## ----------------------------------- solve the problem ----------------------------------- ##
 
 θ = InvPend() 
 τ = t0,tf = 0,10
 x0 = @SVector [2π/3;0]
+
 xf = @SVector [0;0]
 u0 = @SVector [0.0]
-
 α = t->xf
 μ = t->u0
 η = closed_loop(θ,x0,α,μ,τ)
