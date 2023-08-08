@@ -19,7 +19,7 @@ end
 
 nx(Kr::Regulator) = nx(Kr.θ)
 nu(Kr::Regulator) = nu(Kr.θ)
-extrema(Kr::Regulator) = extrema(Kr.Pr)
+domain(Kr::Regulator) = domain(Kr.Pr)
 eachindex(Kr::Regulator) = OneTo(nu(Kr)*nx(Kr))
 show(io::IO, Kr::Regulator) = println(io, make_plot(t->vec(Kr(t)), t_plot(Kr)))
 

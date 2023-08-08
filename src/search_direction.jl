@@ -58,7 +58,7 @@ end
 order(Ko::OptFBGain) = Ko.N
 nx(Ko::OptFBGain) = nx(Ko.θ)
 nu(Ko::OptFBGain) = nu(Ko.θ)
-extrema(Ko::OptFBGain) = extrema(Ko.P)
+domain(Ko::OptFBGain) = domain(Ko.P)
 eachindex(Ko::OptFBGain) = OneTo(nu(Ko)*nx(Ko))
 show(io::IO, Ko::OptFBGain) = println(io, println(io, make_plot(t->vec(Ko(t)), t_plot(Ko))))
 
@@ -181,7 +181,7 @@ end
 order(vo::OptFFWInput) = vo.N
 nx(vo::OptFFWInput) = nx(vo.θ)
 nu(vo::OptFFWInput) = nu(vo.θ)
-extrema(vo::OptFFWInput) = extrema(vo.r)
+domain(vo::OptFFWInput) = domain(vo.r)
 eachindex(vo::OptFFWInput) = OneTo(nu(vo)^2)
 show(io::IO, vo::OptFFWInput) = println(io, make_plot(t->vec(vo(t)), t_plot(vo)))
 
