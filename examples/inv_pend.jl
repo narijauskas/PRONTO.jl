@@ -36,3 +36,4 @@ u0 = @SVector [0.0]
 
 ξ,data = pronto(θ,x0,η,τ; tol=1e-4);
 ξ,data = pronto(θ,x0,η,τ; tol=1e-4, show_preview=false);
+descent(data)
