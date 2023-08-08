@@ -155,15 +155,21 @@ end
 
 PLOT_HEIGHT::Int = 10
 PLOT_WIDTH::Int = 100
+PLOT_COLORS = [
+    crayon"#FFC12E",
+    crayon"#FF7F10",
+    crayon"#FF3C38",
+    crayon"#FF006E",
+    crayon"#2AD599",
+    crayon"#007DC6",
+]
+PLOT_KW = (
+    height = PLOT_HEIGHT, 
+    width = PLOT_WIDTH,
+    color = repeat(PLOT_COLORS, 3),
+)
 t_plot(t0,tf) = LinRange(t0,tf,4*PLOT_WIDTH)
 t_plot(x) = t_plot(domain(x)...)
-
-
-# for convenience more than anything
-function Base.getindex(ode::ODE, i)
-    [ode(t)[ix] for t in t_plot(ode), ix in i]
-end
-
 
 function set_plot_scale(height, width)
     global PLOT_HEIGHT = convert(Int, height)
@@ -178,22 +184,11 @@ function make_plot(f, ts)
     lineplot(ts, reduce(hcat, collect.(f(t) for t∈ts))';
                 height = PLOT_HEIGHT,
                 width = PLOT_WIDTH,
-                labels = false,
-                color = repeat(manto_colors,3))
+                color = repeat(PLOT_COLORS,3),
+                labels = false)
 end
 
 # before julia 1.9:
 # reduce(hcat, collect.(ξ.x(t) for t∈ts))'
 # after julia 1.9:
 # stack(ξ.x(t) for t∈ts)'
-
-
-
-manto_colors = [
-    crayon"#FFC12E",
-    crayon"#FF7F10",
-    crayon"#FF3C38",
-    crayon"#FF006E",
-    crayon"#2AD599",
-    crayon"#007DC6",
-]
