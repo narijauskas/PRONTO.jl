@@ -4,7 +4,7 @@
 
 function armijo(θ, x0, ξ, ζ, Kr, h, Dh, τ;
                 resample_dt = 0.001,
-                armijo_maxiters = 25,
+                armijo_maxiters = 35,
                 show_armijo = false,
                 α = 0.4,
                 β = 0.7)
@@ -43,7 +43,7 @@ function armijo_projection(θ::Model{NX,NU},x0,x,u,z,v,γ,Kr,τ; resample_dt=0.0
         return SVector{NU,Float64}(μ - Kr_(t)*(x1-α))
     end
 
-    x = ODE(dxdt_armijo, x0, (t0,tf), (θ,x,u,z,v,γ,Kr); callback = cb, kw...)
+    x = ODE(dxdt_armijo, x0, (t0,tf), (θ,x,u,z,v,γ,Kr); callback = cb, tstops=LinRange(t0,tf,1000), kw...)
 
     u = VecInterpolant(
         MVector{NU, Float64}(undef),

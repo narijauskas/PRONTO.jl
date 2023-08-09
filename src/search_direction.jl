@@ -213,7 +213,7 @@ function search_direction(θ::Model{NX,NU},ξ,Ko,vo,τ; resample_dt=0.001) where
     end
 
     z0 = zeros(SVector{NX,Float64})
-    z = ODE(dz_dt, z0, (t0,tf), (θ,ξ,Ko,vo); callback = cb)
+    z = ODE(dz_dt, z0, (t0,tf), (θ,ξ,Ko,vo); callback = cb, tstops=LinRange(t0,tf,1000))
     v = VecInterpolant(
         MVector{NU, Float64}(undef),
         # [AkimaInterpolation([x[i] for x in sv.saveval], sv.t) for i in 1:NU],

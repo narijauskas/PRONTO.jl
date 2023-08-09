@@ -63,7 +63,7 @@ function projection(θ::Model{NX,NU}, x0, α, μ, Kr, (t0,tf); dt=0.001) where {
         return SVector{NU,Float64}(μ - Kr*(x-α))
     end
 
-    x = ODE(dxdt, x0, (t0,tf), (θ,α,μ,Kr); callback = cb)
+    x = ODE(dxdt, x0, (t0,tf), (θ,α,μ,Kr); callback = cb, tstops=LinRange(t0,tf,100))
     # u = DataInterpolations.CubicSpline(sv.saveval, sv.t)
     # u = DataInterpolations.AkimaInterpolation(first.(sv.saveval), sv.t)
 

@@ -84,4 +84,10 @@ t0,tf = τ = (0,10)
 x0 = SVector{22}(x_eig(1))
 μ = t->SVector{1}(0.4*sin(t))
 η = open_loop(θ,x0,μ,τ)
-ξ,data = pronto(θ,x0,η,τ);
+@profview ξ,data = pronto(θ,x0,η,τ)
+show(data)
+
+for _ in 1:50
+    ξ,data = pronto(θ,x0,η,τ)
+    GC.gc()
+end

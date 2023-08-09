@@ -88,6 +88,7 @@ end
 
 @define_R Spin2 kr*I(NU)
 PRONTO.Pf(θ::Spin2,α,μ,tf) = SMatrix{NX,NX,Float64}(I(NX)-α*α')
+PRONTO.preview(θ::Spin2, ξ) = ξ.u
 
 # must be run after any changes to model definition
 resolve_model(Spin2)
@@ -103,7 +104,8 @@ tlist = collect(range(0, 5, length=500));
 θ = Spin2()
 μ = t -> [0.2 * flattop(t, T=5, t_rise=0.3, func=:blackman)];
 η = open_loop(θ, x0, μ, τ)
-ξ,data = pronto(θ, x0, η, τ; tol=1e-4, show_preview=false);
-
+@benchmark ξ,data = pronto(θ, x0, η, τ; tol=1e-4, show_preview=false)
+show(data)
+descent(data)
 # terminal cost for each iteration
-# [PRONTO.p(θ,ξ.x(tf),ξ.u(tf),tf) for ξ in data.ξ]*2
+[PRONTO.m(θ,ξ.x(tf),ξ.u(tf),tf) for ξ in data.ξ]*2
