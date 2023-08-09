@@ -89,10 +89,11 @@ function ODE(fn::Function, ic, ts, p, ::Size{S}; alg=Tsit5(), kw...) where {S}
 
     buf = MArray{Tuple{S...}, Float64, length(S), prod(S)}(undef)
     fill!(buf, 0)
-    prob = init(ODEProblem(fn, ic, ts, p), alg, reltol=1e-6, abstol=1e-6, kw...)
-    solve!(prob)
-    addsteps!(prob)
-    ODE(buf, prob.sol.retcode, prob.sol.interp)
+    # prob = init(ODEProblem(fn, ic, ts, p), alg, reltol=1e-6, abstol=1e-6, kw...)
+    # solve!(prob)
+    # addsteps!(prob)
+    sol = solve(ODEProblem(fn, ic, ts, p), alg; reltol=1e-6, abstol=1e-6, kw...)
+    ODE(buf, sol.retcode, sol.interp)
 end
 
 
