@@ -21,6 +21,12 @@ macro define_l(T, ex)
     :(define_l($(esc(T)), $(esc(fn))))
 end
 
+macro define_c(T, ex)
+    names = fieldnames(eval(:(Main.$T)))
+    fn = :((x,u,t, $(names...)) -> $ex)
+    :(define_c($(esc(T)), $(esc(fn))))
+end
+
 macro define_m(T, ex)
     names = fieldnames(eval(:(Main.$T)))
     fn = :((x,u,t, $(names...)) -> $ex)
@@ -69,12 +75,13 @@ function define_f(T::Type{<:Model{NX,NU}}, user_f) where {NX,NU}
     define_methods(T, Size(NX,NX,NX), Jx(Jx(f)), :fxx, :x, :u, :t)
     define_methods(T, Size(NX,NX,NU), Ju(Jx(f)), :fxu, :x, :u, :t)
     define_methods(T, Size(NX,NU,NU), Ju(Ju(f)), :fuu, :x, :u, :t)
-    return nothing
+    return f
 end
 
 function define_l(T::Type{<:Model{NX,NU}}, user_l) where {NX,NU}
     info("defining stage cost and derivatives for $(as_bold(T))")
     l = traceuser(T, user_l)
+    return l
     Jx,Ju = jacobians(T)
     lx = reshape(Jx(l), NX)
     lu = reshape(Ju(l), NU)
@@ -87,9 +94,18 @@ function define_l(T::Type{<:Model{NX,NU}}, user_l) where {NX,NU}
     return nothing
 end
 
+
+function define_c(T::Type{<:Model{NX,NU}}, user_c) where {NX,NU}
+    info("defining constraints for $(as_bold(T))")
+    c = traceuser(T, user_c)
+    define_methods(T, Size(length(c)), c, :c, :x, :u, :t)
+    return nothing
+end
+
 function define_m(T::Type{<:Model{NX,NU}}, user_m) where {NX,NU}
     info("defining terminal cost and derivatives for $(as_bold(T))")
     m = traceuser(T, user_m)
+    # return m
     Jx,Ju = jacobians(T)
     mx = reshape(Jx(m), NX)
     define_methods(T, Size(1), m, :m, :x, :u, :t)
@@ -139,6 +155,47 @@ function define_L(T::Type{<:Model{NX,NU}}) where {NX,NU}
     return nothing
 end
 
+function resolve_all(T::Type{<:Model{NX,NU}},f,l) where {NX,NU}
+    Jx,Ju = jacobians(T)
+
+    fx = Jx(f)
+    fu = Ju(f)
+    fxx = Jx(fx)
+    fxu = Ju(fx)
+    fuu = Ju(fu)
+
+    define_methods(T, Size(NX), f, :f, :x, :u, :t)
+    define_methods(T, Size(NX,NX), fx, :fx, :x, :u, :t)
+    define_methods(T, Size(NX,NU), fu, :fu, :x, :u, :t)
+    define_methods(T, Size(NX,NX,NX), fxx, :fxx, :x, :u, :t)
+    define_methods(T, Size(NX,NX,NU), fxu, :fxu, :x, :u, :t)
+    define_methods(T, Size(NX,NU,NU), fuu, :fuu, :x, :u, :t)
+
+    lx = reshape(Jx(l), NX)
+    lu = reshape(Ju(l), NU)
+    lxx = Jx(lx)
+    lxu = Ju(lx)
+    luu = Ju(lu)
+
+    define_methods(T, Size(1), l, :l, :x, :u, :t)
+    define_methods(T, Size(NX), lx, :lx, :x, :u, :t)
+    define_methods(T, Size(NU), lu, :lu, :x, :u, :t)
+
+    λ = collect(first(@variables λ[1:NX]))
+    Lxx = lxx .+ sum(λ[k]*fxx[k,:,:] for k in 1:NX)
+    Lxu = lxu .+ sum(λ[k]*fxu[k,:,:] for k in 1:NX)
+    Luu = luu .+ sum(λ[k]*fuu[k,:,:] for k in 1:NX)
+
+    define_methods(T, Size(NX,NX), Lxx, :Lxx, :λ, :x, :u, :t)
+    define_methods(T, Size(NX,NU), Lxu, :Lxu, :λ, :x, :u, :t)
+    define_methods(T, Size(NU,NU), Luu, :Luu, :λ, :x, :u, :t)
+
+    ε = symbolic(:ε, 7)
+    
+    define_methods(T, Size(NX,NX), substitute(lxx, Dict(ε[7]=>0)), :lxx, :x, :u, :t)
+    define_methods(T, Size(NX,NU), substitute(lxu, Dict(ε[7]=>0)), :lxu, :x, :u, :t)
+    define_methods(T, Size(NU,NU), substitute(luu, Dict(ε[7]=>0)), :luu, :x, :u, :t)
+end
 
 # ----------------------------------- code generation helpers ----------------------------------- #
 

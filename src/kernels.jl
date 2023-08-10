@@ -49,3 +49,6 @@ Luu(θ,λ,x,u,t) = throw(ModelDefError(θ))
 Lxx!(out,θ,λ,x,u,t) = throw(ModelDefError(θ))
 Lxu!(out,θ,λ,x,u,t) = throw(ModelDefError(θ))
 Luu!(out,θ,λ,x,u,t) = throw(ModelDefError(θ))
+
+c(θ,x,u,t) = throw(ModelDefError(θ))
+c!(out,θ,x,u,t) = throw(ModelDefError(θ))

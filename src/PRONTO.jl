@@ -37,7 +37,7 @@ using Base: fieldindex
 import Base: extrema, length, eachindex, show, size, eltype, getproperty, getindex
 
 
-export @define_f, @define_l, @define_m, @define_Q, @define_R
+export @define_f, @define_l, @define_m, @define_Q, @define_R, @define_c
 export @dynamics, @incremental_cost, @terminal_cost, @regulator_Q, @regulator_R
 export resolve_model, symbolic
 export zero_input, open_loop, closed_loop, smooth
@@ -255,12 +255,26 @@ function closed_loop(θ, x0, α, μ, τ)
     Kr = regulator(θ, α, μ, τ)
     projection(θ, x0, α, μ, Kr, τ)
 end
+# for each constraint
+# c(ξ(t))
 
 # ----------------------------------- pronto loop ----------------------------------- #
 
 fwd(τ) = extrema(τ)
 bkwd(τ) = reverse(fwd(τ))
 
+# function isfeasible(θ::Model, ξ::Trajectory, (t0,tf))
+#     bar = [[c(θ, ξ.x(t), ξ.u(t), t)[i] for t in LinRange(t0,tf,1000)] for i in 1:7]
+#     @. maximum(bar) < 0
+# end
+
+function feas(θ::Model, ξ::Trajectory, (t0,tf))
+    maximum.([[c(θ, ξ.x(t), ξ.u(t), t)[i] for t in LinRange(t0,tf,1000)] for i in 1:7])
+end
+
+function isfeasible(θ::Model, ξ::Trajectory, τ)
+    feas(θ, ξ, τ) .< 0
+end
 
 # solves for x(t),u(t)'
 function pronto(θ::Model, x0::StaticVector, ξ::Trajectory, τ; 
@@ -280,6 +294,22 @@ function pronto(θ::Model, x0::StaticVector, ξ::Trajectory, τ;
         loop_start = time_ns()
         data.iterations[] += 1
         push!(data.ξ, ξ)
+
+        println(isfeasible(θ, ξ, τ))
+        if all(isfeasible(θ, ξ, τ))
+            println("all feasible!")
+            θ.δ = -0.5.*feas(θ, ξ, τ)
+        else
+            # θ.δ = θ.δ./2 # for only the infeasible ones
+            # foreach(fs,δ isfeasible(θ, ξ, τ), θ.δ)
+            θ.δ = map(zip(isfeasible(θ, ξ, τ), θ.δ)) do (fs,δ)
+                fs ? δ : δ/2
+            end
+            # θ.δ = isfeasible(θ, ξ, τ) ? θ.δ : θ.δ./2
+        end
+        # if any deltas go below tolerance - error and quit
+        println(θ.δ)
+        
 
         # -------------- build regulator -------------- #
         # α,μ -> Kr,x,u
