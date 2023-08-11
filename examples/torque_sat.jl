@@ -339,12 +339,20 @@ J = θ.J
 η = closed_loop(θ,x0,α,μ,τ)
 @time ξ,data = pronto(θ,x0,η,τ; tol = 1e-4)
 
+θ.ε = θ.ε*ε_i
 
+ε_0 = [0.1*ones(6); 1]
+ε_i = 0.21*ones(7) # fast mode
+ε_f = 2e-3.*ε_0
 
+while !all(θ.ε .<= ε_f)
+    θ.ε = θ.ε.*ε_i # only decrement the ones that haven't satisfied the tolerance
+    ξ,data = pronto(θ,x0,ξ,τ; tol = 1e-4)
+end
 
 ## ------------------------------- plotting ------------------------------- ##
 
-using GLMakie
+using CairoMakie
 
 # plot quaternion, angular rate state elements separately
 fig = Figure()
@@ -374,4 +382,4 @@ lines!(ax, ts, vec(1 .- nqt))
 
 
 
-save("torque_sat.png", fig)https://github.com/Thomas-Dearing/ProntoDev
+save("torque_sat.png", fig)#https://github.com/Thomas-Dearing/ProntoDev

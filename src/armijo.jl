@@ -12,12 +12,22 @@ function armijo(θ, x0, ξ, ζ, Kr, h, Dh, τ;
     γmin = β^armijo_maxiters
     γ = min(γmax(θ,ζ,τ), 1.0)
     φ = ξ
-    while γ > γmin
-        show_armijo && iiinfo("γ = $(round(γ; digits=6))")
-        # φ = P(ξ+γζ)
-        φ = armijo_projection(θ, x0, ξ, ζ, γ, Kr, τ; resample_dt)
-        g = cost(φ, τ)
-        h-g >= -α*γ*Dh ? break : (γ *= β)
+    if all(isfeasible(θ, ξ, τ))
+        while γ > γmin
+            show_armijo && iiinfo("γ = $(round(γ; digits=6))")
+            # φ = P(ξ+γζ)
+            φ = armijo_projection(θ, x0, ξ, ζ, γ, Kr, τ; resample_dt)
+            g = cost(φ, τ)
+            (h-g >= -α*γ*Dh && all(isfeasible(θ,φ,τ))) ? break : (γ *= β)
+        end
+    else
+        while γ > γmin
+            show_armijo && iiinfo("γ = $(round(γ; digits=6))")
+            # φ = P(ξ+γζ)
+            φ = armijo_projection(θ, x0, ξ, ζ, γ, Kr, τ; resample_dt)
+            g = cost(φ, τ)
+            h-g >= -α*γ*Dh ? break : (γ *= β)
+        end
     end
     return φ,γ
 end
