@@ -335,11 +335,12 @@ J = θ.J
 μ = t->GenGuessXU(t,tf,x0,xd,J)[2]
 
 
-θ = TorqueSatC()
+θ = TorqueSatC(ε = ε_0)
 η = closed_loop(θ,x0,α,μ,τ)
-@time ξ,data = pronto(θ,x0,η,τ; tol = 1e-4)
-
-θ.ε = θ.ε*ε_i
+dat = PRONTO.Data[]
+@time ξ,d = pronto(θ,x0,η,τ; tol = 1e-4)
+push!(dat,d)
+# θ.ε = θ.ε*ε_i
 
 ε_0 = [0.1*ones(6); 1]
 ε_i = 0.21*ones(7) # fast mode
@@ -347,7 +348,8 @@ J = θ.J
 
 while !all(θ.ε .<= ε_f)
     θ.ε = θ.ε.*ε_i # only decrement the ones that haven't satisfied the tolerance
-    ξ,data = pronto(θ,x0,ξ,τ; tol = 1e-4)
+    ξ,d = pronto(θ,x0,ξ,τ; tol = 1e-4)
+    push!(dat,d)
 end
 
 ## ------------------------------- plotting ------------------------------- ##
@@ -355,7 +357,7 @@ end
 using CairoMakie
 
 # plot quaternion, angular rate state elements separately
-fig = Figure()
+fig = Figure(; resolution = (1600, 900))
 ts = 0:0.001:tf
 ax = Axis(fig[1,1]; xlabel="time [s]", ylabel="quaternion")
 qt = [data.ξ[end].x(t)[i] for t∈ts, i∈1:4]
@@ -369,7 +371,7 @@ foreach(i->lines!(ax, ts, wt[:,i]), 1:3)
 ax = Axis(fig[3,1]; xlabel="time [s]", ylabel="input [Nm]")
 u = [data.ξ[end].u(t)[i] for t∈ts, i∈1:3]
 foreach(i->lines!(ax, ts, u[:,i]), 1:3)
-display(fig)
+# display(fig)
 
 # Compute and plot quaternion norm to validate error tolerance
 nqt = zeros(length(ts))
@@ -380,6 +382,6 @@ ax = Axis(fig[4,1]; xlabel="time [s]", ylabel="quaternion norm")
 lines!(ax, ts, vec(1 .- nqt))
 
 
-
+display(fig)
 
 save("torque_sat.png", fig)#https://github.com/Thomas-Dearing/ProntoDev
