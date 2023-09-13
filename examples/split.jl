@@ -60,14 +60,14 @@ end
     return 1/2*x'*P*x
 end
 
-@define_Q Split2 begin
+@define_Qr Split2 begin
     x_re = x[1:11]
     x_im = x[12:22]
     ψ = x_re + im*x_im
     return kq*mprod(I(11) - ψ*ψ')
 end
 
-@define_R Split2 kr*I(1)
+@define_Rr Split2 kr*I(1)
 
 # must be run after any changes to model definition
 resolve_model(Split2)

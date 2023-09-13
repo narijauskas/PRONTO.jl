@@ -17,8 +17,8 @@ end
 ]
 @define_l InvPend 1/2*x'*I(2)*x + 1/2*u'*I(1)*u
 @define_m InvPend 1/2*x'*I(2)*x
-@define_Q InvPend diagm([10, 1])
-@define_R InvPend diagm([1e-3])
+@define_Qr InvPend diagm([10, 1])
+@define_Rr InvPend diagm([1e-3])
 resolve_model(InvPend)
 PRONTO.preview(θ::InvPend, ξ) = ξ.x
 
