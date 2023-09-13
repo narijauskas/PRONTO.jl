@@ -27,8 +27,8 @@ end
     1/2*x'*Pl*x
 end
 
-@define_Q TwoSpin kq*I(4)
-@define_R TwoSpin kr*I(1)
+@define_Qr TwoSpin kq*I(4)
+@define_Rr TwoSpin kr*I(1)
 resolve_model(TwoSpin)
 
 

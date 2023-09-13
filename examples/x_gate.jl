@@ -49,8 +49,8 @@ end
     return 1/2*(x-xf)'*I(12)*(x-xf)
 end
 
-@define_Q XGate3 kq*I(12)
-@define_R XGate3 kr*I(1)
+@define_Qr XGate3 kq*I(12)
+@define_Rr XGate3 kr*I(1)
 
 # must be run after any changes to model definition
 resolve_model(XGate3)

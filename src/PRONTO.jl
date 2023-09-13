@@ -36,7 +36,7 @@ using Base: fieldindex
 import Base: extrema, length, eachindex, show, size, eltype, getproperty, getindex
 
 
-export @define_f, @define_l, @define_m, @define_Q, @define_R
+export @define_f, @define_l, @define_m, @define_Qr, @define_Rr
 export @dynamics, @incremental_cost, @terminal_cost, @regulator_Q, @regulator_R
 export resolve_model, symbolic
 export zero_input, open_loop, closed_loop, smooth

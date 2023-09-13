@@ -42,8 +42,8 @@ end
 
 @define_l LaneChange 1/2*(x-xeq)'*I*(x-xeq) + 1/2*u'*I*u
 @define_m LaneChange 1/2*(x-xeq)'*I*(x-xeq)
-@define_R LaneChange diagm(kr)
-@define_Q LaneChange diagm(kq)
+@define_Rr LaneChange diagm(kr)
+@define_Qr LaneChange diagm(kq)
 resolve_model(LaneChange)
 PRONTO.preview(θ::LaneChange, ξ) = ξ.x
 

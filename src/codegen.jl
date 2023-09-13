@@ -27,24 +27,24 @@ macro define_m(T, ex)
     :(define_m($(esc(T)), $(esc(fn))))
 end
 
-macro define_Q(T, ex)
+macro define_Qr(T, ex)
     names = fieldnames(eval(:(Main.$T)))
     fn = :((x,u,t, $(names...)) -> $ex)
-    :(define_Q($(esc(T)), $(esc(fn))))
+    :(define_Qr($(esc(T)), $(esc(fn))))
 end
 
-macro define_R(T, ex)
+macro define_Rr(T, ex)
     names = fieldnames(eval(:(Main.$T)))
     fn = :((x,u,t, $(names...)) -> $ex)
-    :(define_R($(esc(T)), $(esc(fn))))
+    :(define_Rr($(esc(T)), $(esc(fn))))
 end
 
 # friendly names for the macros
 var"@dynamics" = var"@define_f"
 var"@incremental_cost" = var"@define_l"
 var"@terminal_cost" = var"@define_m"
-var"@regulator_Q" = var"@define_Q"
-var"@regulator_R" = var"@define_R"
+var"@regulator_Q" = var"@define_Qr"
+var"@regulator_R" = var"@define_Rr"
 
 # run before using model, ensures all methods are generated
 function resolve_model(T::Type{<:Model})
@@ -98,14 +98,14 @@ function define_m(T::Type{<:Model{NX,NU}}, user_m) where {NX,NU}
     return nothing
 end
 
-function define_Q(T::Type{<:Model{NX,NU}}, user_Q) where {NX,NU}
+function define_Qr(T::Type{<:Model{NX,NU}}, user_Q) where {NX,NU}
     info("defining regulator Q method for $(as_bold(T))")
     Q = traceuser(T, user_Q)
     define_methods(T, Size(NX,NX), Q, :Q, :x, :u, :t)
     return nothing
 end
 
-function define_R(T::Type{<:Model{NX,NU}}, user_R) where {NX,NU}
+function define_Rr(T::Type{<:Model{NX,NU}}, user_R) where {NX,NU}
     info("defining regulator R method for $(as_bold(T))")
     R = traceuser(T, user_R)
     define_methods(T, Size(NU,NU), R, :R, :x, :u, :t)
