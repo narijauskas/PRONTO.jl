@@ -17,8 +17,7 @@ end
 
 @kwdef struct XGate3 <: PRONTO.Model{12,1}
     kl::Float64 = 0.01
-    kr::Float64 = 1.0
-    kq::Float64 = 1.0
+    kq::Float64 = 0.5
 end
 
 @define_f XGate3 begin
@@ -39,7 +38,7 @@ end
 end
 
 @define_l XGate3 begin
-    kl/2*u'*I*u + 0.3*x'*mprod(diagm([0,0,1,0,0,1]))*x
+    kl/2*u'*I*u + kq/2*x'*mprod(diagm([0,0,1,0,0,1]))*x
 end
 
 @define_m XGate3 begin
@@ -49,15 +48,13 @@ end
     return 1/2*(x-xf)'*I(12)*(x-xf)
 end
 
-@define_Qr XGate3 kq*I(12)
-@define_Rr XGate3 kr*I(1)
+@define_Qr XGate3 I(12)
+@define_Rr XGate3 I(1)
+PRONTO.Pf(θ::XGate3,α,μ,tf) = SMatrix{12,12,Float64}(I(12))
 
 # must be run after any changes to model definition
 resolve_model(XGate3)
 
-# overwrite default behavior of Pf
-PRONTO.Pf(θ::XGate3,α,μ,tf) = SMatrix{12,12,Float64}(I(12))
-PRONTO.γmax(θ::XGate3, ζ, τ) = PRONTO.sphere(2, ζ, τ)
 PRONTO.preview(θ::XGate3, ξ) = ξ.u
 
 ## ----------------------------------- run optimization ----------------------------------- ##
@@ -70,5 +67,4 @@ PRONTO.preview(θ::XGate3, ξ) = ξ.u
 x0 = SVector{12}(vec([ψ1;ψ2;0*ψ1;0*ψ2]))
 μ = t->SVector{1}((π/tf)*exp(-(t-tf/2)^2/(tf^2))*cos(2*π*1*t))
 η = open_loop(θ, x0, μ, τ) # guess trajectory
-ξ,data = pronto(θ, x0, η, τ); # optimal trajectory
-
+ξ,data = pronto(θ, x0, η, τ;tol=1e-4); # optimal trajectory
