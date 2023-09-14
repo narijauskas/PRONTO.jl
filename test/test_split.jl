@@ -138,7 +138,7 @@ end
 
 x0 = SVector{18}(x_eig(1))
 # xf = SVector{22}((x_eig(4) + x_eig(5))/sqrt(2))
-t0,tf = τ = (0,1.9)
+t0,tf = τ = (0,1.5)
 
 
 θ = Split1(kl=0.01, kr=1, kq=1)
