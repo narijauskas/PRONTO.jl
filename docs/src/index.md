@@ -108,8 +108,7 @@ end
 For our incremental cost $l$, we simpy penilize the control effort $u$
 ```julia
 @define_l TwoSpin begin 
-    Rl = [0.01;;] 
-    1/2*u'*Rl*u
+    1/2*u'*kl*u
 end
 ```
 For this example, the control objective is to steer the system from the $|0\rangle = [1, 0]^T$ state to the target state $|1\rangle = [0, 1]^T$. We can then define our terminal cost function $m$ as 
@@ -119,9 +118,9 @@ m(x(T)) = \frac{1}{2} x^T(T)|P|x(T), P=\begin{bmatrix}1 & 0 & 0 & 0 \\0 & 0 & 0 
 to penilize both real and imaginal parts for $|0\rangle$.
 ```julia
 @define_m TwoSpin begin 
-    Pl = [0 0 0 0;0 1 0 0;0 0 0 0;0 0 0 1] 
+    Pl = [1 0 0 0;0 0 0 0;0 0 1 0;0 0 0 0] 
     1/2*x'*Pl*x
-    end
+end
 ```
 
 For this example, a Linear-Quadratic Regulator (LQR) is used and designed in this way:
