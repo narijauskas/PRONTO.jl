@@ -150,3 +150,99 @@ xf = @SVector [0.0, 1.0, 0.0, 0.0]
 
 If you do this right, you should get:![image description](./Uopt.png)![image description](./Xopt.png)
 The top figure is the optimal control input $u(t)$, while the bottom figure is the state vector $x(t)$ evolves in time. We wish to check if we achieve our control objective, which is to steer the system from $|0\rangle$ to $|1\rangle$, the evolution in time of population is shown below![image description](./Popt.png) 
+
+## Qubit: Pauli X Gate
+We consider a 3-level fluxionium qubit, whose Hamiltonian can be written as
+```math
+H(u)=H_0 + uH_{\text{drive}} = \begin{bmatrix}0 & 0 & 0 \\0 & 1.0 &0\\0 & 0 & 5.0\end{bmatrix} + u\begin{bmatrix}0 & 0.1 & 0.3 \\0.1 & 0 & 0.5\\0.3 & 0.5 & 0\end{bmatrix},
+```
+where $H_0$ is the free Hamiltonian, $H_{\text{drive}}$ is the control Hamiltonian, and $u(t)$ is the control input. We wish to find the optimal control input $u^{\star}(t)$ that performs the X gate for this qubit, that is, $u^{\star}(t)$ steers $|0\rangle=[1,0,0]^T$ to $|1\rangle=[0,1,0]^T$, while simultaneously steers $|1\rangle$ to $|0\rangle$. Meanwhile, we wish to aviod the undesirade state, which is the third state of the system.
+
+First, we load some dependencies:
+```julia
+using PRONTO
+using LinearAlgebra
+using StaticArrays
+using Base: @kwdef
+```
+Then we define a helper function `mprod` converting a complex matrix to its real representation  
+```julia
+function mprod(x)
+    Re = I(2)
+    Im = [0 -1;
+          1 0]
+    M = kron(Re,real(x)) + kron(Im,imag(x))
+    return M
+end
+```
+
+We decide to name our model `XGate3`, where `{12,1}` represents the 12 states vector $x ([|\psi_1\rangle, |\psi_2\rangle]^T)$, and the single input $u$. For this example, our parameters are `kl`, which is a scalar that penilize the control effort, and `kq`, which is a scalar that penilize the undesirade population.
+```julia
+@kwdef struct XGate3 <: PRONTO.Model{12,1}
+    kl::Float64 = 0.01
+    kq::Float64 = 0.5
+end
+```
+First, we can define our dynamics $f$
+```julia
+@define_f XGate3 begin
+    E0 = 0.0
+    E1 = 1.0
+    E2 = 5.0
+    H0 = diagm([E0, E1, E2])
+    H00 = kron(I(2),H0)
+    a1 = 0.1
+    a2 = 0.5
+    a3 = 0.3
+    Ω1 = a1 * u[1]
+    Ω2 = a2 * u[1]
+    Ω3 = a3 * u[1]
+    H1 = [0 Ω1 Ω3; Ω1 0 Ω2; Ω3 Ω2 0]
+    H11 = kron(I(2),H1)
+    return 2 * π * mprod(-im * (H00 + H11)) * x
+end
+```
+For our incremental cost $l$, we penilize both the control effort $u$ and undesirade third state
+```julia
+@define_l XGate3 begin
+    kl/2*u'*I*u + kq/2*x'*mprod(diagm([0,0,1,0,0,1]))*x
+end
+```
+For this example, the control objective is to steer the system from the $|0\rangle = [1, 0, 0]^T$ state to the target state $|1\rangle = [0, 1, 0]^T$, while simultaneously steers $|1\rangle$ to $|0\rangle$. We can then define our terminal cost function $m$ as 
+```math
+m(x(T)) = \|\psi_1(T)-|1\rangle\|^2 + \|\psi_2(T)-|0\rangle\|^2.
+```
+
+```julia
+@define_m XGate3 begin
+    ψ1 = [1;0;0]
+    ψ2 = [0;1;0]
+    xf = vec([ψ2;ψ1;0*ψ2;0*ψ1])
+    return 1/2*(x-xf)'*I(12)*(x-xf)
+end
+```
+
+For this example, a Linear-Quadratic Regulator (LQR) is used and designed in this way:
+```math
+R_r(t) = I,\\Q_r(t) = I ,\\P_r(T) = Q_r(T) = I.
+``` 
+```julia
+@define_Qr XGate3 I(12)
+@define_Rr XGate3 I(1)
+PRONTO.Pf(θ::XGate3,α,μ,tf) = SMatrix{12,12,Float64}(I(12))
+```
+Last we compute the Lagrange dynamics $L = l + \lambda^Tf$.
+```julia
+resolve_model(InvPend)
+```
+We now can solve the OCP! This time, we assume our guess input $\mu(t)=\frac{\pi}{T}e^{...}\cos{(2\pi t)}$ and initialize our solver by computing the open loop system.
+```julia
+θ = XGate3()
+τ = t0,tf = 0,10
+ψ1 = [1;0;0]
+ψ2 = [0;1;0]
+x0 = SVector{12}(vec([ψ1;ψ2;0*ψ1;0*ψ2]))
+μ = t->SVector{1}((π/tf)*exp(-(t-tf/2)^2/(tf^2))*cos(2*π*1*t))
+η = open_loop(θ, x0, μ, τ) # guess trajectory
+ξ,data = pronto(θ, x0, η, τ;tol=1e-4); # optimal trajectory
+```
