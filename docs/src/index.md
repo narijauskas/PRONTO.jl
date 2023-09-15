@@ -9,17 +9,22 @@ where $t\in[0,T]$ is time, $x\in\mathbb R^n$ and $u\in\mathbb R^m$ are the state
 ## Double Integrator
 WIP
 ## Inverted Pendulum
+This example showcases PRONTO's ability to:
+1) steer the system to an **unstable** equilibrium point, 
+2) handle **non-convex** cost functions,
+3) use the **desired target** as an initial guess. 
+
 Consider the dynamics of an inverted pendulum
 ```math
 f(x,u,t)= \begin{bmatrix}x_2 \\\frac{g}{L}\sin{x_1} - \frac{u}{L}\cos{x_1}\end{bmatrix},
 ```
-where $x_1$ [rad] is the angular position, $x_2$ [rad/s] is the angular velocity, and $u$ [m/s^2] is the acceleration of the fulcrum. Here, the parameters are the length of the pendulum $L$ and the gravitional acceleration $g$. 
+where $x_1$ is the angular position, $x_2$ is the angular velocity, and $u$ is the horizontal acceleration of the fulcrum. The length of the pendulum $L$ and the gravitional acceleration $g$ will be treated as parameters. 
 
-To steer the system to the set of (unstable) equilibrium points $x_e = [2k\pi~~0]^\top$, $k\in\mathbb Z$, we define the terminal cost
+To steer the pendulum to the upright position, we define the terminal cost
 ```math
 m(x) = 1-\cos(x_1)+\tfrac12x_2^2.
 ```
-Note that this cost is non-convex!
+This non-convex function is zero if and only if $x=[2k\pi~~0]^\top$, with $k\in\mathbb Z$.
 
 To limit the control effort during the transient $[0,T]$, we define the incremental cost
 ```math
@@ -35,7 +40,7 @@ using StaticArrays
 using Base: @kwdef
 ```
 
-We can now build our inverted pendulum OCP. To do so, we decide to name our model `InvPend`, where `{2,1}` captures the fact that we have two states, $x\in\mathbb R^2$, and one control input $u\in\mathbb^1$. The parameters of this model are the length of the pendulum `L`, the gravitional acceleration `g`, and the input weight `ρ`.
+To build our OCP, we decide to name our model `InvPend`. The `{2,1}` captures the fact that we have two states, $x\in\mathbb R^2$, and one control input, $u\in\mathbb^1$. The parameters of this model are the length of the pendulum `L`, the gravitional acceleration `g`, and the control effort penalty `ρ`. We provide nominal values for each parameter.
 ```julia
 @kwdef struct InvPend <: Model{2,1} 
     L::Float64 = 2 
@@ -52,29 +57,30 @@ The next step is to define the dynamics $f(x,u,t)$, the incremental cost $l(x,u,
 @define_l InvPend 1/2*ρ*u[1]^2
 @define_m InvPend 1-cos(x[1])+x[2]^2/2
 ```
-We must now select the LQR matrices used by the projection operator. In this example, we only provide `Qr` and `Rr`. The terminal weight matrix `Pr` is automatically computed by linearizing the dynamics around $x(T)$ and solving the Algebraic Riccati Equation.
+We must now select the LQR matrices used by the projection operator. Since the linearized system is always controllable, we limit ourselves to choosing `Qr` and `Rr`. By doing so, we allow PRONTO to generate the terminal weight matrix `Pr` by linearizing the dynamics around $x(T)$ and solving the Algebraic Riccati Equation.
 ```julia
 @define_Qr InvPend diagm([10, 1])
 @define_Rr InvPend diagm([1e-3])
 ```
-The last step in the problem definition is to call `resolve_model` to instantiate PRONTO.
+The last step in the problem definition is to call `resolve_model` to instantiate PRONTO. Since we're interested in seeing how the solution estimate $x(t)$ changes from one iteration to the next, we ask PRONTO to output an ascii plot of `ξ.x` after every iteration.
 ```julia
 resolve_model(InvPend)
+PRONTO.preview(θ::InvPend, ξ) = ξ.x
 ```
-Now are now ready to solve our OCP! To do so, we load the parameters `θ`, the time horizon `τ`, and the inital condition `x0`. Here, we will be using the default value of all our parameters (defined in `InvPend`). If we wanted to solve our OCP on Mars, however, we could instead call `θ = InvPend(g=3.71)`.
+We are now ready to solve our OCP! To do so, we load the parameters `θ`, the time horizon `τ`, and the inital condition `x0`. Here, we will be using the default value of all our parameters (defined in `InvPend`). If we wanted to solve our OCP on Mars, we could instead call `θ = InvPend(g=3.71,ρ=10)`, where we've increased the input penalty to account for the reduced gravity.
 ```julia
 θ = InvPend() 
 τ = t0,tf = 0,10
 x0 = @SVector [2π/3;0]
 ```
-Next, we need to provide PRONTO with an initial guess. Specifically, we select the input $\mu(t)=0,~\forall t\in[0,T]$ and the state $\alpha(t)=[0~~0],~\forall t\in[0,T]$. Note that this initial guess is _NOT_ a feasible trajectory! Indeed, this guess ignores the initial conditions of our problem since $\alpha(0)\neq x_0$. However, the guess is useful because it captures our ideal target.
+Next, we need to provide PRONTO with an initial guess. Since we wish to steer the pendulum to the upright position, we use the desired equilibrium as an initial guess. Our initial state and input estimates are $\alpha(t)=[0~~0]^\top$ and $u(t)=0$, respectively, $\forall t\in[0,T]$. Note that this initial guess is not a suitable OCP solution because $\alpha(0)\neq x_0$. 
 ```julia
-μ = t->@SVector [0.0]
-α = t->@SVector [0;0]
+μ = t->[0]
+α = t->[0;0]
 ```
-We then call the projection operator to turn our guess `α`,`μ` into a trajectory `η`.
+We then call the projection operator to turn our guess `α`,`μ` into a trajectory `η`. This step ensures (among other things) that the error `η.x(0)-x0` is within machine tolerance.
 ```julia
-η = closed_loop(θ,x0,α,μ,τ)
+η = closed_loop(θ,x0,α,x,τ)
 ```
 It is now time to call PRONTO and solve our OCP to a tolerance of $10^{-3}$
 ```julia
@@ -84,7 +90,7 @@ Finally, we plot our results
 ```julia
 # Code for plotting please!
 ```
-:![image description](./inv_pend.png)
+![image description](./inv_pend.png)
 
 ## Qubit: State to State Transfer
 We consider the Schrödinger equation
