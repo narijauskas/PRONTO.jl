@@ -1,15 +1,33 @@
 # PRONTO.jl
 Hello and welcome to the julia implementation of the **PR**ojection-**O**perator-Based **N**ewton’s Method for **T**rajectory **O**ptimization (PRONTO).
+
+PRONTO is a Newton-based method for solving trajectory optimization problems in the form
+```math
+\min\quad m(x(T)) + \int^T_0 l(x(t),u(t),t) dt \\s.t. \quad \dot{x} = f(x,u,t), \qquad x(0) = x_0,
+```
+where $t\in[0,T]$ is time, $x\in\mathbb R^n$ and $u\in\mathbb R^m$ are the state and input vectors, $x_0\in\mathbb R^n$ is the initial condition, $f:\mathbb R^n\times\mathbb R^m\times[0,T]\to\mathbb R^n$ is the dynamic model, and $l:\mathbb R^n\times\mathbb R^m\times[0,T]\to\mathbb R$ and $m:\mathbb R^n\to\mathbb R$ are the incremental and terminal costs.
+## Double Integrator
+WIP
 ## Inverted Pendulum
-We consider a simple inverted pendulum system
+Consider the dynamics of an inverted pendulum
 ```math
-\dot{x} = \begin{bmatrix}\dot{x_1} \\\dot{x_2}\end{bmatrix} = \begin{bmatrix}x_2 \\\frac{g}{L}\sin{x_1} - \frac{u}{L}\cos{x_1}\end{bmatrix},
+f(x,u,t)= \begin{bmatrix}x_2 \\\frac{g}{L}\sin{x_1} - \frac{u}{L}\cos{x_1}\end{bmatrix},
 ```
-where $x_1$ [rad] is the angular position, $x_2$ [rad/s] is the angular velocity and $u$ [m/s^2] is the control input (the acceleration of the pivot point). Assume the pendulum starts at the initial condition $x_0 = [\frac{2\pi}{3},0]^T$ at time $t=0$ and we wish the pendulum goes to the equilibrium point $x_e = [0,0]^T$ at time $t=10$. To compute such a control law $u(t)$, we solve the OCP:
+where $x_1$ [rad] is the angular position, $x_2$ [rad/s] is the angular velocity, and $u$ [m/s^2] is the acceleration of the fulcrum. Here, the parameters are the length of the pendulum $L$ and the gravitional acceleration $g$. 
+
+To steer the system to the set of (unstable) equilibrium points $x_e = [2k\pi~~0]^\top$, $k\in\mathbb Z$, we define the terminal cost
 ```math
-\min h(\xi) = m(x(T)) + \int^T_0 l(x(t),u(t),t) dt \\s.t. \quad \dot{x} = f(x,u,t), \qquad x(0) = x_0.
+m(x) = 1-\cos(x_1)+\tfrac12x_2^2.
 ```
-First, we load some dependencies:
+Note that this cost is non-convex!
+
+To limit the control effort during the transient $[0,T]$, we define the incremental cost
+```math
+l(x) = \tfrac12\rho u^2,
+```
+where $\rho>0$ is an additional parameter of the OCP.
+
+Having fully defined our problem, we begin our code by loading a few dependencies
 ```julia
 using PRONTO
 using LinearAlgebra
@@ -17,50 +35,56 @@ using StaticArrays
 using Base: @kwdef
 ```
 
-Now we can define our model for this inverted pendulum. We decide to name our model `InvPend`, where `{2,1}` represents the 2 state vector $x$, the single control input $u$; `L` is the length of the pendulum and `g` is the gravity acceleration on earth. 
+We can now build our inverted pendulum OCP. To do so, we decide to name our model `InvPend`, where `{2,1}` captures the fact that we have two states, $x\in\mathbb R^2$, and one control input $u\in\mathbb^1$. The parameters of this model are the length of the pendulum `L`, the gravitional acceleration `g`, and the input weight `ρ`.
 ```julia
 @kwdef struct InvPend <: Model{2,1} 
     L::Float64 = 2 
     g::Float64 = 9.81 
-    Q::SMatrix{2,2,Float64} = I(2) 
-    R::SMatrix{1,1,Float64} = I(1) 
-    P::SMatrix{2,2,Float64} = I(2)
+    ρ::Float64 = 1
 end
 ```
-Then we can define our OCP, where the dynamics $f = \dot{x}$, the incremental cost $l = \frac{1}{2}x^TQx+\frac{1}{2}u^TRu$, and the terminal cost $m = \frac{1}{2}x^TPx$.
+The next step is to define the dynamics $f(x,u,t)$, the incremental cost $l(x,u,t)$, and the terminal cost $m(x)$.
 ```julia
 @define_f InvPend [ 
     x[2], 
     g/L*sin(x[1])-u[1]*cos(x[1])/L,
     ]
-@define_l InvPend 1/2*x'*Q*x + 1/2*u'*R*u
-@define_m InvPend 1/2*x'*P*x
+@define_l InvPend 1/2*ρ*u[1]^2
+@define_m InvPend 1-cos(x[1])+x[2]^2/2
 ```
-Next we define a LQR for the projection operator. In this case, we only need to define `Q` and `R`; `P` is computed by ARE around the equilibrium point.
+We must now select the LQR matrices used by the projection operator. In this example, we only provide `Qr` and `Rr`. The terminal weight matrix `Pr` is automatically computed by linearizing the dynamics around $x(T)$ and solving the Algebraic Riccati Equation.
 ```julia
 @define_Qr InvPend diagm([10, 1])
 @define_Rr InvPend diagm([1e-3])
 ```
-Last we compute the Lagrange dynamics $L = l + \lambda^Tf$.
+The last step in the problem definition is to call `resolve_model` to instantiate PRONTO.
 ```julia
 resolve_model(InvPend)
 ```
-Now we can solve this OCP! We load the parameter `θ`, the time horizon `τ` and the inital condition `x0`. For this OCP, our intial guess does NOT have to be a trajectory! We assume a pair of state-and-input curve `α` and `μ`, which is NOT a trajectory, but we can obtain `η`, which is the output from the projection operator.
+Now are now ready to solve our OCP! To do so, we load the parameters `θ`, the time horizon `τ`, and the inital condition `x0`. Here, we will be using the default value of all our parameters (defined in `InvPend`). If we wanted to solve our OCP on Mars, however, we could instead call `θ = InvPend(g=3.71)`.
 ```julia
 θ = InvPend() 
 τ = t0,tf = 0,10
 x0 = @SVector [2π/3;0]
-xe = @SVector [0;0]
-u0 = @SVector [0.0]
-α = t->xe
-μ = t->u0
+```
+Next, we need to provide PRONTO with an initial guess. Specifically, we select the input $\mu(t)=0,~\forall t\in[0,T]$ and the state $\alpha(t)=[0~~0],~\forall t\in[0,T]$. Note that this initial guess is _NOT_ a feasible trajectory! Indeed, this guess ignores the initial conditions of our problem since $\alpha(0)\neq x_0$. However, the guess is useful because it captures our ideal target.
+```julia
+μ = t->@SVector [0.0]
+α = t->@SVector [0;0]
+```
+We then call the projection operator to turn our guess `α`,`μ` into a trajectory `η`.
+```julia
 η = closed_loop(θ,x0,α,μ,τ)
 ```
-The desired OCP is solved!
+It is now time to call PRONTO and solve our OCP to a tolerance of $10^{-3}$
 ```julia
 ξ,data = pronto(θ,x0,η,τ; tol=1e-3);
 ```
-We can plot the optimal results:![image description](./inv_pend.png)
+Finally, we plot our results
+```julia
+# Code for plotting please!
+```
+:![image description](./inv_pend.png)
 
 ## Qubit: State to State Transfer
 We consider the Schrödinger equation
