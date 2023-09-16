@@ -6,6 +6,22 @@ PRONTO is a Newton-based method for solving trajectory optimization problems in 
 \min\quad m(x(T)) + \int^T_0 l(x(t),u(t),t) dt \\s.t. \quad \dot{x} = f(x,u,t), \qquad x(0) = x_0,
 ```
 where $t\in[0,T]$ is time, $x\in\mathbb R^n$ and $u\in\mathbb R^m$ are the state and input vectors, $x_0\in\mathbb R^n$ is the initial condition, $f:\mathbb R^n\times\mathbb R^m\times[0,T]\to\mathbb R^n$ is the dynamic model, and $l:\mathbb R^n\times\mathbb R^m\times[0,T]\to\mathbb R$ and $m:\mathbb R^n\to\mathbb R$ are the incremental and terminal costs.
+The key element of PRONTO is the _projection operator_, which tranforms any pair of state and input curves $[\alpha(t),\mu(t)]$ into a trajectory $[x(t),u(t)]$ that satisfies $\dot x = f(x,u,t)$ and $x(0)=x_0$. This is achieved by solving the differential equation
+```math
+\begin{cases}
+\dot{x} = f(x,u,t), \qquad x(0) = x_0,\\
+u=\mu-K_r(t)(x-\alpha),
+\end{cases} 
+```
+where $K_r(t)$ is a time-varying feedback gain used to stabilize the trajectory $[x(t),u(t)]$ around the initial curves $[\alpha(t),\mu(t)]$. To compute $K_r(t)$, PRONTO.jl solves the Differential Riccati Equation
+```math
+\begin{cases}
+-\dot{P}_r = A_\eta(t)^\top P_r+P_rA_\eta(t)-K_r^\top R_r(t) K_r + Q_r(t), \qquad P(T) = P_T,\\
+~~K_r=R_r(t)^{-1}B_\eta(t)^\top P_r,
+\end{cases} 
+```
+where $A_\eta(t),B_\eta(t)$ are the linearized dynamics (linearized around $[\alpha(t),\mu(t)]$). To use PRONTO, the user must provide suitable regulator matrices $Q_r(t),R_r(t)$ and terminal condition $P_T$. Since $K_r(t)$ plays a vital role in stabilizing the solution estimates, the choice of $Q_r(t),R_r(t)$ and $P_T$ is crucial to the covergence of PRONTO, especially for systems with unstable dynamics.
+
 ## Double Integrator
 WIP
 ## Inverted Pendulum
@@ -57,11 +73,13 @@ The next step is to define the dynamics $f(x,u,t)$, the incremental cost $l(x,u,
 @define_l InvPend 1/2*ρ*u[1]^2
 @define_m InvPend 1-cos(x[1])+x[2]^2/2
 ```
-We must now select the LQR matrices used by the projection operator. Since the linearized system is always controllable, we limit ourselves to choosing `Qr` and `Rr`. By doing so, we allow PRONTO to generate the terminal weight matrix `Pr` by linearizing the dynamics around $x(T)$ and solving the Algebraic Riccati Equation.
+We must now select the LQR matrices used by the projection operator. Since the linearized system is always controllable, we limit ourselves to choosing `Qr` and `Rr`. By doing so, we allow PRONTO to automatically compute the terminal conditions `PT` by linearizing the dynamics around $x(T)$ and solving the Algebraic Riccati Equation.
 ```julia
 @define_Qr InvPend diagm([10, 1])
 @define_Rr InvPend diagm([1e-3])
 ```
+Note that, since the target equilibrium is unstable, we selected a very small input penalty $R_r$. This ensures that the regulator gain $K_r(t)$ will prioritize the angular position error (which has the highest cost) when updating the solution estimate.
+
 The last step in the problem definition is to call `resolve_model` to instantiate PRONTO. Since we're interested in seeing how the solution estimate $x(t)$ changes from one iteration to the next, we ask PRONTO to output an ascii plot of `ξ.x` after every iteration.
 ```julia
 resolve_model(InvPend)
