@@ -104,11 +104,23 @@ It is now time to call PRONTO and solve our OCP to a tolerance of $10^{-3}$
 ```julia
 ξ,data = pronto(θ,x0,η,τ; tol=1e-3);
 ```
-Finally, we plot our results
+Finally, we plot our results using `GLMakie`. Feel free to use your favorite Plotting package!
 ```julia
-# Code for plotting please!
+using GLMakie
+
+fig = Figure()
+ts = range(t0,tf,length=1001)
+ax1 = Axis(fig[1,1], xlabel = "time [s]", ylabel = "angular position [rad]")
+ax2 = Axis(fig[2,1], xlabel = "time [s]", ylabel = "angular velocity [rad/s]")
+ax3 = Axis(fig[3,1], xlabel = "time [s]", ylabel = "control input [m/s^2]")
+
+lines!(ax1, ts, [ξ.x(t)[1] for t in ts], color = :blue, linewidth = 2)
+lines!(ax2, ts, [ξ.x(t)[2] for t in ts], color = :green, linewidth = 2)
+lines!(ax3, ts, [ξ.u(t)[1] for t in ts], color = :red, linewidth = 2)
+
+display(fig)
 ```
-![image description](./inv_pend.png)
+![image description](./inv_pend_2.png)
 
 ## Qubit: State to State Transfer
 We consider the Schrödinger equation

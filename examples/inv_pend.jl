@@ -38,3 +38,19 @@ x0 = @SVector [2π/3;0]
 ξ,data = pronto(θ,x0,η,τ; tol=1e-3);
 
 ## ----------------------------------- plot the results ----------------------------------- ##
+
+import Pkg
+Pkg.activate()
+using GLMakie
+
+fig = Figure()
+ts = range(t0,tf,length=1001)
+ax1 = Axis(fig[1,1], xlabel = "time [s]", ylabel = "angular position [rad]")
+ax2 = Axis(fig[2,1], xlabel = "time [s]", ylabel = "angular velocity [rad/s]")
+ax3 = Axis(fig[3,1], xlabel = "time [s]", ylabel = "control input [m/s^2]")
+
+lines!(ax1, ts, [ξ.x(t)[1] for t in ts], color = :blue, linewidth = 2)
+lines!(ax2, ts, [ξ.x(t)[2] for t in ts], color = :green, linewidth = 2)
+lines!(ax3, ts, [ξ.u(t)[1] for t in ts], color = :red, linewidth = 2)
+
+display(fig)
