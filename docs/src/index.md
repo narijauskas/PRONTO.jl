@@ -37,6 +37,54 @@ A^TP + PA - PBR^{-1}B^TP + Q = 0,
 ``` 
 and $m=\frac{1}{2}x^TPx$ is the terminal cost.
 
+First, we load some dependencies
+```julia
+using PRONTO
+using LinearAlgebra
+using MatrixEquations
+using StaticArrays
+using Base: @kwdef
+```
+We decide to name this system `DoubleInt`, with state vector `x` 2-dim and control input `u` 1-dim. The three parameters are $R$, $Q$, and $P$.
+```julia
+@kwdef struct DoubleInt <: Model{2,1}
+    Rl::Float64 
+    Ql::SMatrix{2,2,Float64}
+    Pm::SMatrix{2,2,Float64}
+end
+```
+We can then define the system dynamics `f`, incremental cost `l`, and terminal cost `m`
+```julia
+A = [0 1; 0 0]
+B = [0; 1]
+
+@define_f DoubleInt A*x + B*u[1]
+
+@define_l DoubleInt 1/2*Rl*u[1]^2 + 1/2*x'*Ql*x
+
+@define_m DoubleInt 1/2*x'*Pm*x
+``` 
+Regulator
+```julia
+@define_Qr DoubleInt I(2)
+@define_Rr DoubleInt I(1)
+```
+The problem is ready to be solved! Given the initial condition $x_0=[2,0]^T$ and time horizon $T=2$, we pick a guess input $\mu=0$ to start the solver; the tolerance `tol` is set to be $10^{-6}$.
+```julia
+Rl = 0.04
+Ql = diagm([1.0, 0.0])
+Pm = arec(A,B,Rl*I,Ql)[1]
+θ = DoubleInt(Rl, Ql, Pm) 
+τ = t0,tf = 0,2
+x0 = @SVector [2,0]
+
+μ = t->[0]
+
+η = open_loop(θ,x0,μ,τ)
+
+ξ,data = pronto(θ,x0,η,τ; tol=1e-6);
+```
+
 We plot the optimal results using `GLMakie`
 ```julia
 using GLMakie

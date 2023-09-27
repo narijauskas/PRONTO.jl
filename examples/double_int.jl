@@ -19,9 +19,8 @@ B = [0; 1]
 
 @define_l DoubleInt 1/2*Rl*u[1]^2 + 1/2*x'*Ql*x
 
-@define_m DoubleInt begin
-    1/2*x'*Pm*x
-end 
+@define_m DoubleInt 1/2*x'*Pm*x
+
 
 
 @define_Qr DoubleInt I(2)
