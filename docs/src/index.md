@@ -48,9 +48,9 @@ using Base: @kwdef
 We decide to name this system `DoubleInt`, with state vector `x` 2-dim and control input `u` 1-dim. The three parameters are $R$, $Q$, and $P$.
 ```julia
 @kwdef struct DoubleInt <: Model{2,1}
-    Rl::Float64 
-    Ql::SMatrix{2,2,Float64}
-    Pm::SMatrix{2,2,Float64}
+    R::Float64 
+    Q::SMatrix{2,2,Float64}
+    P::SMatrix{2,2,Float64}
 end
 ```
 We can then define the system dynamics `f`, incremental cost `l`, and terminal cost `m`
@@ -60,9 +60,9 @@ B = [0; 1]
 
 @define_f DoubleInt A*x + B*u[1]
 
-@define_l DoubleInt 1/2*Rl*u[1]^2 + 1/2*x'*Ql*x
+@define_l DoubleInt 1/2*R*u[1]^2 + 1/2*x'*Q*x
 
-@define_m DoubleInt 1/2*x'*Pm*x
+@define_m DoubleInt 1/2*x'*P*x
 ``` 
 Regulator
 ```julia
@@ -71,10 +71,10 @@ Regulator
 ```
 The problem is ready to be solved! Given the initial condition $x_0=[2,0]^T$ and time horizon $T=2$, we pick a guess input $\mu=0$ to start the solver; the tolerance `tol` is set to be $10^{-6}$.
 ```julia
-Rl = 0.04
-Ql = diagm([1.0, 0.0])
-Pm = arec(A,B,Rl*I,Ql)[1]
-θ = DoubleInt(Rl, Ql, Pm) 
+R = 0.04
+Q = diagm([1.0, 0.0])
+P = arec(A,B,R*I,Q)[1]
+θ = DoubleInt(R, Q, P) 
 τ = t0,tf = 0,2
 x0 = @SVector [2,0]
 
