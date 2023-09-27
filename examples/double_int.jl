@@ -7,26 +7,22 @@ using Base: @kwdef
 ## ----------------------------------- define the model ----------------------------------- ##
 
 @kwdef struct DoubleInt <: Model{2,1}
-    kl::Float64
+    Rl::Float64 
+    Ql::SMatrix{2,2,Float64}
+    Pm::SMatrix{2,2,Float64}
 end
 
-@define_f DoubleInt begin
-    A = [0 1; 0 0]
-    B = [0; 1]
+A = [0 1; 0 0]
+B = [0; 1]
 
-    A*x + B*u[1]
-end
-@define_l DoubleInt 1/2*kl*u[1]^2 + 1/2*x'*diagm([1,0])*x
+@define_f DoubleInt A*x + B*u[1]
+
+@define_l DoubleInt 1/2*Rl*u[1]^2 + 1/2*x'*Ql*x
+
 @define_m DoubleInt begin
-    A = [0 1; 0 0]
-    B = [0; 1]
-    Q = diagm([1, 0])
-    R = 0.04
+    1/2*x'*Pm*x
+end 
 
-    P, CLSEIG, F = arec(A, B*I, R*I, Q)
-
-    1/2*x'*P*x
-end
 
 @define_Qr DoubleInt I(2)
 @define_Rr DoubleInt I(1)
@@ -36,7 +32,10 @@ PRONTO.preview(θ::DoubleInt, ξ) = ξ.x
 
 ## ----------------------------------- solve the problem ----------------------------------- ##
 
-θ = DoubleInt(kl = 0.04) 
+Rl = 0.04
+Ql = diagm([1.0, 0.0])
+Pm = arec(A,B,Rl*I,Ql)[1]
+θ = DoubleInt(Rl, Ql, Pm) 
 τ = t0,tf = 0,2
 x0 = @SVector [2,0]
 
