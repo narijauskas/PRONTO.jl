@@ -23,7 +23,38 @@ where $K_r(t)$ is a time-varying feedback gain used to stabilize the trajectory 
 where $A_\eta(t),B_\eta(t)$ are the linearized dynamics (linearized around $[\alpha(t),\mu(t)]$). To use PRONTO, the user must provide suitable regulator matrices $Q_r(t),R_r(t)$ and terminal condition $P_T$. Since $K_r(t)$ plays a vital role in stabilizing the solution estimates, the choice of $Q_r(t),R_r(t)$ and $P_T$ is crucial to the covergence of PRONTO, especially for systems with unstable dynamics.
 
 ## Double Integrator
-WIP
+Consider the double integrator system
+```math
+\dot{x} = \begin{bmatrix} 0 & 1\\ 0 & 0 \end{bmatrix}x + \begin{bmatrix} 0\\1 \end{bmatrix}u, 
+```
+where the state $x \in \mathbb R^2$ and the input $u \in \mathbb R$ is the acceleration. We wish to solve the trajectory optimization problem
+```math
+\min\quad \|x(T)\|^2_P + \int^T_0 \|x(t)\|^2_Q + \|u(t)\|^2_R dt \\ s.t. \quad \dot{x} = Ax + Bu, \qquad x(0) = x_0,
+```
+where $Q=\begin{bmatrix} 1 & 0\\0 & 0 \end{bmatrix}$, $R=0.04$, and $l=\frac{1}{2}x^TQx + \frac{1}{2}u^TRu$ is the incremental cost; $P$ is the solution to the Algebraic Riccati Equation
+```math
+A^TP + PA - PBR^{-1}B^TP + Q = 0,
+``` 
+and $m=\frac{1}{2}x^TPx$ is the terminal cost.
+
+We plot the optimal results using `GLMakie`
+```julia
+using GLMakie
+
+fig = Figure()
+ts = range(t0,tf,length=1001)
+ax1 = Axis(fig[1,1], xlabel = "time", ylabel = "position [m]")
+ax2 = Axis(fig[2,1], xlabel = "time", ylabel = "velocity [m/s]")
+ax3 = Axis(fig[3,1], xlabel = "time", ylabel = "acceleration [m/s²]")
+
+lines!(ax1, ts, [ξ.x(t)[1] for t in ts], color = :blue, linewidth = 2)
+lines!(ax2, ts, [ξ.x(t)[2] for t in ts], color = :green, linewidth = 2)
+lines!(ax3, ts, [ξ.u(t)[1] for t in ts], color = :red, linewidth = 2)
+
+display(fig)
+```
+![image description](./double_int.png)
+
 ## Inverted Pendulum
 This example showcases PRONTO's ability to:
 1) steer the system to an **unstable** equilibrium point, 
@@ -56,7 +87,7 @@ using StaticArrays
 using Base: @kwdef
 ```
 
-To build our OCP, we decide to name our model `InvPend`. The `{2,1}` captures the fact that we have two states, $x\in\mathbb R^2$, and one control input, $u\in\mathbb^1$. The parameters of this model are the length of the pendulum `L`, the gravitional acceleration `g`, and the control effort penalty `ρ`. We provide nominal values for each parameter.
+To build our OCP, we decide to name our model `InvPend`. The `{2,1}` captures the fact that we have two states, $x\in\mathbb R^2$, and one control input, $u \in \mathbb R^1$. The parameters of this model are the length of the pendulum `L`, the gravitional acceleration `g`, and the control effort penalty `ρ`. We provide nominal values for each parameter.
 ```julia
 @kwdef struct InvPend <: Model{2,1} 
     L::Float64 = 2 
