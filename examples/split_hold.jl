@@ -69,11 +69,11 @@ PRONTO.Pf(θ::SplitHold, αf, μf, tf) = SMatrix{28,28,Float64}(I(28))
 ψ3 = x_eig(4)[1:7]
 ψ4 = x_eig(5)[1:7]
 x0 = SVector{28}(vec([ψ3;ψ4;0*ψ3;0*ψ4]))
-t0,tf = τ = (0,4)
+t0,tf = τ = (0,2.8)
 
 
 θ = SplitHold(kl=0.01)
-μ = t->SVector{1}(1.0*sin(12*t))
+μ = t->SVector{1}(1.0*sin(4*t))
 η = open_loop(θ,x0,μ,τ)
 ξ,data = pronto(θ,x0,η,τ;tol=1e-3,maxiters=50);
 
@@ -85,6 +85,6 @@ using MAT
 
 ts = t0:0.001:tf
 us = [ξ.u(t)[1] for t in ts]
-file = matopen("split_hold_4T_3N.mat", "w")
+file = matopen("split_hold_2.8T_3N.mat", "w")
 write(file, "Uopt", us)
 close(file)
