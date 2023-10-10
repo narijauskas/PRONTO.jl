@@ -38,9 +38,6 @@ x0 = @SVector [2π/3;0]
 ξ,data = pronto(θ,x0,η,τ; tol=1e-3);
 
 ## ----------------------------------- plot the results ----------------------------------- ##
-
-import Pkg
-Pkg.activate()
 using GLMakie
 
 fig = Figure()

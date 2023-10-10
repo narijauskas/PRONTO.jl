@@ -38,7 +38,6 @@ Clearly, this problem can (and should) be solved using a standard Linear-Quadrat
 using PRONTO
 using Base: @kwdef
 
-using GLMakie
 using LinearAlgebra
 using MatrixEquations
 using StaticArrays
@@ -95,14 +94,14 @@ R=0.04,\qquad \qquad Q=\begin{bmatrix} 1 & 0\\0 & 0 \end{bmatrix}
 ```
 and $P$ equal to the solution to the Algebraic Riccati Equation
 ```math
-A^TP + PA - PBR^{-1}B^TP + Q = 0.
+A^{\top}P + PA - PBR^{-1}B^{\top}P + Q = 0.
 ``` 
 ```julia
 R = 0.04
 Q = diagm([1.0, 0.0])
 P = arec(A,B,R*I,Q)[1]
 ```
-The problem is ready to be solved! Given the initial condition $x_0=[2,0]^T$ and time horizon $T=2$, we pick a guess input $\mu=0$ to start the solver; the tolerance `tol` is set to be $10^{-6}$.
+The problem is ready to be solved! Given the initial condition $x_0=[2,0]^{\top}$ and time horizon $T=2$, we pick a guess input $\mu=0$ to start the solver; the tolerance `tol` is set to be $10^{-6}$.
 ```julia
 θ = DoubleInt(R, Q, P) 
 τ = t0,tf = 0,2
@@ -115,8 +114,10 @@ x0 = @SVector [2,0]
 ξ,data = pronto(θ,x0,η,τ; tol=1e-6);
 ```
 
-We plot the results using `GLMakie`
+We now visualize the solution using `GLMakie`
 ```julia
+using GLMakie
+
 fig = Figure()
 ts = range(t0,tf,length=1001)
 ax1 = Axis(fig[1,1], xlabel = "time", ylabel = "position [m]")
@@ -137,11 +138,28 @@ This example showcases PRONTO's ability to:
 2) handle **non-convex** cost functions,
 3) use the **desired target** as an initial guess. 
 
+We first load a few dependencies
+```julia
+using PRONTO
+using LinearAlgebra
+using StaticArrays
+using Base: @kwdef
+```
+
+To build our OCP, we decide to name our model `InvPend`. The `{2,1}` captures the fact that we have two states, $x\in\mathbb R^2$, and one control input, $u \in \mathbb R^1$. The parameters of this model are the length of the pendulum `L`, the gravitional acceleration `g`, and the control effort penalty `ρ`. We provide nominal values for each parameter.
+```julia
+@kwdef struct InvPend <: Model{2,1} 
+    L::Float64 = 2 
+    g::Float64 = 9.81 
+    ρ::Float64 = 1
+end
+```
+
 Consider the dynamics of an inverted pendulum
 ```math
 f(x,u,t)= \begin{bmatrix}x_2 \\\frac{g}{L}\sin{x_1} - \frac{u}{L}\cos{x_1}\end{bmatrix},
 ```
-where $x_1$ is the angular position, $x_2$ is the angular velocity, and $u$ is the horizontal acceleration of the fulcrum. The length of the pendulum $L$ and the gravitional acceleration $g$ will be treated as parameters. 
+where $x_1$ is the angular position, $x_2$ is the angular velocity, and $u$ is the horizontal acceleration of the fulcrum.
 
 To steer the pendulum to the upright position, we define the terminal cost
 ```math
@@ -155,24 +173,7 @@ l(x) = \tfrac12\rho u^2,
 ```
 where $\rho>0$ is an additional parameter of the OCP.
 
-Having fully defined our problem, we begin our code by loading a few dependencies
-```julia
-using PRONTO
-using Base: @kwdef
-
-using GLMakie
-using LinearAlgebra
-using StaticArrays
-```
-To build our OCP, we decide to name our model `InvPend`. The `{2,1}` captures the fact that we have two states, $x\in\mathbb R^2$, and one control input, $u \in \mathbb R^1$. The parameters of this model are the length of the pendulum `L`, the gravitional acceleration `g`, and the control effort penalty `ρ`. We provide nominal values for each parameter.
-```julia
-@kwdef struct InvPend <: Model{2,1} 
-    L::Float64 = 2 
-    g::Float64 = 9.81 
-    ρ::Float64 = 1
-end
-```
-The next step is to define the dynamics $f(x,u,t)$, the incremental cost $l(x,u,t)$, and the terminal cost $m(x)$.
+Now we can define the dynamics $f(x,u,t)$, the incremental cost $l(x,u,t)$, and the terminal cost $m(x)$.
 ```julia
 @define_f InvPend [ 
     x[2], 
@@ -212,8 +213,10 @@ It is now time to call PRONTO and solve our OCP to a tolerance of $10^{-3}$
 ```julia
 ξ,data = pronto(θ,x0,η,τ; tol=1e-3);
 ```
-Finally, we plot our results using `GLMakie`. Feel free to use your favorite Plotting package!
+Now, we visualize the solution using `GLMakie`.
 ```julia
+using GLMakie
+
 fig = Figure()
 ts = range(t0,tf,length=1001)
 ax1 = Axis(fig[1,1], xlabel = "time [s]", ylabel = "angular position [rad]")
@@ -241,7 +244,6 @@ First, we load the usual dependencies:
 ```julia
 using PRONTO
 using Base: @kwdef
-
 using LinearAlgebra
 using StaticArrays
 ```
@@ -414,3 +416,4 @@ x0 = SVector{12}(vec([ψ1;ψ2;0*ψ1;0*ψ2]))
 ξ,data = pronto(θ, x0, η, τ;tol=1e-4); # optimal trajectory
 ```
 ## Lane Change
+Documentation coming soon!

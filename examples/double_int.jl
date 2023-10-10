@@ -1,7 +1,5 @@
 using PRONTO
 using Base: @kwdef
-
-using GLMakie
 using LinearAlgebra
 using MatrixEquations
 using StaticArrays
@@ -43,6 +41,8 @@ x0 = @SVector [2,0]
 ξ,data = pronto(θ,x0,η,τ; tol=1e-6);
 
 ## ----------------------------------- plot the results ----------------------------------- ##
+using GLMakie
+
 fig = Figure()
 ts = range(t0,tf,length=1001)
 ax1 = Axis(fig[1,1], xlabel = "time", ylabel = "position [m]")
