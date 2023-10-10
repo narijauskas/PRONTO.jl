@@ -243,9 +243,9 @@ where $\mathcal{H_0} = \sigma_z = \begin{bmatrix}0 & 1 \\1 & 0\end{bmatrix}$, an
 First, we load the usual dependencies:
 ```julia
 using PRONTO
-using Base: @kwdef
 using LinearAlgebra
 using StaticArrays
+using Base: @kwdef
 ```
 Note that $|\psi \rangle$ is a $2 \times 1$ complex vector, and we wish to have the state vector $x$ in the real form. We can define our state vector 
 ```math
@@ -260,23 +260,23 @@ We can then convert the the Schrödinger equation $i|\dot{\psi}(t)\rangle = (\ma
 \dot{x}(t) = H(u)x = \begin{bmatrix}0 & 0 & 1 & 0 \\0 & 0 & 0 & -1\\-1 & 0 & 0 & 0\\0 & 1 & 0 & 0\end{bmatrix}x + u\begin{bmatrix}0 & -1 & 0 & 0 \\1 & 0 & 0 & 0\\0 & 0 & 0 & -1\\0 & 0 & 1 & 0\end{bmatrix}x.
 ```
 
-We decide to name our model `TwoSpin`, where `{4,1}` represents the 4 state vector $x (|\psi\rangle)$, and the single input $u (\phi)$. For this example, our parameter is `kl`, which is a scalar that penalizes the control effort.
+We decide to name our model `Qubit`, where `{4,1}` represents the 4 state vector $x (|\psi\rangle)$, and the single input $u (\phi)$. For this example, our parameter is `kl`, which is a scalar that penalizes the control effort.
 ```julia
-@kwdef struct TwoSpin <: Model{4,1} 
+@kwdef struct Qubit <: Model{4,1}
     kl::Float64 = 0.01
 end
 ```
 First, we can define our dynamics $f$
 ```julia
-@define_f TwoSpin begin 
-    H0 = [0 0 1 0;0 0 0 -1;-1 0 0 0;0 1 0 0] 
-    H1 = [0 -1 0 0;1 0 0 0;0 0 0 -1;0 0 1 0] 
+@define_f Qubit begin
+    H0 = [0 0 1 0;0 0 0 -1;-1 0 0 0;0 1 0 0]
+    H1 = [0 -1 0 0;1 0 0 0;0 0 0 -1;0 0 1 0]
     (H0 + u[1]*H1)*x
 end
 ```
 For our incremental cost $l$, we simpy penalize the control effort $u$
 ```julia
-@define_l TwoSpin begin 
+@define_l Qubit begin
     1/2*u'*kl*u
 end
 ```
@@ -286,8 +286,8 @@ m(x(T)) = \frac{1}{2} x^\top(T)Px(T), \qquad \mathrm{with}~P=\begin{bmatrix}1 & 
 ```
 to penilize both real and imaginal parts for $|0\rangle$.
 ```julia
-@define_m TwoSpin begin 
-    Pl = [1 0 0 0;0 0 0 0;0 0 1 0;0 0 0 0] 
+@define_m Qubit begin
+    Pl = [1 0 0 0;0 0 0 0;0 0 1 0;0 0 0 0]
     1/2*x'*Pl*x
 end
 ```
@@ -297,28 +297,48 @@ For this example, a Linear-Quadratic Regulator (LQR) is used. Note that, since t
 R_r(t) = I_1,\\Q_r(t) = I_4 ,\\P_r(T) = I_4.
 ``` 
 ```julia
-@define_Q TwoSpin I(4)
-@define_R TwoSpin I(1)
-PRONTO.Pf(θ::TwoSpin, αf, μf, tf) = SMatrix{4,4,Float64}(I(4))
+@define_Qr Qubit I(4)
+@define_Rr Qubit I(1)
+PRONTO.Pf(θ::Qubit, αf, μf, tf) = SMatrix{4,4,Float64}(I(4))
 ```
 Last we compute the Lagrange dynamics $L = l + \lambda^Tf$.
 ```julia
-resolve_model(InvPend)
+resolve_model(Qubit)
 ```
-We now can solve the OCP! This time, we assume our guess input $\mu(t)=0.4\sin{t}$ and initialize our solver by computing the open loop system.
+We now can solve the OCP! This time, we assume our guess input $\mu(t)=0.4\sin{t}$ and initialize our solver by computing the open loop system `open_loop`.
 ```julia
-θ = TwoSpin() 
-τ = t0,tf = 0,10 
-x0 = @SVector [1.0, 0.0, 0.0, 0.0] 
-xf = @SVector [0.0, 1.0, 0.0, 0.0] 
-μ = t->SVector{1}(0.4*sin(t)) 
-η = open_loop(θ, x0, μ, τ) 
-ξ,data = pronto(θ, x0, η, τ;tol=1e-4);
+θ = Qubit() # instantiate a new model
+τ = t0,tf = 0,10 # define time domain
+x0 = @SVector [1.0, 0.0, 0.0, 0.0] # initial state
+xf = @SVector [0.0, 1.0, 0.0, 0.0] # final state
+μ = t->SVector{1}(0.4*sin(t)) # open loop input μ(t)
+η = open_loop(θ, x0, μ, τ) # guess trajectory
+ξ,data = pronto(θ, x0, η, τ;tol=1e-4); # optimal trajectory
 ```
+We then visualize the solution using `GLMakie`
+```julia
+using GLMakie
+
+fig = Figure()
+ts = range(t0,tf,length=1001)
+ax1 = Axis(fig[1,1], xlabel = "time", ylabel = "quantum state")
+ax2 = Axis(fig[2,1], xlabel = "time", ylabel = "population")
+ax3 = Axis(fig[3,1], xlabel = "time", ylabel = "control input")
+
+lines!(ax1, ts, [ξ.x(t)[1] for t in ts], linewidth = 2, label = "Re(ψ1)")
+lines!(ax1, ts, [ξ.x(t)[2] for t in ts], linewidth = 2, label = "Re(ψ2)")
+lines!(ax1, ts, [ξ.x(t)[3] for t in ts], linewidth = 2, label = "Im(ψ1)")
+lines!(ax1, ts, [ξ.x(t)[4] for t in ts], linewidth = 2, label = "Im(ψ2)")
+fig[1, 2] = Legend(fig, ax1)
+lines!(ax2, ts, [ξ.x(t)[1]^2+ξ.x(t)[3]^2 for t in ts], linewidth = 2, label = "|0⟩")
+lines!(ax2, ts, [ξ.x(t)[2]^2+ξ.x(t)[4]^2 for t in ts], linewidth = 2, label = "|1⟩")
+fig[2, 2] = Legend(fig, ax2)
+lines!(ax3, ts, [ξ.u(t)[1] for t in ts], linewidth = 2)
 
 
-If you do this right, you should get:![image description](./Uopt.png)![image description](./Xopt.png)
-The top figure is the optimal control input $u(t)$, while the bottom figure is the state vector $x(t)$ evolves in time. We wish to check if we achieve our control objective, which is to steer the system from $|0\rangle$ to $|1\rangle$, the evolution in time of population is shown below![image description](./Popt.png) 
+display(fig)
+```
+![image description](./2Spin.png)
 
 ## Qubit: Pauli X Gate
 We consider a 3-level fluxionium qubit, whose Hamiltonian can be written as
