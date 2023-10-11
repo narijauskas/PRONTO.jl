@@ -52,16 +52,12 @@ end
 @define_Rr XGate3 I(1)
 PRONTO.Pf(θ::XGate3,α,μ,tf) = SMatrix{12,12,Float64}(I(12))
 
-# must be run after any changes to model definition
 resolve_model(XGate3)
-
-PRONTO.preview(θ::XGate3, ξ) = ξ.u
 
 ## ----------------------------------- run optimization ----------------------------------- ##
 
 θ = XGate3()
 τ = t0,tf = 0,10
-
 ψ1 = [1;0;0]
 ψ2 = [0;1;0]
 x0 = SVector{12}(vec([ψ1;ψ2;0*ψ1;0*ψ2]))

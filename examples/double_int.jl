@@ -1,5 +1,6 @@
 using PRONTO
 using Base: @kwdef
+
 using LinearAlgebra
 using MatrixEquations
 using StaticArrays
@@ -14,10 +15,10 @@ end
 
 A = [0 1; 0 0]
 B = [0; 1]
+
 @define_f DoubleInt A*x + B*u[1]
 
 @define_l DoubleInt 1/2*R*u[1]^2 + 1/2*x'*Q*x
-
 @define_m DoubleInt 1/2*x'*P*x
 
 @define_Qr DoubleInt I(2)
@@ -30,6 +31,7 @@ resolve_model(DoubleInt)
 R = 0.04
 Q = diagm([1.0, 0.0])
 P = arec(A,B,R*I,Q)[1]
+
 θ = DoubleInt(R, Q, P) 
 τ = t0,tf = 0,2
 x0 = @SVector [2,0]

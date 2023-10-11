@@ -24,7 +24,6 @@ ThreadTools = "dbf13d8f-d36e-4350-8970-f3a99faba1a8"
 UnicodePlots = "b8865327-cd53-5732-bb35-84acbb429228"
 
 [compat]
-julia = "1.8" # not tested on earlier versions
 Crayons = "4"
 DiffEqCallbacks = "2"
 FastClosures = "0.3"
@@ -40,6 +39,7 @@ SymbolicUtils = "1, 0.19"
 Symbolics = "5, 4.6"
 ThreadTools = "0.2"
 UnicodePlots = "3"
+julia = "1.8"
 
 [extras]
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"

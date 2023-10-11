@@ -442,7 +442,7 @@ PRONTO.Pf(θ::XGate3,α,μ,tf) = SMatrix{12,12,Float64}(I(12))
 ```
 Last we compute the Lagrange dynamics $L = l + \lambda^{\top}f$.
 ```julia
-resolve_model(InvPend)
+resolve_model(XGate3)
 ```
 We now can solve the OCP! This time, we assume our guess input $\mu(t)=\frac{\pi}{T}e^{\frac{-(t-T/2)^2}{T^2}}\cos{(2\pi t)}$ and initialize our solver by computing the open loop system.
 ```julia
