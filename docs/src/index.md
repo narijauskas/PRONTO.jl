@@ -397,7 +397,7 @@ For our incremental cost $l$, we penilize both the control effort $u$ and undesi
     kl/2*u'*I*u + kq/2*x'*mprod(diagm([0,0,1,0,0,1]))*x
 end
 ```
-For this example, the control objective is to steer the system from the $|0\rangle = [1, 0, 0]^{\top}$ state to the target state $|1\rangle = [0, 1, 0]^{\top}$, while simultaneously steers $|1\rangle$ to $|0\rangle$. We can then define our terminal cost function $m$ as 
+For this example, the control objective is to steer the system from the $|0\rangle = [1, 0, 0]^{\top}$ state to the target state $|1\rangle = [0, 1, 0]^{\top}$, while simultaneously steering $|1\rangle$ to $|0\rangle$. We can then define our terminal cost function $m$ as 
 ```math
 m(x(T)) = \|\psi_1(T)-|1\rangle\|^2 + \|\psi_2(T)-|0\rangle\|^2.
 ```
