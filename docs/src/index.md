@@ -280,7 +280,7 @@ For our incremental cost $l$, we simpy penalize the control effort $u$
     1/2*u'*kl*u
 end
 ```
-For this example, the control objective is to steer the system from the initial state $|0\rangle = [1, 0]^T$ to the target state $|1\rangle = [0, 1]^T$. We can then define our terminal cost function $m$ as 
+For this example, the control objective is to steer the system from the initial state $|0\rangle = [1, 0]^{\top}$ to the target state $|1\rangle = [0, 1]^{\top}$. We can then define our terminal cost function $m$ as 
 ```math
 m(x(T)) = \frac{1}{2} x^\top(T)Px(T), \qquad \mathrm{with}~P=\begin{bmatrix}1 & 0 & 0 & 0 \\0 & 0 & 0 & 0\\0 & 0 & 1 & 0\\0 & 0 & 0 & 0\end{bmatrix}
 ```
@@ -301,7 +301,7 @@ R_r(t) = I_1,\\Q_r(t) = I_4 ,\\P_r(T) = I_4.
 @define_Rr Qubit I(1)
 PRONTO.Pf(θ::Qubit, αf, μf, tf) = SMatrix{4,4,Float64}(I(4))
 ```
-Last we compute the Lagrange dynamics $L = l + \lambda^Tf$.
+Last we compute the Lagrange dynamics $L = l + \lambda^{\top}f$.
 ```julia
 resolve_model(Qubit)
 ```
@@ -345,7 +345,15 @@ We consider a 3-level fluxionium qubit, whose Hamiltonian can be written as
 ```math
 H(u)=H_0 + uH_{\text{drive}} = \begin{bmatrix}0 & 0 & 0 \\0 & 1.0 &0\\0 & 0 & 5.0\end{bmatrix} + u\begin{bmatrix}0 & 0.1 & 0.3 \\0.1 & 0 & 0.5\\0.3 & 0.5 & 0\end{bmatrix},
 ```
-where $H_0$ is the free Hamiltonian, $H_{\text{drive}}$ is the control Hamiltonian, and $u(t)$ is the control input. We wish to find the optimal control input $u^{\star}(t)$ that performs the X gate for this qubit, that is, $u^{\star}(t)$ steers $|0\rangle=[1,0,0]^{\top}$ to $|1\rangle=[0,1,0]^{\top}$, while simultaneously steers $|1\rangle$ to $|0\rangle$. Meanwhile, we wish to aviod the undesirade state, which is the $|2\rangle$ state of the system.
+where $H_0$ is the free Hamiltonian, $H_{\text{drive}}$ is the control Hamiltonian, and $u(t)$ is the control input. We wish to find the optimal control input $u^{\star}(t)$ that performs the X gate for this qubit, that is, $u^{\star}(t)$ steers $|0\rangle=[1,0,0]^{\top}$ to $|1\rangle=[0,1,0]^{\top}$, while simultaneously steers $|1\rangle$ to $|0\rangle$. Meanwhile, we wish to aviod the undesirade state, which is the $|2\rangle$ state of the system. The optimal control input $u^{\star}$ can be obtained by solving the 
+```math
+\begin{array}{rl}
+\min& \displaystyle\frac{1}{2}\||\psi(T)\rangle-\psi_T\|^2 + \frac{1}{2}\int^T_0\!\!\! \text{kq}\||\psi(t)\rangle\|^2_Q + \text{kl}\|u(t)\|^2 \:dt \\[8pt]
+\mathrm{s.t.} & i|\dot{\psi}\rangle = 2\pi \mathcal{H} |\psi\rangle, \qquad |\psi(0)\rangle = \begin{bmatrix} |0\rangle \\ |1\rangle \end{bmatrix},
+\end{array}
+```
+where $|\psi\rangle = \begin{bmatrix} |\psi_1\rangle\\|\psi_2\rangle \end{bmatrix}$, $\mathcal{H}=I_2 \otimes H(u)$, and $|\psi_T\rangle = \begin{bmatrix} |1\rangle \\ |0\rangle \end{bmatrix}$. kl is a scalar penilizing the control effort, kq is a scalar that penilize the undesirade population, and $Q=I_2 \otimes \text{diag}(0,0,1)$. However this problem is in the complex form, we need to convert the problem to its real representation.
+
 
 First, we load some dependencies:
 ```julia
@@ -354,7 +362,10 @@ using LinearAlgebra
 using StaticArrays
 using Base: @kwdef
 ```
-Then we define a helper function `mprod` converting a complex matrix to its real representation  
+Besides $x = \begin{bmatrix}Re(|\psi\rangle)\\Im(|\psi\rangle) \end{bmatrix}$ that converts a complex quantum state $|\psi\rangle$ into a real vector $x$, we define a helper function `mprod` converting a complex matrix to its real representation
+```math
+M = \begin{bmatrix}Re(\mathcal{M}) & -Im(\mathcal{M}) \\Im(\mathcal{M}) & Re(\mathcal{M})\end{bmatrix}.
+```  
 ```julia
 function mprod(x)
     Re = I(2)
@@ -365,14 +376,20 @@ function mprod(x)
 end
 ```
 
-We decide to name our model `XGate3`, where `{12,1}` represents the 12 states vector $x ([|\psi_1\rangle, |\psi_2\rangle]^{\top})$, and the single input $u$. For this example, our parameters are `kl`, which is a scalar that penilize the control effort, and `kq`, which is a scalar that penilize the undesirade population.
+We decide to name our model `XGate3`, where `{12,1}` represents the 12 states vector $x$ (real representation of two quantum states $|\psi_1\rangle$ and $|\psi_2\rangle$), and the single input $u$. For this example, our parameters are `kl` and `kq`.
+
 ```julia
 @kwdef struct XGate3 <: PRONTO.Model{12,1}
     kl::Float64 = 0.01
     kq::Float64 = 0.5
 end
 ```
-First, we can define our dynamics $f$
+Now we can define our dynamics
+```math
+f = 2 \pi Hx
+```
+
+where $H=\text{mprod}(-i\mathcal{H})$.
 ```julia
 @define_f XGate3 begin
     E0 = 0.0
@@ -391,7 +408,10 @@ First, we can define our dynamics $f$
     return 2 * π * mprod(-im * (H00 + H11)) * x
 end
 ```
-For our incremental cost $l$, we penilize both the control effort $u$ and undesirade third state
+For our incremental cost, we penilize both the control effort $u$ and undesirade state $|2\rangle$
+```math
+l = \frac{\text{kl}}{2}u^{\top}u + \frac{\text{kq}}{2}x^{\top}Qx
+```
 ```julia
 @define_l XGate3 begin
     kl/2*u'*I*u + kq/2*x'*mprod(diagm([0,0,1,0,0,1]))*x
@@ -399,9 +419,9 @@ end
 ```
 For this example, the control objective is to steer the system from the $|0\rangle = [1, 0, 0]^{\top}$ state to the target state $|1\rangle = [0, 1, 0]^{\top}$, while simultaneously steering $|1\rangle$ to $|0\rangle$. We can then define our terminal cost function $m$ as 
 ```math
-m(x(T)) = \|\psi_1(T)-|1\rangle\|^2 + \|\psi_2(T)-|0\rangle\|^2.
+m = \frac{1}{2}(x(T)-x_T)^{\top}(x(T)-x_T),
 ```
-
+where $x_T = \begin{bmatrix}Re(|\psi_T\rangle)\\Im(|\psi_T\rangle) \end{bmatrix}$.
 ```julia
 @define_m XGate3 begin
     ψ1 = [1;0;0]
@@ -420,7 +440,7 @@ R_r(t) = I,\\Q_r(t) = I ,\\P_r(T) = Q_r(T) = I.
 @define_Rr XGate3 I(1)
 PRONTO.Pf(θ::XGate3,α,μ,tf) = SMatrix{12,12,Float64}(I(12))
 ```
-Last we compute the Lagrange dynamics $L = l + \lambda^Tf$.
+Last we compute the Lagrange dynamics $L = l + \lambda^{\top}f$.
 ```julia
 resolve_model(InvPend)
 ```
