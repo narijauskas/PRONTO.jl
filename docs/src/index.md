@@ -77,10 +77,10 @@ m(x)=&\displaystyle\!\!\!\!\frac{1}{2}x^\top Px
 ``` 
 Here, the matrices $R$, $Q$, and $P$ do not need to be specified: PRONTO already knows that the user will provide them as parameters.
 
-Finally, we need to provide the weight matrices for the projection operator. Since this example is too simple for these matrices to have a noticeable impact, we opt for the simplest choice: $R_r(t)=1$ and $Q_r(t)=I_2$.
+Finally, we need to provide the weight matrices for the projection operator. Since this example is too simple for these matrices to have a noticeable impact, we opt for the simplest choice: $R(t)=1$ and $Q(t)=I_2$.
 ```julia
-@define_Rr DoubleInt I(1)
-@define_Qr DoubleInt I(2)
+@define_R DoubleInt I(1)
+@define_Q DoubleInt I(2)
 ```
 We are now ready to build our model!
 ```julia
@@ -182,10 +182,10 @@ Now we can define the dynamics $f(x,u,t)$, the incremental cost $l(x,u,t)$, and 
 @define_l InvPend 1/2*ρ*u[1]^2
 @define_m InvPend 1-cos(x[1])+x[2]^2/2
 ```
-We must now select the LQR matrices used by the projection operator. Since the linearized system is always controllable, we limit ourselves to choosing `Qr` and `Rr`. By doing so, we allow PRONTO to automatically compute the terminal conditions `PT` by linearizing the dynamics around $x(T)$ and solving the Algebraic Riccati Equation.
+We must now select the LQR matrices used by the projection operator. Since the linearized system is always controllable, we limit ourselves to choosing `Q` and `R`. By doing so, we allow PRONTO to automatically compute the terminal conditions `PT` by linearizing the dynamics around $x(T)$ and solving the Algebraic Riccati Equation.
 ```julia
-@define_Qr InvPend diagm([10, 1])
-@define_Rr InvPend diagm([1e-3])
+@define_Q InvPend diagm([10, 1])
+@define_R InvPend diagm([1e-3])
 ```
 Note that, since the target equilibrium is unstable, we selected a very small input penalty $R_r$. This ensures that the regulator gain $K_r(t)$ will prioritize the angular position error (which has the highest cost) when updating the solution estimate.
 
@@ -294,11 +294,11 @@ end
 
 For this example, a Linear-Quadratic Regulator (LQR) is used. Note that, since the linearized system is *not* controllable, we need to provide a value for the terminal cost $P_T$:
 ```math
-R_r(t) = I_1,\\Q_r(t) = I_4 ,\\P_r(T) = I_4.
+R(t) = I_1,\\Q(t) = I_4 ,\\P_r(T) = I_4.
 ``` 
 ```julia
-@define_Qr Qubit I(4)
-@define_Rr Qubit I(1)
+@define_Q Qubit I(4)
+@define_R Qubit I(1)
 PRONTO.Pf(θ::Qubit, αf, μf, tf) = SMatrix{4,4,Float64}(I(4))
 ```
 Last we compute the Lagrange dynamics $L = l + \lambda^{\top}f$.
@@ -436,8 +436,8 @@ For this example, a Linear-Quadratic Regulator (LQR) is used and designed in thi
 R_r(t) = I,\\Q_r(t) = I ,\\P_r(T) = Q_r(T) = I.
 ``` 
 ```julia
-@define_Qr XGate3 I(12)
-@define_Rr XGate3 I(1)
+@define_Q XGate3 I(12)
+@define_R XGate3 I(1)
 PRONTO.Pf(θ::XGate3,α,μ,tf) = SMatrix{12,12,Float64}(I(12))
 ```
 Last we compute the Lagrange dynamics $L = l + \lambda^{\top}f$.
