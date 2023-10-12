@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>PRONTO.jl · PRONTO.jl</title><script data-outdated-warner src="assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.045/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.24/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="assets/documenter.js"></script><script src="siteinfo.js"></script><script src="../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href>PRONTO.jl</a></span></div><form class="docs-search" action="search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li class="is-active"><a class="tocitem" href>PRONTO.jl</a><ul class="internal"><li><a class="tocitem" href="#An-Example:-Two-Spin-System"><span>An Example: Two Spin System</span></a></li><li><a class="tocitem" href="#Model-Definition"><span>Model Definition</span></a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>PRONTO.jl</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>PRONTO.jl</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/narijauskas/PRONTO.jl/blob/main/docs/src/index.md" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="PRONTO.jl"><a class="docs-heading-anchor" href="#PRONTO.jl">PRONTO.jl</a><a id="PRONTO.jl-1"></a><a class="docs-heading-anchor-permalink" href="#PRONTO.jl" title="Permalink"></a></h1><p>Hello and welcome to the julia implementation of the <strong>PR</strong>ojection-<strong>O</strong>perator-Based <strong>N</strong>ewton’s Method for <strong>T</strong>rajectory <strong>O</strong>ptimization (PRONTO).</p><h2 id="An-Example:-Two-Spin-System"><a class="docs-heading-anchor" href="#An-Example:-Two-Spin-System">An Example: Two Spin System</a><a id="An-Example:-Two-Spin-System-1"></a><a class="docs-heading-anchor-permalink" href="#An-Example:-Two-Spin-System" title="Permalink"></a></h2><p>We consider the Schrödinger equation</p><p class="math-container">\[i|\dot{\psi}(t)\rangle = (\mathcal{H_0} + \phi(t)\mathcal{H_1})|\psi(t)\rangle,\]</p><p>where <span>$\mathcal{H_0} = \sigma_z = \begin{bmatrix} 0 &amp; 1 \\
+1 &amp; 0 \end{bmatrix}$</span>, and <span>$\mathcal{H_1} = \sigma_y = \begin{bmatrix} 0 &amp; -i \\
+i &amp; 0 \end{bmatrix}$</span> are the Pauli matrices. The real control input <span>$\phi(t)$</span> drives the system between 2 qubit states <span>$|0\rangle$</span> and <span>$|1\rangle$</span>, which are the two eigenstates of the free Hamiltonian <span>$\mathcal{H_0}$</span>. We wish to find the optimal control input <span>$\phi^{\star}(t)$</span> that performs the state-to-state transfer from <span>$|0\rangle$</span> to <span>$|1\rangle$</span>. To do this, we will solve:</p><p class="math-container">\[\min h(\xi) = p(x(T)) + \int^T_0 l(x(t),u(t),t) dt \\
+s.t.    \quad \dot{x} = f(x,u,t), x(0) = x_0,\\
+\text{where:} \quad \xi(\cdot) = [x(\cdot);u(\cdot)]\]</p><p>First, we load some dependencies:</p><pre><code class="language-julia hljs">using PRONTO
+using StaticArrays, LinearAlgebra</code></pre><p>Note that <span>$|\psi \rangle$</span> is a <span>$2 \times 1$</span> complex vector, and we wish to have the state vector <span>$x$</span> in the real form. We can define our state vector </p><p class="math-container">\[x = \begin{bmatrix}
+Re(|\psi\rangle)\\
+Im(|\psi\rangle) 
+\end{bmatrix},\]</p><p>which in this case is a <span>$4 \times 1$</span> vector of real numbers. Moreover, any complex square matrix <span>$\mathcal{H}$</span> can be represented in its real form using the helper function <code>mprod</code>:</p><p class="math-container">\[H_{re} = \begin{bmatrix}
+Re(\mathcal{H}) &amp; -Im(\mathcal{H}) \\
+Im(\mathcal{H}) &amp; Re(\mathcal{H})
+\end{bmatrix}.\]</p><pre><code class="language-julia hljs">function mprod(H) 
+    Re = I(2) 
+    Im = [0 -1; 1 0] 
+    H_re = kron(Re,real(H)) + kron(Im,imag(H)); 
+    return H_re 
+end</code></pre><p>We also define a function <code>inprod</code> to compute the real representation of <span>$|\psi\rangle \langle \psi|$</span> using <span>$x$</span>:</p><pre><code class="language-julia hljs">function inprod(x) 
+    i = Int(length(x)/2) 
+    a = x[1:i] 
+    b = x[i+1:end] 
+    P = [a*a&#39;+b*b&#39; -(a*b&#39;+b*a&#39;); a*b&#39;+b*a&#39; a*a&#39;+b*b&#39;] 
+    return P
+end</code></pre><h2 id="Model-Definition"><a class="docs-heading-anchor" href="#Model-Definition">Model Definition</a><a id="Model-Definition-1"></a><a class="docs-heading-anchor-permalink" href="#Model-Definition" title="Permalink"></a></h2><p>We decide to name our model <code>Spin2</code>, where <code>{4,1,3}</code> represents the 4 state vector <span>$x (|\psi\rangle)$</span>, the single input <span>$u (\phi)$</span> and the 3 parameters <code>kl, kr, kq</code>.</p><pre><code class="language-julia hljs">@kwdef struct Spin2 &lt;: PRONTO.Model{4,1,3}
+    kl::Float64 # stage cost gain
+    kr::Float64 # regulator r gain
+    kq::Float64 # regulator q gain
+end</code></pre><p>For this example, the control objective is to steer the system from the <span>$|0\rangle = [1, 0]^T$</span> state to the target state <span>$|1\rangle = [0, 1]^T$</span>. We can then define our terminal cost function <span>$m(\psi(T))$</span> as </p><p class="math-container">\[m(\psi(T)) = \frac{1}{2} \langle \psi(T)|P|\psi(T)\rangle = \frac{1}{2} \langle \psi(T)|(I-|1\rangle \langle 1|)|\psi(T)\rangle\]</p><pre><code class="language-julia hljs">function termcost(x,u,t,θ)
+    P = I(4) - inprod([0 1 0 0])
+    1/2 * collect(x&#39;)*P*x
+end</code></pre><p>We convert the the Schrödinger equation <span>$i|\dot{\psi}(t)\rangle = (\mathcal{H_0} + \phi(t)\mathcal{H_1})|\psi(t)\rangle$</span> into the system dynamics </p><p class="math-container">\[\dot{x}(t) = H(u)x = \begin{bmatrix}
+0 &amp; 0 &amp; 1 &amp; 0 \\
+0 &amp; 0 &amp; 0 &amp; -1\\
+-1 &amp; 0 &amp; 0 &amp; 0\\
+0 &amp; 1 &amp; 0 &amp; 0
+\end{bmatrix}x + u\begin{bmatrix}
+0 &amp; -1 &amp; 0 &amp; 0 \\
+1 &amp; 0 &amp; 0 &amp; 0\\
+0 &amp; 0 &amp; 0 &amp; -1\\
+0 &amp; 0 &amp; 1 &amp; 0
+\end{bmatrix}x.\]</p><pre><code class="language-julia hljs">function dynamics(x,u,t,θ)
+    H0 = [0 1;1 0]
+    H1 = [0 -im;im 0]
+    return mprod(-im*(H0 + u[1]*H1) )*x
+end</code></pre><p>For this example, we only consider the use of energy during the process, and we define our incremental cost</p><p class="math-container">\[\int_0^T l(x,u,t) dt = \int_0^T \frac{kl}{2}u^Tu \quad dt\]</p><p>as</p><pre><code class="language-julia hljs">stagecost(x,u,t,θ) = 1/2 *θ.kl*collect(u&#39;)I*u</code></pre><h3 id="Regulator"><a class="docs-heading-anchor" href="#Regulator">Regulator</a><a id="Regulator-1"></a><a class="docs-heading-anchor-permalink" href="#Regulator" title="Permalink"></a></h3><p>For this example, a Linear-Quadratic Regulator (LQR) is used and designed in this way:</p><p class="math-container">\[R_r(t) = I,\\
+Q_r(t) = I - |\psi(t)\rangle \langle \psi(t)|,\\
+P_r(T) = Q_r(T) = I - |\psi(T)\rangle \langle \psi(T)|.\]</p><pre><code class="language-julia hljs">regR(x,u,t,θ) = θ.kr*I(1)
+
+function regQ(x,u,t,θ) 
+    x_re = x[1:2] 
+    x_im = x[3:4] 
+    ψ = x_re + im*x_im 
+    θ.kq*mprod(I(2) - ψ*ψ&#39;)
+end
+
+PRONTO.Pf(α,μ,tf,θ::Spin2) = SMatrix{4,4,Float64}(I(4) - α*α&#39;)</code></pre><p>We have finished defining our model! Now it is the time to generate the functions so PRONTO can solve the optimization problem.</p><pre><code class="language-julia hljs">PRONTO.generate_model(Spin2, dynamics, stagecost, termcost, regQ, regR)</code></pre><p>All these functions below are for PRONTO&#39;s internal use to solve the problem.</p><pre><code class="nohighlight hljs">[PRONTO: generating the TwoSpin model
+    &gt; initializing symbolics...
+    &gt; tracing functions for TwoSpin...
+        &gt; generated f!(out, x, u, t, θ::TwoSpin)
+        &gt; generated Q(x, u, t, θ::TwoSpin)
+        &gt; generated R(x, u, t, θ::TwoSpin)
+        &gt; generated f(x, u, t, θ::TwoSpin)
+        &gt; generated fx(x, u, t, θ::TwoSpin)
+        &gt; generated fu(x, u, t, θ::TwoSpin)
+        &gt; generated l(x, u, t, θ::TwoSpin)
+        &gt; generated lx(x, u, t, θ::TwoSpin)
+        &gt; generated lu(x, u, t, θ::TwoSpin)
+        &gt; generated lxx(x, u, t, θ::TwoSpin)
+        &gt; generated lxu(x, u, t, θ::TwoSpin)
+        &gt; generated luu(x, u, t, θ::TwoSpin)
+        &gt; generated Lxx(λ, x, u, t, θ::TwoSpin)
+        &gt; generated Lxu(λ, x, u, t, θ::TwoSpin)
+        &gt; generated Luu(λ, x, u, t, θ::TwoSpin)
+        &gt; generated p(x, u, t, θ::TwoSpin)
+        &gt; generated px(x, u, t, θ::TwoSpin)
+        &gt; generated pxx(x, u, t, θ::TwoSpin)
+    &gt; done!</code></pre><p>For example, we take a look into <code>fu</code>, which is the first derivative of our dynamics function <code>f</code> </p><p class="math-container">\[\dot{x}=H(u)x = \begin{bmatrix}
+0 &amp; 0 &amp; 1 &amp; 0 \\
+0 &amp; 0 &amp; 0 &amp; -1\\
+-1 &amp; 0 &amp; 0 &amp; 0\\
+0 &amp; 1 &amp; 0 &amp; 0
+\end{bmatrix}x + u\begin{bmatrix}
+0 &amp; -1 &amp; 0 &amp; 0 \\
+1 &amp; 0 &amp; 0 &amp; 0\\
+0 &amp; 0 &amp; 0 &amp; -1\\
+0 &amp; 0 &amp; 1 &amp; 0
+\end{bmatrix}x\]</p><p>with respect to <code>u</code>. Mathematically, <code>fu</code> is</p><p class="math-container">\[\begin{bmatrix}
+0 &amp; -1 &amp; 0 &amp; 0 \\
+1 &amp; 0 &amp; 0 &amp; 0\\
+0 &amp; 0 &amp; 0 &amp; -1\\
+0 &amp; 0 &amp; 1 &amp; 0
+\end{bmatrix}x = \begin{bmatrix}
+                    -x_2\\
+                    x_1\\
+                    -x_4\\
+                    x_3
+                 \end{bmatrix}.\]</p><p>In PRONTO, <code>fu</code> looks like this:</p><pre><code class="language-julia hljs">function PRONTO.fu(x, u, t, θ::TwoSpin)
+    out = (MMatrix{4, 1, Float64})(undef)
+    @inbounds begin
+            out[1] = (*)(-1, (getindex)(x, 2))
+            out[2] = (getindex)(x, 1)
+            out[3] = (*)(-1, (getindex)(x, 4))
+            out[4] = (getindex)(x, 3)
+        end
+    return (SMatrix{4, 1, Float64})(out)
+end</code></pre><p>They are exactly the same! However, PRONTO.jl has generated an efficient implementation for us automatically.</p><p>We now show how to solve the problem. The initial state is the <span>$|0\rangle$</span> state <code>x_eig(1)</code>, and we will solve the system from time <code>t0=0</code> to <code>tf=10</code>.</p><pre><code class="language-julia hljs">x0 = SVector{4}(x_eig(1))
+t0,tf = τ = (0,10)</code></pre><h3 id="Parameters"><a class="docs-heading-anchor" href="#Parameters">Parameters</a><a id="Parameters-1"></a><a class="docs-heading-anchor-permalink" href="#Parameters" title="Permalink"></a></h3><pre><code class="language-julia hljs">θ = Spin2(kl=0.01, kr=1, kq=1)</code></pre><p>To initialize our solver, we set the initial guess input <span>$\mu(t) = 0.5\sin(t)$</span>, and then we obtain the intial trajectory <span>$\varphi$</span> by solving the open loop problem:</p><pre><code class="language-julia hljs">μ = @closure t-&gt;SVector{1}(0.5*sin(t))
+φ = open_loop(θ,x0,μ,τ)</code></pre><p>Finally, we are ready to solve the optimization problem! </p><pre><code class="language-julia hljs">@time ξ = pronto(θ,x0,φ,τ; tol = 1e-5, maxiters = 50, limitγ = true)</code></pre><h3 id="Results"><a class="docs-heading-anchor" href="#Results">Results</a><a id="Results-1"></a><a class="docs-heading-anchor-permalink" href="#Results" title="Permalink"></a></h3><p>If you do this right, you should get: <img src="Uopt.jpg" alt="image description"/> <img src="Xopt.jpg" alt="image description"/></p><p>The top figure is the optimal control input <span>$u(t)$</span>, while the bottom figure is the state vector <span>$x(t)$</span> evolves in time. We wish to check if we achieve our control objective, which is to steer the system from <span>$|0\rangle$</span> to <span>$|1\rangle$</span>, the evolution in time of population is shown below <img src="Popt.jpg" alt="image description"/>   </p></article><nav class="docs-footer"><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.25 on <span class="colophon-date" title="Tuesday 8 August 2023 22:20">Tuesday 8 August 2023</span>. Using Julia version 1.9.2.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

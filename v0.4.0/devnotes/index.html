@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>PRONTO Devnotes · PRONTO.jl</title><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.045/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.24/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../">PRONTO.jl</a></span></div><form class="docs-search" action="../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../">PRONTO.jl</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>PRONTO Devnotes</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>PRONTO Devnotes</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/narijauskas/PRONTO.jl/blob/main/docs/src/devnotes.md" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="PRONTO-Devnotes"><a class="docs-heading-anchor" href="#PRONTO-Devnotes">PRONTO Devnotes</a><a id="PRONTO-Devnotes-1"></a><a class="docs-heading-anchor-permalink" href="#PRONTO-Devnotes" title="Permalink"></a></h1><h2 id=".-Model-Definition"><a class="docs-heading-anchor" href="#.-Model-Definition">1. Model Definition</a><a id=".-Model-Definition-1"></a><a class="docs-heading-anchor-permalink" href="#.-Model-Definition" title="Permalink"></a></h2><p>The model requires: $ f(θ,t,x,u) $</p><pre><code class="language-julia hljs">using PRONTO
+
+@model TwoSpin begin
+    NX = 4; NU = 1; NΘ = 0
+
+    f(θ,t,x,u) = ...
+end</code></pre><p>This defines a type:</p><pre><code class="language-julia hljs">TwoSpin &lt;: PRONTO.Model{4,1,0}</code></pre><h2 id=".-Model-Derivation"><a class="docs-heading-anchor" href="#.-Model-Derivation">2. Model Derivation</a><a id=".-Model-Derivation-1"></a><a class="docs-heading-anchor-permalink" href="#.-Model-Derivation" title="Permalink"></a></h2><p>Symbolically generate functions for:</p><p class="math-container">\[
+f(θ,t,ξ)
+$
+
+defined within the pronto module as:
+
+```julia
+PRONTO.f(M,θ,t,ξ)
+PRONTO.f!(M,buf,θ,t,ξ)
+```
+
+dispatch on `M` where `M &lt;: PRONTO.Model`
+
+Macros do the heavy lifting.
+
+
+Jacobian defined as:
+
+$J_x (f) = \begin{bmatrix}
+\frac{δf_?}{δx_?} &amp; \cdots &amp; \frac{δf_?}{δx_?}\\
+\vdots &amp; \ddots &amp; \vdots\\
+\frac{δf_?}{δx_?} &amp; \cdots &amp; \frac{δf_?}{δx_?}\\
+\end{bmatrix}\]</p><p class="math-container">\[f_x = J_x(f);\ f_{xu} = J_u(J_x(f))\]</p><p class="math-container">\[f[2] = f_2\]</p><p class="math-container">\[f_x[2,1] = \frac{δf_2}{δx_1}\]</p><p class="math-container">\[f_{xu}[2,1,3] = \frac{δ\frac{δf_2}{δx_1}}{δu_3}\]</p><p class="math-container">\[\vdots\]</p><pre><code class="language-julia hljs">f[2] = f_2 # NX
+fx[2,1] = df2/dx1 # NX,NX
+fxu[2,1,3] = d(df2/dx1)/du3# NX,NX,NU</code></pre><h2 id="Hello-Jay"><a class="docs-heading-anchor" href="#Hello-Jay">Hello Jay</a><a id="Hello-Jay-1"></a><a class="docs-heading-anchor-permalink" href="#Hello-Jay" title="Permalink"></a></h2><p>Here is a model:</p><pre><code class="language-julia hljs">
+@model Split begin
+    using LinearAlgebra
+        
+    NX = 22; NU = 1; NΘ = 0
+
+    function mprod(x)
+        Re = I(2)  
+        Im = [0 -1;
+            1 0]   
+        M = kron(Re,real(x)) + kron(Im,imag(x));
+        return M   
+    end
+
+    function inprod(x)
+        a = x[1:Int(NX/2)]
+        b = x[(Int(NX/2)+1):(2*Int(NX/2))]
+        P = [a*a&#39;+b*b&#39; -(a*b&#39;+b*a&#39;);
+            a*b&#39;+b*a&#39; a*a&#39;+b*b&#39;]
+        return P
+    end
+
+    N = 5
+    n = 2*N+1
+    α = 10
+    ω = 0.5
+
+    H = zeros(n,n)
+    for i = 1:n
+        H[i,i] = 4*(i-N-1)^2
+    end
+    v = -α/4 * ones(n-1)
+
+    H0 = H + Bidiagonal(zeros(n), v, :U) + Bidiagonal(zeros(n), v, :L)
+    H1 = Bidiagonal(zeros(n), -v*1im, :U) + Bidiagonal(zeros(n), v*1im, :L)
+    H2 = Bidiagonal(zeros(n), -v, :U) + Bidiagonal(zeros(n), -v, :L)
+
+    nu = eigvecs(H0)
+
+    nu1 = nu[:,1]
+    nu2 = nu[:,2]
+
+    f(θ,t,x,u) = mprod(-1im*ω*(H0 + sin(u[1])*H1 + (1-cos(u[1]))*H2))*x
+    
+    Ql = zeros(2*n,2*n)
+    Rl = I
+    l(θ,t,x,u) = 1/2*x&#39;*Ql*x + 1/2*u&#39;*Rl*u
+    
+    Rr(θ,t,x,u) = diagm(ones(1))
+    Qr(θ,t,x,u) = diagm(ones(2*n))
+    
+    xf = [nu2;0*nu2]
+    function p(θ,t,x,u)
+        P = I(2*n) - inprod(xf)
+        1/2*x&#39;*P*x
+    end
+
+
+end
+</code></pre><h2 id=".-Intermediate-Operators"><a class="docs-heading-anchor" href="#.-Intermediate-Operators">3. Intermediate Operators</a><a id=".-Intermediate-Operators-1"></a><a class="docs-heading-anchor-permalink" href="#.-Intermediate-Operators" title="Permalink"></a></h2><p>Provide convenience for efficiently defining diffeq&#39;s later on. Eg.</p><p class="math-container">\[K_r = R_r^{-1} B_r^T P_r\]</p><pre><code class="language-julia hljs">Ar(M,θ,t,φ) = (fx!(M,buf,θ,t,φ); return buf)
+Kr(M,θ,t,φ,Pr) = Rr(...)\(Br(...)&#39;Pr(...))</code></pre><div class="admonition is-warning"><header class="admonition-header">yo</header><div class="admonition-body"><ul><li>should these be in-place?</li><li>if so, where should buffers be defined?</li><li>this behavior would almost be closer to an ode solution</li></ul></div></div><h2 id=".-DiffEQs"><a class="docs-heading-anchor" href="#.-DiffEQs">4. DiffEQs</a><a id=".-DiffEQs-1"></a><a class="docs-heading-anchor-permalink" href="#.-DiffEQs" title="Permalink"></a></h2><p class="math-container">\[\frac{dPr}{dt} = -A_r^T P_r - P_r A_r + K_r^T R_r K_r - Q_r\]</p><p>define an in-place version using the format of DifferentialEquations.jl</p><pre><code class="language-julia hljs">dPr_dt(dPr, Pr, (M,θ,φ), t)</code></pre><h2 id=".-ODE-Solutions"><a class="docs-heading-anchor" href="#.-ODE-Solutions">5. ODE Solutions</a><a id=".-ODE-Solutions-1"></a><a class="docs-heading-anchor-permalink" href="#.-ODE-Solutions" title="Permalink"></a></h2><p>uses internal buffer and is wrapped by FunctionWrappers.jl - todo: make thread-safe</p><pre><code class="language-julia hljs">Pr(t)</code></pre><h2 id=".-Trajectories"><a class="docs-heading-anchor" href="#.-Trajectories">6. Trajectories</a><a id=".-Trajectories-1"></a><a class="docs-heading-anchor-permalink" href="#.-Trajectories" title="Permalink"></a></h2><p>special ODE solutions with pretty plots :)</p><h2 id=".-Buffered-Operators"><a class="docs-heading-anchor" href="#.-Buffered-Operators">0. Buffered Operators</a><a id=".-Buffered-Operators-1"></a><a class="docs-heading-anchor-permalink" href="#.-Buffered-Operators" title="Permalink"></a></h2><p>ODE solutions, trajectories, and intermediate operators all behave the same way:</p><ul><li>apply function in-place using internal buffer (with clear thread-safety)</li><li>return a copy of the internal buffer (can use fancy types, eg. sparse arrays)</li></ul><p>With some differences:</p><ul><li>ODEs/Trajectories render as plots (why not everything?)</li><li>intermediate operators and diffeqs should both have symbolic rendering (maybe a macro facilitates this, eg. <code>@symbolic TwoSpin fx</code>)</li></ul></article><nav class="docs-footer"><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.24 on <span class="colophon-date" title="Tuesday 30 May 2023 21:53">Tuesday 30 May 2023</span>. Using Julia version 1.8.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
