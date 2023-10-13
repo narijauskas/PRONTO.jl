@@ -72,10 +72,10 @@ x0 = SVector{29}(vec([ψ3;ψ4;0*ψ3;0*ψ4;0]))
 t0,tf = τ = (0,2.8)
 
 
-θ = SplitHold(kl=0.01)
+θ = SplitHold(kl=0.001)
 μ = t->SVector{1}(1.0*sin(4*t))
 η = open_loop(θ,x0,μ,τ)
-@time ξ,data = pronto(θ,x0,η,τ;tol=1e-3,maxiters=50);
+ξ,data = pronto(θ,x0,η,τ;tol=1e-6,maxiters=50);
 
 ##
 import Pkg
@@ -84,7 +84,7 @@ Pkg.activate()
 using MAT
 
 ts = t0:0.001:tf
-us = [ξ.u(t)[1] for t in ts]
-file = matopen("split_hold_2.8T_4N.mat", "w")
+us = [ξ.x(t)[end] for t in ts]
+file = matopen("split_hold_2.8T_3N_EX.mat", "w")
 write(file, "Uopt", us)
 close(file)
