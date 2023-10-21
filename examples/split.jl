@@ -84,4 +84,4 @@ t0,tf = τ = (0,1.5)
 x0 = SVector{22}(x_eig(1))
 μ = t->SVector{1}(0.4*sin(t))
 η = open_loop(θ,x0,μ,τ)
-ξ,data = pronto(θ,x0,η,τ;tol=1e-3,maxiters=50,show_steps=true);
+ξ,data = pronto(θ,x0,η,τ;tol=1e-3,maxiters=50,show_steps=false);
