@@ -26,7 +26,7 @@ end
 function x_eig(i)
     α = 10 
     v = -α/4
-    N = 5
+    N = 4
     H0 = SymTridiagonal(promote([4.0i^2 for i in -N:N], v*ones(2N))...)
     w = eigvecs(collect(H0)) # symbolic doesn't work here
     x_eig = kron([1;0],w[:,i])
@@ -35,7 +35,7 @@ end
 
 ## ----------------------------------- define the model ----------------------------------- ##
 
-@kwdef struct Split4 <: PRONTO.Model{22,1}
+@kwdef struct Split4 <: PRONTO.Model{18,1}
     kl::Float64 # stage cost gain
     kr::Float64 # regulator r gain
     kq::Float64 # regulator q gain
@@ -44,7 +44,7 @@ end
 @define_f Split4 begin
     α = 10 
     v = -α/4
-    N = 5
+    N = 4
     H0 = SymTridiagonal(promote([4.0i^2 for i in -N:N], v*ones(2N))...)
     H1 = v*im*Tridiagonal(ones(2N), zeros(2N+1), -ones(2N))
     H2 = v*Tridiagonal(-ones(2N), zeros(2N+1), -ones(2N))
@@ -56,15 +56,15 @@ end
 end
 
 @define_m Split4 begin
-    P = I(22) - inprod(x_eig(4))
+    P = I(18) - inprod(x_eig(4))
     return 1/2*x'*P*x
 end
 
 @define_Q Split4 begin
-    x_re = x[1:11]
-    x_im = x[12:22]
+    x_re = x[1:9]
+    x_im = x[10:18]
     ψ = x_re + im*x_im
-    return kq*mprod(I(11) - ψ*ψ')
+    return kq*mprod(I(9) - ψ*ψ')
 end
 
 @define_R Split4 kr*I(1)
@@ -72,16 +72,29 @@ end
 # must be run after any changes to model definition
 resolve_model(Split4)
 
-PRONTO.Pf(θ::Split4,α,μ,tf) = SMatrix{22,22,Float64}(I(22)-inprod(α))
+PRONTO.Pf(θ::Split4,α,μ,tf) = SMatrix{18,18,Float64}(I(18)-inprod(α))
 PRONTO.γmax(θ::Split4, ζ, τ) = PRONTO.sphere(1, ζ, τ)
-PRONTO.preview(θ::Split4, ξ) = [I(11) I(11)]*(ξ.x.^2)
+PRONTO.preview(θ::Split4, ξ) = [I(9) I(9)]*(ξ.x.^2)
 
 ## ----------------------------------- solve the problem ----------------------------------- ##
 # eigenstate 1->4
 
 θ = Split4(kl=0.01, kr=1, kq=1)
-t0,tf = τ = (0,1.5)
-x0 = SVector{22}(x_eig(1))
-μ = t->SVector{1}(0.4*sin(t))
+t0,tf = τ = (0,2.0)
+# x0 = SVector{18}(x_eig(1))
+x0 = SVector{18}((x_eig(4) - x_eig(5))/sqrt(2))
+μ = t->SVector{1}(1.0*sin(t))
 η = open_loop(θ,x0,μ,τ)
 ξ,data = pronto(θ,x0,η,τ;tol=1e-3,maxiters=50,show_steps=false);
+
+## ----------------------------------- output the results ----------------------------------- ##
+import Pkg
+Pkg.activate()
+
+using MAT
+
+ts = t0:0.001:tf
+us = [ξ.u(t)[1] for t in ts]
+file = matopen("bs_4-_2T_4N.mat", "w")
+write(file, "Uopt", us)
+close(file)
