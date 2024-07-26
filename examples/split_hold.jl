@@ -49,7 +49,7 @@ end
 @define_m SplitHold begin
     ψ0 = x_eig(1)[1:9]
     ψ1 = x_eig(2)[1:9]
-    xf = vec([ψ0;ψ1;0*ψ0;0*ψ1])
+    xf = vec([-ψ1;ψ0;0*ψ0;0*ψ1])
     P = I(36)
     return 1/2 * (x-xf)'*P*(x-xf)
 end
@@ -66,9 +66,11 @@ PRONTO.Pf(θ::SplitHold, αf, μf, tf) = SMatrix{36,36,Float64}(I(36))
 
 ## ----------------------------------- solve the problem ----------------------------------- ##
 
-ψ3 = x_eig(4)[1:9]
-ψ4 = x_eig(5)[1:9]
-x0 = SVector{36}(vec([ψ3;ψ4;0*ψ3;0*ψ4]))
+ψ0 = x_eig(1)[1:9]
+ψ1 = x_eig(2)[1:9]
+# ψ3 = x_eig(4)[1:9]
+# ψ4 = x_eig(5)[1:9]
+x0 = SVector{36}(vec([ψ0;ψ1;0*ψ0;0*ψ1]))
 t0,tf = τ = (0,2.8)
 
 
@@ -85,6 +87,6 @@ using MAT
 
 ts = t0:0.001:tf
 us = [ξ.u(t)[1] for t in ts]
-file = matopen("split_hold_2.8T_4N.mat", "w")
+file = matopen("NewGate_2.8T_4N.mat", "w")
 write(file, "Uopt", us)
 close(file)
