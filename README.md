@@ -3,7 +3,7 @@
 [![](https://img.shields.io/badge/docs-dev-blue.svg)](https://narijauskas.github.io/PRONTO.jl/dev)
 
 # PRONTO.jl
-A Julia implementation of the **PR**ojection-**O**perator-Based **N**ewton’s Method for **T**rajectory **O**ptimization (PRONTO). PRONTO is a numerical method for trajectory optimization which leverages variational calculus to solve the optimal control problem directly in infinite-dimensional function space. Consider the optimal control problem:
+A Julia implementation of the **PR**ojection-**O**perator-Based **N**ewton’s Method for **T**rajectory **O**ptimization (PRONTO) developed by John Hauser and coworkers. PRONTO is a numerical method for trajectory optimization which leverages variational calculus to solve the optimal control problem directly in infinite-dimensional function space. Consider the optimal control problem:
 
 $$\min h(ξ) = p(x(T)) + \int_0^T l(x(t),u(t)) dt$$
 where $h$ is $\mathcal{C}^2$ convex function, and $ξ(t) = (x(t),u(t))$ is a trajectory restricted by the dynamics of the system, which lies on the trajectory manifold:
