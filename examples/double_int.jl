@@ -41,18 +41,3 @@ x0 = @SVector [2,0]
 η = open_loop(θ,x0,μ,τ)
 
 ξ,data = pronto(θ,x0,η,τ; tol=1e-6);
-
-## ----------------------------------- plot the results ----------------------------------- ##
-using GLMakie
-
-fig = Figure()
-ts = range(t0,tf,length=1001)
-ax1 = Axis(fig[1,1], xlabel = "time", ylabel = "position [m]")
-ax2 = Axis(fig[2,1], xlabel = "time", ylabel = "velocity [m/s]")
-ax3 = Axis(fig[3,1], xlabel = "time", ylabel = "acceleration [m/s²]")
-
-lines!(ax1, ts, [ξ.x(t)[1] for t in ts], color = :blue, linewidth = 2)
-lines!(ax2, ts, [ξ.x(t)[2] for t in ts], color = :green, linewidth = 2)
-lines!(ax3, ts, [ξ.u(t)[1] for t in ts], color = :red, linewidth = 2)
-
-display(fig)
