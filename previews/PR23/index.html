@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>PRONTO.jl · PRONTO.jl</title><script data-outdated-warner src="assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.045/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.24/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="assets/documenter.js"></script><script src="siteinfo.js"></script><script src="../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href>PRONTO.jl</a></span></div><form class="docs-search" action="search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li class="is-active"><a class="tocitem" href>PRONTO.jl</a><ul class="internal"><li><a class="tocitem" href="#Double-Integrator"><span>Double Integrator</span></a></li><li><a class="tocitem" href="#Inverted-Pendulum"><span>Inverted Pendulum</span></a></li><li><a class="tocitem" href="#Qubit:-State-to-State-Transfer"><span>Qubit: State to State Transfer</span></a></li><li><a class="tocitem" href="#Qubit:-Pauli-X-Gate"><span>Qubit: Pauli X Gate</span></a></li><li><a class="tocitem" href="#Lane-Change"><span>Lane Change</span></a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>PRONTO.jl</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>PRONTO.jl</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/narijauskas/PRONTO.jl/blob/main/docs/src/index.md" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="PRONTO.jl"><a class="docs-heading-anchor" href="#PRONTO.jl">PRONTO.jl</a><a id="PRONTO.jl-1"></a><a class="docs-heading-anchor-permalink" href="#PRONTO.jl" title="Permalink"></a></h1><p>Hello! Welcome to the julia implementation of the <strong>PR</strong>ojection-<strong>O</strong>perator-Based <strong>N</strong>ewton’s Method for <strong>T</strong>rajectory <strong>O</strong>ptimization (PRONTO). PRONTO is a Newton-based method for solving trajectory optimization problems</p><p class="math-container">\[\begin{array}{rl}
+\min&amp;\displaystyle  m(x(T)) + \int^T_0\!\!\! l(x(t),u(t),t) dt \\ 
+\mathrm{s.t.} &amp; \dot{x} = f(x,u,t), \qquad ~x(0) = x_0,
+\end{array}\]</p><p>where <span>$t\in[0,T]$</span> is the time variable, <span>$x\in\mathbb R^n$</span> and <span>$u\in\mathbb R^m$</span> are the state and input vectors, <span>$x_0\in\mathbb R^n$</span> is the initial condition, <span>$f:\mathbb R^n\!\times\!\mathbb R^m\!\times\![0,T]\to\mathbb R^n$</span> is the dynamic model, and <span>$l:\mathbb R^n\!\times\!\mathbb R^m\!\times\![0,T]\to\mathbb R$</span> and <span>$m:\mathbb R^n\to\mathbb R$</span> are the incremental and terminal costs, respectively. The key element of PRONTO is the <em>projection operator</em>, which tranforms any pair of state and input curves <span>$[\alpha(t),\mu(t)]$</span> into a trajectory <span>$[x(t),u(t)]$</span> that satisfies <span>$\dot x = f(x,u,t)$</span> and <span>$x(0)=x_0$</span>. This is achieved by solving the differential equation</p><p class="math-container">\[\begin{cases}
+\dot{x} = f(x,u,t), \qquad x(0) = x_0,\\
+u=\mu-K_r(t)(x-\alpha),
+\end{cases} \]</p><p>where <span>$K_r(t)$</span> is a time-varying feedback gain used to stabilize the trajectory <span>$[x(t),u(t)]$</span> around the state and input curves <span>$[\alpha(t),\mu(t)]$</span>. To compute <span>$K_r(t)$</span>, PRONTO.jl solves the Differential Riccati Equation</p><p class="math-container">\[\begin{cases}
+-\dot{P}_r = A_\eta(t)^\top P_r+P_rA_\eta(t)-K_r^\top R_r(t) K_r + Q_r(t), \qquad P(T) = P_T,\\
+~~K_r=R_r(t)^{-1}B_\eta(t)^\top P_r,
+\end{cases} \]</p><p>where <span>$A_\eta(t),B_\eta(t)$</span> are the Jacobians of the system dynamics, linearized around <span>$[\alpha(t),\mu(t)]$</span>. To use PRONTO, the user must provide suitable regulator matrices <span>$Q_r(t),R_r(t)$</span>. If the user does not provide a terminal condition <span>$P_T$</span>, PRONTO will generate one by solving the Algebraic Riccati Equation for the linearized system. </p><p><strong>NOTE:</strong> Since <span>$K_r(t)$</span> plays a vital role in stabilizing the solution estimates, the choice of <span>$Q_r(t),R_r(t)$</span> and <span>$P_T$</span> is crucial to the covergence of PRONTO, especially for systems with unstable dynamics.</p><h2 id="Double-Integrator"><a class="docs-heading-anchor" href="#Double-Integrator">Double Integrator</a><a id="Double-Integrator-1"></a><a class="docs-heading-anchor-permalink" href="#Double-Integrator" title="Permalink"></a></h2><p>Our first example shows how to employ PRONTO.jl in the familiar context of linear time-invariant systems. To this end, consider the well-known optimal control problem</p><p class="math-container">\[\begin{array}{rl}
+\min&amp; \displaystyle\frac{1}{2}\|x(T)\|^2_P + \frac{1}{2}\int^T_0\!\!\! \|x(t)\|^2_Q + \|u(t)\|^2_R \:dt \\[8pt]
+\mathrm{s.t.} &amp; \dot{x} = Ax + Bu, \qquad x(0) = x_0.
+\end{array}\]</p><p>Clearly, this problem can (and should) be solved using a standard Linear-Quadratic Regulator (LQR). However, this is a PRONTO.jl tutorial, so that&#39;s what we&#39;ll be using instead. We begin by loading some dependencies</p><pre><code class="language-julia hljs">using PRONTO
+using Base: @kwdef
+
+using LinearAlgebra
+using MatrixEquations
+using StaticArrays</code></pre><p>The first two packages (<code>PRONTO</code> and <code>Base: @kwdef</code>) are always required to deploy PRONTO.jl. All other packages are useful for this example, but are not strictly necessary in general.</p><p>To initialize PRONTO, we first need to define our model. Since this example features a double integrator, we name our model <code>DoubleInt</code> and specify that it has a <span>$2$</span> states and <span>$1$</span> control input. We also choose to leave the weight matrices <span>$R$</span>, <span>$Q$</span>, and <span>$P$</span>, as undefined <em>model parameters</em>.</p><pre><code class="language-julia hljs">@kwdef struct DoubleInt &lt;: Model{2,1}
+    R::Float64 
+    Q::SMatrix{2,2,Float64}
+    P::SMatrix{2,2,Float64}
+end</code></pre><p>Next, we define the dynamic model of the double integrator</p><p class="math-container">\[f(x,u,t) = \begin{bmatrix} 0 &amp; 1\\ 0 &amp; 0 \end{bmatrix}x + \begin{bmatrix} 0\\1 \end{bmatrix}u.\]</p><pre><code class="language-julia hljs">A = [0 1; 0 0]
+B = [0; 1]
+
+@define_f DoubleInt A*x + B*u[1]</code></pre><p>Here, the matrices <span>$A$</span> and <span>$B$</span> are hard-coded into the PRONTO model and cannot be changed without redefining the model from scratch. This is deemed acceptable since we&#39;re not interested in changing our system.</p><p>Next, we define the incremental and terminal cost of our model</p><p class="math-container">\[\begin{array}{rl}
+l(x,u,t) = &amp;\displaystyle\!\!\!\!\frac{1}{2}x^\top Qx + \frac{1}{2}u^\top Ru\\[8pt]
+m(x)=&amp;\displaystyle\!\!\!\!\frac{1}{2}x^\top Px
+\end{array}\]</p><pre><code class="language-julia hljs">@define_l DoubleInt 1/2*R*u[1]^2 + 1/2*x&#39;*Q*x
+@define_m DoubleInt 1/2*x&#39;*P*x</code></pre><p>Here, the matrices <span>$R$</span>, <span>$Q$</span>, and <span>$P$</span> do not need to be specified: PRONTO already knows that the user will provide them as parameters.</p><p>Finally, we need to provide the weight matrices for the projection operator. Since this example is too simple for these matrices to have a noticeable impact, we opt for the simplest choice: <span>$R_r(t)=1$</span> and <span>$Q_r(t)=I_2$</span>.</p><pre><code class="language-julia hljs">@define_Rr DoubleInt I(1)
+@define_Qr DoubleInt I(2)</code></pre><p>We are now ready to build our model!</p><pre><code class="language-julia hljs">resolve_model(DoubleInt)</code></pre><p>This command uses symbolic calculations to determine all the necessary Gradients, Jacobians, and Hessians used by PRONTO. You can track the status in the Terminal, but this step is generally very quick.</p><p>In preparation of solving the optimal control problem, it is now time to define all the model parameters that were not hard-coded into the model. For our purposes, we&#39;ll select</p><p class="math-container">\[R=0.04,\qquad \qquad Q=\begin{bmatrix} 1 &amp; 0\\0 &amp; 0 \end{bmatrix}\]</p><p>and <span>$P$</span> equal to the solution to the Algebraic Riccati Equation</p><p class="math-container">\[A^{\top}P + PA - PBR^{-1}B^{\top}P + Q = 0.\]</p><pre><code class="language-julia hljs">R = 0.04
+Q = diagm([1.0, 0.0])
+P = arec(A,B,R*I,Q)[1]</code></pre><p>The problem is ready to be solved! Given the initial condition <span>$x_0=[2,0]^{\top}$</span> and time horizon <span>$T=2$</span>, we pick a guess input <span>$\mu=0$</span> to start the solver; the tolerance <code>tol</code> is set to be <span>$10^{-6}$</span>.</p><pre><code class="language-julia hljs">θ = DoubleInt(R, Q, P) 
+τ = t0,tf = 0,2
+x0 = @SVector [2,0]
+
+μ = t-&gt;[0]
+
+η = open_loop(θ,x0,μ,τ)
+
+ξ,data = pronto(θ,x0,η,τ; tol=1e-6);</code></pre><p>We now visualize the solution using <code>GLMakie</code></p><pre><code class="language-julia hljs">using GLMakie
+
+fig = Figure()
+ts = range(t0,tf,length=1001)
+ax1 = Axis(fig[1,1], xlabel = &quot;time&quot;, ylabel = &quot;position [m]&quot;)
+ax2 = Axis(fig[2,1], xlabel = &quot;time&quot;, ylabel = &quot;velocity [m/s]&quot;)
+ax3 = Axis(fig[3,1], xlabel = &quot;time&quot;, ylabel = &quot;acceleration [m/s²]&quot;)
+
+lines!(ax1, ts, [ξ.x(t)[1] for t in ts], color = :blue, linewidth = 2)
+lines!(ax2, ts, [ξ.x(t)[2] for t in ts], color = :green, linewidth = 2)
+lines!(ax3, ts, [ξ.u(t)[1] for t in ts], color = :red, linewidth = 2)
+
+display(fig)</code></pre><p><img src="double_int.png" alt="image description"/></p><h2 id="Inverted-Pendulum"><a class="docs-heading-anchor" href="#Inverted-Pendulum">Inverted Pendulum</a><a id="Inverted-Pendulum-1"></a><a class="docs-heading-anchor-permalink" href="#Inverted-Pendulum" title="Permalink"></a></h2><p>This example showcases PRONTO&#39;s ability to:</p><ol><li>steer the system to an <strong>unstable</strong> equilibrium point, </li><li>handle <strong>non-convex</strong> cost functions,</li><li>use the <strong>desired target</strong> as an initial guess. </li></ol><p>We first load a few dependencies</p><pre><code class="language-julia hljs">using PRONTO
+using LinearAlgebra
+using StaticArrays
+using Base: @kwdef</code></pre><p>To build our OCP, we decide to name our model <code>InvPend</code>. The <code>{2,1}</code> captures the fact that we have two states, <span>$x\in\mathbb R^2$</span>, and one control input, <span>$u \in \mathbb R^1$</span>. The parameters of this model are the length of the pendulum <code>L</code>, the gravitional acceleration <code>g</code>, and the control effort penalty <code>ρ</code>. We provide nominal values for each parameter.</p><pre><code class="language-julia hljs">@kwdef struct InvPend &lt;: Model{2,1} 
+    L::Float64 = 2 
+    g::Float64 = 9.81 
+    ρ::Float64 = 1
+end</code></pre><p>Consider the dynamics of an inverted pendulum</p><p class="math-container">\[f(x,u,t)= \begin{bmatrix}x_2 \\\frac{g}{L}\sin{x_1} - \frac{u}{L}\cos{x_1}\end{bmatrix},\]</p><p>where <span>$x_1$</span> is the angular position, <span>$x_2$</span> is the angular velocity, and <span>$u$</span> is the horizontal acceleration of the fulcrum.</p><p>To steer the pendulum to the upright position, we define the terminal cost</p><p class="math-container">\[m(x) = 1-\cos(x_1)+\tfrac12x_2^2.\]</p><p>This non-convex function is zero if and only if <span>$x=[2k\pi~~0]^\top$</span>, with <span>$k\in\mathbb Z$</span>.</p><p>To limit the control effort during the transient <span>$[0,T]$</span>, we define the incremental cost</p><p class="math-container">\[l(x) = \tfrac12\rho u^2,\]</p><p>where <span>$\rho&gt;0$</span> is an additional parameter of the OCP.</p><p>Now we can define the dynamics <span>$f(x,u,t)$</span>, the incremental cost <span>$l(x,u,t)$</span>, and the terminal cost <span>$m(x)$</span>.</p><pre><code class="language-julia hljs">@define_f InvPend [ 
+    x[2], 
+    g/L*sin(x[1])-u[1]*cos(x[1])/L,
+    ]
+@define_l InvPend 1/2*ρ*u[1]^2
+@define_m InvPend 1-cos(x[1])+x[2]^2/2</code></pre><p>We must now select the LQR matrices used by the projection operator. Since the linearized system is always controllable, we limit ourselves to choosing <code>Qr</code> and <code>Rr</code>. By doing so, we allow PRONTO to automatically compute the terminal conditions <code>PT</code> by linearizing the dynamics around <span>$x(T)$</span> and solving the Algebraic Riccati Equation.</p><pre><code class="language-julia hljs">@define_Qr InvPend diagm([10, 1])
+@define_Rr InvPend diagm([1e-3])</code></pre><p>Note that, since the target equilibrium is unstable, we selected a very small input penalty <span>$R_r$</span>. This ensures that the regulator gain <span>$K_r(t)$</span> will prioritize the angular position error (which has the highest cost) when updating the solution estimate.</p><p>The last step in the problem definition is to call <code>resolve_model</code> to instantiate PRONTO. Since we&#39;re interested in seeing how the solution estimate <span>$x(t)$</span> changes from one iteration to the next, we also ask PRONTO to output an ascii plot of <code>ξ.x</code> after every iteration.</p><pre><code class="language-julia hljs">resolve_model(InvPend)
+PRONTO.preview(θ::InvPend, ξ) = ξ.x</code></pre><p>We are now ready to solve our OCP! To do so, we load the parameters <code>θ</code>, the time horizon <code>τ</code>, and the inital condition <code>x0</code>. Here, we will be using the default value of all our parameters (defined in <code>InvPend</code>). If we wanted to solve our OCP on Mars, we could instead call <code>θ = InvPend(g=3.71,ρ=10)</code>, where we&#39;ve increased the input penalty to account for the reduced gravity.</p><pre><code class="language-julia hljs">θ = InvPend() 
+τ = t0,tf = 0,10
+x0 = @SVector [2π/3;0]</code></pre><p>Next, we need to provide PRONTO with an initial guess. Since we wish to steer the pendulum to the upright position, we use the <strong>desired</strong> equilibrium as an initial guess. Therefore, our initial state and input estimates are <span>$\alpha(t)=[0~~0]^\top$</span> and <span>$u(t)=0$</span>, respectively, <span>$\forall t\in[0,T]$</span>. Note that this initial guess is not a suitable solution because <span>$\alpha(0)\neq x_0$</span>.</p><pre><code class="language-julia hljs">μ = t-&gt;[0]
+α = t-&gt;[0;0]</code></pre><p>We then call the projection operator to turn our guess <code>α</code>,<code>μ</code> into a trajectory <code>η</code>. This step ensures (among other things) that the error <code>η.x(0)-x0</code> is within machine tolerance.</p><pre><code class="language-julia hljs">η = closed_loop(θ,x0,α,x,τ)</code></pre><p>It is now time to call PRONTO and solve our OCP to a tolerance of <span>$10^{-3}$</span></p><pre><code class="language-julia hljs">ξ,data = pronto(θ,x0,η,τ; tol=1e-3);</code></pre><p>Now, we visualize the solution using <code>GLMakie</code>.</p><pre><code class="language-julia hljs">using GLMakie
+
+fig = Figure()
+ts = range(t0,tf,length=1001)
+ax1 = Axis(fig[1,1], xlabel = &quot;time [s]&quot;, ylabel = &quot;angular position [rad]&quot;)
+ax2 = Axis(fig[2,1], xlabel = &quot;time [s]&quot;, ylabel = &quot;angular velocity [rad/s]&quot;)
+ax3 = Axis(fig[3,1], xlabel = &quot;time [s]&quot;, ylabel = &quot;control input [m/s^2]&quot;)
+
+lines!(ax1, ts, [ξ.x(t)[1] for t in ts], color = :blue, linewidth = 2)
+lines!(ax2, ts, [ξ.x(t)[2] for t in ts], color = :green, linewidth = 2)
+lines!(ax3, ts, [ξ.u(t)[1] for t in ts], color = :red, linewidth = 2)
+
+display(fig)</code></pre><p><img src="inv_pend_2.png" alt="image description"/></p><h2 id="Qubit:-State-to-State-Transfer"><a class="docs-heading-anchor" href="#Qubit:-State-to-State-Transfer">Qubit: State to State Transfer</a><a id="Qubit:-State-to-State-Transfer-1"></a><a class="docs-heading-anchor-permalink" href="#Qubit:-State-to-State-Transfer" title="Permalink"></a></h2><p>We consider the Schrödinger equation</p><p class="math-container">\[i|\dot{\psi}(t)\rangle = (\mathcal{H_0} + u(t)\mathcal{H_1})|\psi(t)\rangle,\]</p><p>where <span>$\mathcal{H_0} = \sigma_z = \begin{bmatrix}0 &amp; 1 \\1 &amp; 0\end{bmatrix}$</span>, and <span>$\mathcal{H_1} = \sigma_y = \begin{bmatrix}0 &amp; -i \\i &amp; 0\end{bmatrix}$</span> are the Pauli matrices. The real control input <span>$u(t)$</span> drives the system between 2 qubit states <span>$|0\rangle$</span> and <span>$|1\rangle$</span>, which are the two eigenstates of the free Hamiltonian <span>$\mathcal{H_0}$</span>. We wish to find the optimal control input <span>$u^{\star}(t)$</span> that performs the state-to-state transfer from <span>$|0\rangle$</span> to <span>$|1\rangle$</span>. To do this, we will solve:</p><p class="math-container">\[\min m(x(T)) + \int^T_0 l(x(t),u(t),t) dt \\s.t. \quad \dot{x} = f(x,u,t), x(0) = x_0,\]</p><p>First, we load the usual dependencies:</p><pre><code class="language-julia hljs">using PRONTO
+using LinearAlgebra
+using StaticArrays
+using Base: @kwdef</code></pre><p>Note that <span>$|\psi \rangle$</span> is a <span>$2 \times 1$</span> complex vector, and we wish to have the state vector <span>$x$</span> in the real form. We can define our state vector </p><p class="math-container">\[x = \begin{bmatrix}Re(|\psi\rangle)\\Im(|\psi\rangle) \end{bmatrix},\]</p><p>which in this case is a <span>$4 \times 1$</span> vector of real numbers. Moreover, any complex square matrix <span>$\mathcal{H}$</span> can be represented in its real form:</p><p class="math-container">\[H = \begin{bmatrix}Re(\mathcal{H}) &amp; -Im(\mathcal{H}) \\Im(\mathcal{H}) &amp; Re(\mathcal{H})\end{bmatrix}.\]</p><p>We can then convert the the Schrödinger equation <span>$i|\dot{\psi}(t)\rangle = (\mathcal{H_0} + \phi(t)\mathcal{H_1})|\psi(t)\rangle$</span> into the nonlinear system </p><p class="math-container">\[\dot{x}(t) = H(u)x = \begin{bmatrix}0 &amp; 0 &amp; 1 &amp; 0 \\0 &amp; 0 &amp; 0 &amp; -1\\-1 &amp; 0 &amp; 0 &amp; 0\\0 &amp; 1 &amp; 0 &amp; 0\end{bmatrix}x + u\begin{bmatrix}0 &amp; -1 &amp; 0 &amp; 0 \\1 &amp; 0 &amp; 0 &amp; 0\\0 &amp; 0 &amp; 0 &amp; -1\\0 &amp; 0 &amp; 1 &amp; 0\end{bmatrix}x.\]</p><p>We decide to name our model <code>Qubit</code>, where <code>{4,1}</code> represents the 4 state vector <span>$x (|\psi\rangle)$</span>, and the single input <span>$u (\phi)$</span>. For this example, our parameter is <code>kl</code>, which is a scalar that penalizes the control effort.</p><pre><code class="language-julia hljs">@kwdef struct Qubit &lt;: Model{4,1}
+    kl::Float64 = 0.01
+end</code></pre><p>First, we can define our dynamics <span>$f$</span></p><pre><code class="language-julia hljs">@define_f Qubit begin
+    H0 = [0 0 1 0;0 0 0 -1;-1 0 0 0;0 1 0 0]
+    H1 = [0 -1 0 0;1 0 0 0;0 0 0 -1;0 0 1 0]
+    (H0 + u[1]*H1)*x
+end</code></pre><p>For our incremental cost <span>$l$</span>, we simpy penalize the control effort <span>$u$</span></p><pre><code class="language-julia hljs">@define_l Qubit begin
+    1/2*u&#39;*kl*u
+end</code></pre><p>For this example, the control objective is to steer the system from the initial state <span>$|0\rangle = [1, 0]^{\top}$</span> to the target state <span>$|1\rangle = [0, 1]^{\top}$</span>. We can then define our terminal cost function <span>$m$</span> as </p><p class="math-container">\[m(x(T)) = \frac{1}{2} x^\top(T)Px(T), \qquad \mathrm{with}~P=\begin{bmatrix}1 &amp; 0 &amp; 0 &amp; 0 \\0 &amp; 0 &amp; 0 &amp; 0\\0 &amp; 0 &amp; 1 &amp; 0\\0 &amp; 0 &amp; 0 &amp; 0\end{bmatrix}\]</p><p>to penilize both real and imaginal parts for <span>$|0\rangle$</span>.</p><pre><code class="language-julia hljs">@define_m Qubit begin
+    Pl = [1 0 0 0;0 0 0 0;0 0 1 0;0 0 0 0]
+    1/2*x&#39;*Pl*x
+end</code></pre><p>For this example, a Linear-Quadratic Regulator (LQR) is used. Note that, since the linearized system is <em>not</em> controllable, we need to provide a value for the terminal cost <span>$P_T$</span>:</p><p class="math-container">\[R_r(t) = I_1,\\Q_r(t) = I_4 ,\\P_r(T) = I_4.\]</p><pre><code class="language-julia hljs">@define_Qr Qubit I(4)
+@define_Rr Qubit I(1)
+PRONTO.Pf(θ::Qubit, αf, μf, tf) = SMatrix{4,4,Float64}(I(4))</code></pre><p>Last we compute the Lagrange dynamics <span>$L = l + \lambda^{\top}f$</span>.</p><pre><code class="language-julia hljs">resolve_model(Qubit)</code></pre><p>We now can solve the OCP! This time, we assume our guess input <span>$\mu(t)=0.4\sin{t}$</span> and initialize our solver by computing the open loop system <code>open_loop</code>.</p><pre><code class="language-julia hljs">θ = Qubit() # instantiate a new model
+τ = t0,tf = 0,10 # define time domain
+x0 = @SVector [1.0, 0.0, 0.0, 0.0] # initial state
+xf = @SVector [0.0, 1.0, 0.0, 0.0] # final state
+μ = t-&gt;SVector{1}(0.4*sin(t)) # open loop input μ(t)
+η = open_loop(θ, x0, μ, τ) # guess trajectory
+ξ,data = pronto(θ, x0, η, τ;tol=1e-4); # optimal trajectory</code></pre><p>We then visualize the solution using <code>GLMakie</code></p><pre><code class="language-julia hljs">using GLMakie
+
+fig = Figure()
+ts = range(t0,tf,length=1001)
+ax1 = Axis(fig[1,1], xlabel = &quot;time&quot;, ylabel = &quot;quantum state&quot;)
+ax2 = Axis(fig[2,1], xlabel = &quot;time&quot;, ylabel = &quot;population&quot;)
+ax3 = Axis(fig[3,1], xlabel = &quot;time&quot;, ylabel = &quot;control input&quot;)
+
+lines!(ax1, ts, [ξ.x(t)[1] for t in ts], linewidth = 2, label = &quot;Re(ψ1)&quot;)
+lines!(ax1, ts, [ξ.x(t)[2] for t in ts], linewidth = 2, label = &quot;Re(ψ2)&quot;)
+lines!(ax1, ts, [ξ.x(t)[3] for t in ts], linewidth = 2, label = &quot;Im(ψ1)&quot;)
+lines!(ax1, ts, [ξ.x(t)[4] for t in ts], linewidth = 2, label = &quot;Im(ψ2)&quot;)
+fig[1, 2] = Legend(fig, ax1)
+lines!(ax2, ts, [ξ.x(t)[1]^2+ξ.x(t)[3]^2 for t in ts], linewidth = 2, label = &quot;|0⟩&quot;)
+lines!(ax2, ts, [ξ.x(t)[2]^2+ξ.x(t)[4]^2 for t in ts], linewidth = 2, label = &quot;|1⟩&quot;)
+fig[2, 2] = Legend(fig, ax2)
+lines!(ax3, ts, [ξ.u(t)[1] for t in ts], linewidth = 2)
+
+
+display(fig)</code></pre><p><img src="2Spin.png" alt="image description"/></p><h2 id="Qubit:-Pauli-X-Gate"><a class="docs-heading-anchor" href="#Qubit:-Pauli-X-Gate">Qubit: Pauli X Gate</a><a id="Qubit:-Pauli-X-Gate-1"></a><a class="docs-heading-anchor-permalink" href="#Qubit:-Pauli-X-Gate" title="Permalink"></a></h2><p>We consider a 3-level fluxionium qubit, whose Hamiltonian can be written as</p><p class="math-container">\[H(u)=H_0 + uH_{\text{drive}} = \begin{bmatrix}0 &amp; 0 &amp; 0 \\0 &amp; 1.0 &amp;0\\0 &amp; 0 &amp; 5.0\end{bmatrix} + u\begin{bmatrix}0 &amp; 0.1 &amp; 0.3 \\0.1 &amp; 0 &amp; 0.5\\0.3 &amp; 0.5 &amp; 0\end{bmatrix},\]</p><p>where <span>$H_0$</span> is the free Hamiltonian, <span>$H_{\text{drive}}$</span> is the control Hamiltonian, and <span>$u(t)$</span> is the control input. We wish to find the optimal control input <span>$u^{\star}(t)$</span> that performs the X gate for this qubit, that is, <span>$u^{\star}(t)$</span> steers <span>$|0\rangle=[1,0,0]^{\top}$</span> to <span>$|1\rangle=[0,1,0]^{\top}$</span>, while simultaneously steers <span>$|1\rangle$</span> to <span>$|0\rangle$</span>. Meanwhile, we wish to aviod the undesirade state, which is the <span>$|2\rangle$</span> state of the system. The optimal control input <span>$u^{\star}$</span> can be obtained by solving the </p><p class="math-container">\[\begin{array}{rl}
+\min&amp; \displaystyle\frac{1}{2}\||\psi(T)\rangle-\psi_T\|^2 + \frac{1}{2}\int^T_0\!\!\! \text{kq}\||\psi(t)\rangle\|^2_Q + \text{kl}\|u(t)\|^2 \:dt \\[8pt]
+\mathrm{s.t.} &amp; i|\dot{\psi}\rangle = 2\pi \mathcal{H} |\psi\rangle, \qquad |\psi(0)\rangle = \begin{bmatrix} |0\rangle \\ |1\rangle \end{bmatrix},
+\end{array}\]</p><p>where <span>$|\psi\rangle = \begin{bmatrix} |\psi_1\rangle\\|\psi_2\rangle \end{bmatrix}$</span>, <span>$\mathcal{H}=I_2 \otimes H(u)$</span>, and <span>$|\psi_T\rangle = \begin{bmatrix} |1\rangle \\ |0\rangle \end{bmatrix}$</span>. kl is a scalar penilizing the control effort, kq is a scalar that penilize the undesirade population, and <span>$Q=I_2 \otimes \text{diag}(0,0,1)$</span>. However this problem is in the complex form, we need to convert the problem to its real representation.</p><p>First, we load some dependencies:</p><pre><code class="language-julia hljs">using PRONTO
+using LinearAlgebra
+using StaticArrays
+using Base: @kwdef</code></pre><p>Besides <span>$x = \begin{bmatrix}Re(|\psi\rangle)\\Im(|\psi\rangle) \end{bmatrix}$</span> that converts a complex quantum state <span>$|\psi\rangle$</span> into a real vector <span>$x$</span>, we define a helper function <code>mprod</code> converting a complex matrix to its real representation</p><p class="math-container">\[M = \begin{bmatrix}Re(\mathcal{M}) &amp; -Im(\mathcal{M}) \\Im(\mathcal{M}) &amp; Re(\mathcal{M})\end{bmatrix}.\]</p><pre><code class="language-julia hljs">function mprod(x)
+    Re = I(2)
+    Im = [0 -1;
+          1 0]
+    M = kron(Re,real(x)) + kron(Im,imag(x))
+    return M
+end</code></pre><p>We decide to name our model <code>XGate3</code>, where <code>{12,1}</code> represents the 12 states vector <span>$x$</span> (real representation of two quantum states <span>$|\psi_1\rangle$</span> and <span>$|\psi_2\rangle$</span>), and the single input <span>$u$</span>. For this example, our parameters are <code>kl</code> and <code>kq</code>.</p><pre><code class="language-julia hljs">@kwdef struct XGate3 &lt;: PRONTO.Model{12,1}
+    kl::Float64 = 0.01
+    kq::Float64 = 0.5
+end</code></pre><p>Now we can define our dynamics</p><p class="math-container">\[f = 2 \pi Hx\]</p><p>where <span>$H=\text{mprod}(-i\mathcal{H})$</span>.</p><pre><code class="language-julia hljs">@define_f XGate3 begin
+    E0 = 0.0
+    E1 = 1.0
+    E2 = 5.0
+    H0 = diagm([E0, E1, E2])
+    H00 = kron(I(2),H0)
+    a1 = 0.1
+    a2 = 0.5
+    a3 = 0.3
+    Ω1 = a1 * u[1]
+    Ω2 = a2 * u[1]
+    Ω3 = a3 * u[1]
+    H1 = [0 Ω1 Ω3; Ω1 0 Ω2; Ω3 Ω2 0]
+    H11 = kron(I(2),H1)
+    return 2 * π * mprod(-im * (H00 + H11)) * x
+end</code></pre><p>For our incremental cost, we penilize both the control effort <span>$u$</span> and undesirade state <span>$|2\rangle$</span></p><p class="math-container">\[l = \frac{\text{kl}}{2}u^{\top}u + \frac{\text{kq}}{2}x^{\top}Qx\]</p><pre><code class="language-julia hljs">@define_l XGate3 begin
+    kl/2*u&#39;*I*u + kq/2*x&#39;*mprod(diagm([0,0,1,0,0,1]))*x
+end</code></pre><p>For this example, the control objective is to steer the system from the <span>$|0\rangle = [1, 0, 0]^{\top}$</span> state to the target state <span>$|1\rangle = [0, 1, 0]^{\top}$</span>, while simultaneously steering <span>$|1\rangle$</span> to <span>$|0\rangle$</span>. We can then define our terminal cost function <span>$m$</span> as </p><p class="math-container">\[m = \frac{1}{2}(x(T)-x_T)^{\top}(x(T)-x_T),\]</p><p>where <span>$x_T = \begin{bmatrix}Re(|\psi_T\rangle)\\Im(|\psi_T\rangle) \end{bmatrix}$</span>.</p><pre><code class="language-julia hljs">@define_m XGate3 begin
+    ψ1 = [1;0;0]
+    ψ2 = [0;1;0]
+    xf = vec([ψ2;ψ1;0*ψ2;0*ψ1])
+    return 1/2*(x-xf)&#39;*I(12)*(x-xf)
+end</code></pre><p>For this example, a Linear-Quadratic Regulator (LQR) is used and designed in this way:</p><p class="math-container">\[R_r(t) = I,\\Q_r(t) = I ,\\P_r(T) = Q_r(T) = I.\]</p><pre><code class="language-julia hljs">@define_Qr XGate3 I(12)
+@define_Rr XGate3 I(1)
+PRONTO.Pf(θ::XGate3,α,μ,tf) = SMatrix{12,12,Float64}(I(12))</code></pre><p>Last we compute the Lagrange dynamics <span>$L = l + \lambda^{\top}f$</span>.</p><pre><code class="language-julia hljs">resolve_model(XGate3)</code></pre><p>We now can solve the OCP! This time, we assume our guess input <span>$\mu(t)=\frac{\pi}{T}e^{\frac{-(t-T/2)^2}{T^2}}\cos{(2\pi t)}$</span> and initialize our solver by computing the open loop system.</p><pre><code class="language-julia hljs">θ = XGate3()
+τ = t0,tf = 0,10
+ψ1 = [1;0;0]
+ψ2 = [0;1;0]
+x0 = SVector{12}(vec([ψ1;ψ2;0*ψ1;0*ψ2]))
+μ = t-&gt;SVector{1}((π/tf)*exp(-(t-tf/2)^2/(tf^2))*cos(2*π*1*t))
+η = open_loop(θ, x0, μ, τ) # guess trajectory
+ξ,data = pronto(θ, x0, η, τ;tol=1e-4); # optimal trajectory</code></pre><p>Finally, we visualize the solution using <code>GLMakie</code>. We can see from the result that the same control input steers <span>$|0\rangle$</span> to <span>$|1\rangle$</span> and <span>$|1\rangle$</span> to <span>$|0\rangle$</span>, while <span>$|2\rangle$</span> stays low during the whole process. </p><pre><code class="language-julia hljs">using GLMakie
+
+fig = Figure()
+ts = range(t0,tf,length=1001)
+ax1 = Axis(fig[1,1], xlabel = &quot;time&quot;, ylabel = &quot;control input&quot;)
+ax2 = Axis(fig[2,1], xlabel = &quot;time&quot;, ylabel = &quot;population&quot;)
+ax3 = Axis(fig[3,1], xlabel = &quot;time&quot;, ylabel = &quot;population&quot;)
+
+lines!(ax1, ts, [ξ.u(t)[1] for t in ts], linewidth = 2)
+
+lines!(ax2, ts, [ξ.x(t)[1]^2+ξ.x(t)[7]^2 for t in ts], linewidth = 2, label = &quot;|0⟩&quot;)
+lines!(ax2, ts, [ξ.x(t)[2]^2+ξ.x(t)[8]^2 for t in ts], linewidth = 2, label = &quot;|1⟩&quot;)
+lines!(ax2, ts, [ξ.x(t)[3]^2+ξ.x(t)[9]^2 for t in ts], linewidth = 2, label = &quot;|2⟩&quot;)
+axislegend(ax2, position = :rc)
+
+lines!(ax3, ts, [ξ.x(t)[4]^2+ξ.x(t)[10]^2 for t in ts], linewidth = 2, label = &quot;|0⟩&quot;)
+lines!(ax3, ts, [ξ.x(t)[5]^2+ξ.x(t)[11]^2 for t in ts], linewidth = 2, label = &quot;|1⟩&quot;)
+lines!(ax3, ts, [ξ.x(t)[6]^2+ξ.x(t)[12]^2 for t in ts], linewidth = 2, label = &quot;|2⟩&quot;)
+axislegend(ax3, position = :rc)
+
+display(fig)</code></pre><p><img src="Xgate.png" alt="image description"/></p><h2 id="Lane-Change"><a class="docs-heading-anchor" href="#Lane-Change">Lane Change</a><a id="Lane-Change-1"></a><a class="docs-heading-anchor-permalink" href="#Lane-Change" title="Permalink"></a></h2><p>Coming soon!</p></article><nav class="docs-footer"><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.25 on <span class="colophon-date" title="Thursday 19 September 2024 15:15">Thursday 19 September 2024</span>. Using Julia version 1.9.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
