@@ -27,6 +27,7 @@ UnicodePlots = "b8865327-cd53-5732-bb35-84acbb429228"
 [compat]
 Crayons = "4"
 DiffEqCallbacks = "2"
+DataInterpolations = "4"
 FastClosures = "0.3"
 FunctionWrappers = "1"
 Interpolations = "0.14"
