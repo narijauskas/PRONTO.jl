@@ -46,6 +46,10 @@ var"@terminal_cost" = var"@define_m"
 var"@regulator_Q" = var"@define_Qr"
 var"@regulator_R" = var"@define_Rr"
 
+# aliases to maintain support for v1.0.0 syntax
+var"@define_Q" = var"@define_Qr"
+var"@define_R" = var"@define_Rr"
+
 # run before using model, ensures all methods are generated
 function resolve_model(T::Type{<:Model})
     define_L(T)
