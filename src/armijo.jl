@@ -28,12 +28,6 @@ armijo_projection(θ,x0,ξ,ζ,γ,Kr,τ; kw...) = armijo_projection(θ,x0,ξ.x,ξ
 
 function armijo_projection(θ::Model{NX,NU},x0,x,u,z,v,γ,Kr,τ; resample_dt=0.001, kw...) where {NX,NU}
     t0,tf = τ
-    # ts = t0:resample_dt:tf
-    # ts = Float64[]
-    # ubuf = SVector{NU,Float64}[]
-    # ubuf = Vector{SVector{NU,Float64}}(undef, length(ts))
-    # xbuf = Vector{SVector{NX,Float64}}(undef, length(ts))
-    # i = Ref(1)
 
     sv = SavedValues(Float64, SVector{NU,Float64})
     cb = SavingCallback(sv) do x1,t,integrator
@@ -48,70 +42,13 @@ function armijo_projection(θ::Model{NX,NU},x0,x,u,z,v,γ,Kr,τ; resample_dt=0.0
     u = VecInterpolant(
         MVector{NU, Float64}(undef),
         # [AkimaInterpolation([x[i] for x in sv.saveval], sv.t) for i in 1:NU],
+        # [FritschCarlsonMonotonicInterpolation([x[i] for x in sv.saveval], sv.t) for i in 1:NU],
         [CubicSpline([x[i] for x in sv.saveval], sv.t) for i in 1:NU],
     )
 
-    # cb = DiscreteCallback((_,_,_)->true, integrator->begin
-    #     (_,x_,u_,z_,v_,γ_,Kr_) = integrator.p
-    #     t = integrator.t
-    #     α = x_(t) + γ_*z_(t)
-    #     μ = u_(t) + γ_*v_(t)
-    #     u1 = μ - Kr_(t)*(x1-α)
-    #     push!(ts, t)
-    #     push!(ubuf, SVector{NU,Float64}(u1))
-    # end)
-
-    # cb = FunctionCallingCallback(funcat = ts, func_start = false) do x1,t,integrator
-    #     (_,x_,u_,z_,v_,γ_,Kr_) = integrator.p
-    #     α = x_(t) + γ_*z_(t)
-    #     μ = u_(t) + γ_*v_(t)
-    #     u1 = μ - Kr_(t)*(x1-α)
-    #     ubuf[i[]] = SVector{NU,Float64}(u1)
-    #     xbuf[i[]] = SVector{NX,Float64}(x1)
-    #     i[] += 1
-    #     # push!(ubuf, SVector{NU,Float64}(u1))
-    #     # push!(xbuf, SVector{NX,Float64}(x1))
-    # end
-    # ODE(dxdt_armijo, x0, (t0,tf), (θ,x,u,z,v,γ,Kr); callback = cb, dense=false, kw...)
-    # x = Interpolant(scale(interpolate(xbuf, BSpline(Cubic())), ts))
-    # u = Interpolant(scale(interpolate(ubuf, BSpline(Cubic())), ts))
-
-
-    # x = Interpolant(scale(interpolate(xbuf, BSpline(Cubic())), ts))
-    # return saved_values
-    # interpolate([x[1] for x in sv.saveval], sv.t, FritschCarlsonMonotonicInterpolation())
-    
-    # x = ODE(dxdt_armijo, x0, (t0,tf), (θ,x,u,z,v,γ,Kr); callback = cb, kw...)
-    # u = DataInterpolations.CubicSpline(sv.saveval, sv.t)
-    # u = DataInterpolations.AkimaInterpolation(first.(sv.saveval), sv.t)
-
-
-
-    # u = VecInterpolant(
-    #     MVector{NU, Float64}(undef),
-    #     [interpolate(sv.t, [x[i] for x in sv.saveval], SteffenMonotonicInterpolation()) for i in 1:NU]
-    # )
-
-    # xx = ODE(dxdt_armijo, x0, (t0,tf), (θ,x,u,z,v,γ,Kr); kw...)
-    # uu = t->begin
-    #     local α = x(t) + γ*z(t)
-    #     local μ = u(t) + γ*v(t)
-    #     return SVector{NU,Float64}(μ - Kr(t)*(xx(t)-α))
-    # end
-    # return Trajectory(θ,xx,uu)
-
-    # interpolate(u_i, sv.t, FritschCarlsonMonotonicInterpolation()) for 
-    # x[i] for x in saved_values.saveval
-    # u = Interpolant(interpolate(saved_values.saveval, saved_values.t, FritschCarlsonMonotonicInterpolation()))
-    # u = Interpolant(scale(interpolate(saved_values.saveval, BSpline(Cubic())), saved_values.t))
-    # return u
     return Trajectory(θ,x,u)
 end
 
-# VecInterpolant(sv) = VecInterpolant(
-#     MVector{NU, Float64}(undef),
-#     [interpolate(sv.t, [x[i] for x in sv.saveval], FritschCarlsonMonotonicInterpolation()) for i in 1:NU]
-# )
 
 struct VecInterpolant{S,T,N,L,ITP}
     buf::MArray{S,T,N,L}
