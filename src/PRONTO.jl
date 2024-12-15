@@ -216,7 +216,8 @@ function descent(data)
             title = "log10(-Dh)",
             width = PLOT_WIDTH,
             height = 2*PLOT_HEIGHT,
-            marker = [is2ndorder(Ko) ? '⦿' : '⊝' for Ko in data.Ko[1:n]],
+            # marker = [is2ndorder(Ko) ? '⦿' : '⊝' for Ko in data.Ko[1:n]],
+            marker = [is2ndorder(Ko) ? '2' : '1' for Ko in data.Ko[1:n]],
             color = PLOT_COLORS[1],)
             # color = [is2ndorder(Ko) ? PLOT_COLORS[1] : PLOT_COLORS[6] for Ko in data.Ko[1:n]],)
 end
