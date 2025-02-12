@@ -45,6 +45,8 @@ var"@incremental_cost" = var"@define_l"
 var"@terminal_cost" = var"@define_m"
 var"@regulator_Q" = var"@define_Q"
 var"@regulator_R" = var"@define_R"
+var"@define_Qr" = var"@define_Q"
+var"@define_Rr" = var"@define_R"
 
 # run before using model, ensures all methods are generated
 function resolve_model(T::Type{<:Model})
