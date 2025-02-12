@@ -1,3 +1,4 @@
+# shaken lattice inferometer
 using PRONTO
 using LinearAlgebra
 using StaticArrays
@@ -56,7 +57,7 @@ end
 end
 
 @define_m Split2 begin
-    P = I(22) - inprod(x_eig(2))
+    P = I(22) - inprod(x_eig(4))
     return 1/2*x'*P*x
 end
 
@@ -77,11 +78,11 @@ PRONTO.γmax(θ::Split2, ζ, τ) = PRONTO.sphere(1, ζ, τ)
 PRONTO.preview(θ::Split2, ξ) = [I(11) I(11)]*(ξ.x.^2)
 
 ## ----------------------------------- solve the problem ----------------------------------- ##
-# eigenstate 1->2
+# eigenstate 1->4
 
 θ = Split2(kl=0.01, kr=1, kq=1)
 t0,tf = τ = (0,10)
 x0 = SVector{22}(x_eig(1))
 μ = t->SVector{1}(0.4*sin(t))
 η = open_loop(θ,x0,μ,τ)
-ξ,data = pronto(θ,x0,η,τ);
+ξ,data = pronto(θ,x0,η,τ; tol=1e-5); # converges at tol=1e-5
